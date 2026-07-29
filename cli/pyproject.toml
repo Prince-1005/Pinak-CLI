@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pinak-cli"
+version = "1.0.0"
+description = "A powerful, aesthetic command-line media downloader using yt-dlp"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "yt-dlp>=2025.1.1",
+    "rich>=13.0.0",
+    "prompt-toolkit>=3.0.0",
+    "win11toast",
+    "questionary",
+    "pydantic",
+    "pydantic-settings",
+    "platformdirs",
+    "typer",
+]
+
+[project.scripts]
+pinak = "pinak.cli:run_cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pinak*"]

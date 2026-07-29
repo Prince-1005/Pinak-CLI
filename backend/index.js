@@ -11,8 +11,8 @@ app.use(cors());
 app.use(express.json());
 
 // Initialize Supabase Admin Client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder';
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
 // Initialize Upstash Redis for rate limiting
@@ -22,17 +22,17 @@ const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 if (redisUrl && redisToken) {
   ratelimit = new Ratelimit({
     redis: new Redis({ url: redisUrl, token: redisToken }),
-    limiter: Ratelimit.slidingWindow(10, '1 m'), // 10 requests per minute
+    limiter: Ratelimit.slidingWindow(30, '1 m'), // 30 events per minute per IP
   });
 }
 
-// Keep-awake ping route for UptimeRobot
+// UptimeRobot keep-awake ping route
 app.get('/ping', (req, res) => {
-  res.status(200).json({ status: 'alive', message: 'Backend is active' });
+  res.status(200).json({ status: 'alive', message: 'PINAK Backend is active' });
 });
 
-// Logging route for PINAK CLI
-app.post('/api/v1/log-download', async (req, res) => {
+// Activity tracking endpoint for PINAK CLI
+app.post('/api/v1/track', async (req, res) => {
   try {
     // 1. Rate Limiting
     if (ratelimit) {
@@ -44,16 +44,33 @@ app.post('/api/v1/log-download', async (req, res) => {
     }
 
     const body = req.body;
-    const { user_name, command_executed, target_link, cli_version } = body;
+    const {
+      activity_type,
+      username,
+      device_id,
+      command,
+      url,
+      status,
+      mode,
+      duration,
+      size,
+      session_id,
+      platform,
+    } = body;
 
     // 2. Validate required fields
-    if (!user_name || !command_executed || !target_link) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: user_name, command_executed, and target_link are required.' 
+    const validActivityTypes = ['session_start', 'session_end', 'download', 'command'];
+    if (!activity_type || !validActivityTypes.includes(activity_type)) {
+      return res.status(400).json({
+        error: `Invalid or missing activity_type. Must be one of: ${validActivityTypes.join(', ')}`
       });
     }
 
-    // 3. HMAC Signature Verification
+    if (!device_id) {
+      return res.status(400).json({ error: 'Missing required field: device_id' });
+    }
+
+    // 3. HMAC Signature Verification (optional - skipped if PINAK_HMAC_SECRET not set)
     const timestamp = req.headers['x-pinak-timestamp'];
     const signature = req.headers['x-pinak-signature'];
     const secret = process.env.PINAK_HMAC_SECRET;
@@ -74,30 +91,31 @@ app.post('/api/v1/log-download', async (req, res) => {
       }
     }
 
-    // 4. IP Hashing
-    const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
-    const ipHash = crypto.createHash('sha256').update(rawIp + 'PINAK_SALT').digest('hex').substring(0, 16);
-
-    // 5. Save to Supabase
-    const { data, error } = await supabaseAdmin.from('download_command_logs').insert([
+    // 4. Save to Supabase
+    const { error: dbError } = await supabaseAdmin.from('activity_logs').insert([
       {
-        user_name,
-        command_executed,
-        target_link,
-        cli_version: cli_version || '1.0.0',
-        ip_hash: ipHash,
-        status: 'SUCCESS',
+        activity_type: activity_type,
+        username: (username || 'anonymous').substring(0, 120),
+        device_id: String(device_id).substring(0, 128),
+        command: command ? String(command).substring(0, 1024) : null,
+        url: url ? String(url).substring(0, 2048) : null,
+        status: status ? String(status).substring(0, 32) : null,
+        mode: mode ? String(mode).substring(0, 16) : null,
+        duration: Number(duration) || 0,
+        size: Number(size) || 0,
+        session_id: session_id ? String(session_id).substring(0, 64) : null,
+        platform: (platform || 'unknown').substring(0, 64),
       },
     ]);
 
-    if (error) {
-      console.error('Database Error:', error);
-      return res.status(500).json({ error: 'Failed to record log to database.' });
+    if (dbError) {
+      console.error('Database Error:', dbError);
+      return res.status(500).json({ error: 'Failed to record activity to database.' });
     }
 
     return res.status(200).json({
       success: true,
-      message: 'Download command log recorded successfully.',
+      message: `Activity "${activity_type}" recorded successfully.`,
       timestamp: new Date().toISOString(),
     });
 
