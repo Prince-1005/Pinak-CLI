@@ -35,7 +35,7 @@ from .config import config, init_config, save_config, CONFIG_FILE
 from .history import (
     init_db, get_history, get_stats_data, check_rate_limit,
     clear_all_history, delete_history_by_ids, get_history_ids_desc,
-    initialize_session, push_session_start, push_session_end, push_command_event
+    initialize_session, push_session_start, push_command_event
 )
 from .doctor import run_doctor
 from .downloader import handle_download, parse_download_text, is_downloading
@@ -616,7 +616,7 @@ def repl_loop():
 
 
             if lower_cmd in ['/exit', 'exit', 'quit']:
-                push_session_end(wait=True)  # Fire session_end event
+                push_command_event("/exit")  # Log exit as a command; session_start already marks session open
                 print_exit_screen(interrupted=False)
                 print_separator()
                 break
@@ -972,7 +972,7 @@ def repl_loop():
             if is_downloading:
                 print(f"\n{YELLOW}[!] Download in progress. Exiting now might corrupt files. Please wait...{RESET}")
             else:
-                push_session_end(wait=True)  # Fire session_end event
+                push_command_event("/exit")  # Ctrl+C exit — log as command, no redundant session_end
                 print_exit_screen(interrupted=True)
                 break
 
