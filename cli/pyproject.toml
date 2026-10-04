@@ -7,17 +7,56 @@ name = "pinak-cli"
 version = "1.0.0"
 description = "A powerful, aesthetic command-line media downloader using yt-dlp"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Pinak Team" }]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: End Users/Desktop",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Multimedia :: Video",
+  "Topic :: Utilities",
+]
+keywords = ["yt-dlp", "downloader", "cli", "video", "media", "instagram"]
+urls = { Homepage = "https://github.com/pinak-project/pinak-cli", Repository = "https://github.com/pinak-project/pinak-cli" }
 dependencies = [
     "yt-dlp>=2025.1.1",
     "rich>=13.0.0",
     "prompt-toolkit>=3.0.0",
-    "win11toast",
+    "win11toast; sys_platform == 'win32'",
     "questionary",
-    "pydantic",
-    "pydantic-settings",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
     "platformdirs",
     "typer",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pytest-mock>=3.12",
+    "hypothesis>=6.0",
+    "ruff>=0.4",
+    "black>=24.0",
+    "mypy>=1.10",
+    "bandit>=1.7",
+    "pip-audit>=2.7",
+    "cyclonedx-bom>=7.0",
+    "pre-commit>=3.0",
+]
+test = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pytest-mock>=3.12",
+    "hypothesis>=6.0",
+]
+ffmpeg = [
+    "static-ffmpeg>=2.5",
 ]
 
 [project.scripts]
@@ -26,3 +65,56 @@ pinak = "pinak.cli:run_cli"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["pinak*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q --cov=pinak --cov-report=term-missing"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["pinak"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "except ImportError:",
+    "except KeyboardInterrupt:",
+]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+extend-exclude = ["__pycache__", ".venv", "downloads"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP", "C4", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["pinak"]
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.mypy]
+python_version = "3.9"
+ignore_missing_imports = true
+warn_unused_configs = true
+show_error_codes = true
+# Strict by default: every function must be fully annotated.
+disallow_untyped_defs = true
+disallow_untyped_calls = false
+exclude = ["__pycache__", ".venv", "tests/"]
+
+# Legacy dynamic modules (REPL + download engines) stay lenient for now;
+# they are covered by tests instead. Tighten module-by-module later.
+[[tool.mypy.overrides]]
+module = ["pinak.cli", "pinak.downloader", "pinak.instagram"]
+ignore_errors = true
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]
+skips = ["B101"]
