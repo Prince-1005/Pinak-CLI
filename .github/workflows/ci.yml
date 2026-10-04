@@ -75,7 +75,7 @@ jobs:
         run: bandit -r pinak -x tests -q -ll
 
       - name: pip-audit (dependency CVEs)
-        run: pip-audit
+        run: pip-audit -r requirements-lock.txt
 
       - name: SBOM (CycloneDX)
         run: |

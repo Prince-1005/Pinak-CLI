@@ -1,0 +1,5 @@
+[allowlist]
+paths = [
+  "cli/fb_info\\.json",
+  "cli/test_fb\\.py"
+]
