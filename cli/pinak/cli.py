@@ -777,7 +777,20 @@ def main(
     updater.start_background_update_check()
     maybe_print_offline_notice()
 
-    if len(sys.argv) > 1:
+    has_args = bool(
+        url
+        or output
+        or force
+        or audio
+        or quality
+        or doctor
+        or verbose
+        or dry_run
+        or as_json
+        or log_file
+    )
+    # Testing tools like CliRunner don't mock sys.argv, so this is safer
+    if has_args or (len(sys.argv) > 1 and "pytest" not in sys.argv[0]):
         from .commands.run import run_single
 
         raise typer.Exit(
