@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import sys
+from typing import Any
 
 # ANSI Color Codes
 CYAN = "\033[96m"
@@ -123,12 +124,12 @@ def ffmpeg_available() -> bool:
     return shutil.which(os.path.basename(path)) is not None
 
 
-def human_duration(seconds: object) -> str:
+def human_duration(seconds: Any) -> str:
     try:
-        seconds = int(seconds)  # type: ignore[arg-type]
+        sec_int = int(float(str(seconds)))
     except (TypeError, ValueError):
         return "unknown"
-    mins, secs = divmod(seconds, 60)
+    mins, secs = divmod(sec_int, 60)
     hours, mins = divmod(mins, 60)
     if hours:
         return f"{hours}h {mins}m {secs}s"

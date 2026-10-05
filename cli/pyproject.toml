@@ -112,7 +112,7 @@ exclude = ["__pycache__", ".venv", "tests/"]
 # Legacy dynamic modules (REPL + download engines) stay lenient for now;
 # they are covered by tests instead. Tighten module-by-module later.
 [[tool.mypy.overrides]]
-module = ["pinak.cli", "pinak.downloader", "pinak.instagram"]
+module = ["pinak.cli", "pinak.downloader", "pinak.instagram", "pinak.commands.info"]
 ignore_errors = true
 
 [tool.bandit]

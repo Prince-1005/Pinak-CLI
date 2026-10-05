@@ -2,7 +2,6 @@ import contextlib
 import os
 import re
 import sys
-from typing import Optional
 
 # Configure UTF-8 encoding for stdout/stderr to prevent emoji rendering errors on Windows
 if hasattr(sys.stdout, "reconfigure"):
@@ -725,16 +724,16 @@ def maybe_print_offline_notice() -> bool:
 
 @app.command()
 def main(
-    url: Optional[str] = typer.Argument(None, help="The URL to download from"),
-    output: Optional[str] = typer.Option(None, "-o", "--output", help="Output directory"),
+    url: str | None = typer.Argument(None, help="The URL to download from"),
+    output: str | None = typer.Option(None, "-o", "--output", help="Output directory"),
     force: bool = typer.Option(False, "--force", help="Force download despite duplicates"),
     audio: bool = typer.Option(False, "--audio", help="Extract audio directly as MP3"),
-    quality: Optional[str] = typer.Option(
+    quality: str | None = typer.Option(
         None, "--quality", help="Quality: best, worst, audio, 360p, 720p, 1080p"
     ),
     doctor: bool = typer.Option(False, "--doctor", help="Run environment checks and exit"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose debug output"),
-    log_file: Optional[str] = typer.Option(
+    log_file: str | None = typer.Option(
         None, "--log-file", help="Write detailed logs to this file"
     ),
     dry_run: bool = typer.Option(
