@@ -1,5 +1,6 @@
 """Entry-point smoke test: real subprocess, real interpreter, no mocks."""
 
+import os
 import subprocess
 import sys
 
@@ -19,11 +20,16 @@ def test_module_entrypoint_version():
 
 
 def test_module_entrypoint_help():
+    env = os.environ.copy()
+    env["NO_COLOR"] = "1"
+    env["TERM"] = "dumb"
+    env["COLUMNS"] = "1000"
     proc = subprocess.run(
         [sys.executable, "-m", "pinak", "--help"],
         capture_output=True,
         text=True,
         timeout=120,
+        env=env,
     )
     assert proc.returncode == 0
     assert "--dry-run" in proc.stdout

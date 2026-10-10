@@ -33,6 +33,7 @@ dependencies = [
     "pydantic-settings>=2.0",
     "platformdirs",
     "typer",
+    "Pillow>=10.0.0",
 ]
 
 [project.optional-dependencies]

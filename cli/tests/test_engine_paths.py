@@ -106,6 +106,7 @@ def test_is_executable_variants(tmp_path, monkeypatch):
     assert ff_mod._is_executable("/nonexistent/zzz") is False
     binary = tmp_path / "ffmpeg"
     binary.write_bytes(b"x")
+    binary.chmod(0o755)
     assert ff_mod._is_executable(str(binary)) is True
     monkeypatch.setattr(ff_mod.shutil, "which", lambda name: "/usr/bin/ffmpeg")
     assert ff_mod._is_executable("ffmpeg") is True
@@ -121,6 +122,7 @@ def test_try_static_ffmpeg_success_with_fake_package(tmp_path, monkeypatch):
 
     fake_bin = tmp_path / "ffmpeg"
     fake_bin.write_bytes(b"x")
+    fake_bin.chmod(0o755)
     fake_mod = types.ModuleType("static_ffmpeg")
     fake_mod.add_paths = lambda: True  # noqa: E731
     monkeypatch.setitem(sys.modules, "static_ffmpeg", fake_mod)
@@ -173,5 +175,6 @@ def test_ensure_ffprobe_fetch_path(tmp_path, monkeypatch):
 def test_ensure_ffprobe_existing(tmp_path, monkeypatch):
     probe = tmp_path / "ffprobe"
     probe.write_bytes(b"x")
+    probe.chmod(0o755)
     monkeypatch.setattr(ff_mod, "get_ffprobe_path", lambda: str(probe))
     assert ff_mod.ensure_ffprobe() == str(probe)
