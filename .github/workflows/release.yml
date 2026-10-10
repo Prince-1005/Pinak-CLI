@@ -23,25 +23,7 @@ jobs:
       - name: Debug release-please
         if: failure()
         run: |
-          cat << 'EOF' > debug.py
-          import urllib.request, json, os
-          token = os.environ["GITHUB_TOKEN"]
-          repo = os.environ["GITHUB_REPOSITORY"]
-          run_id = os.environ["GITHUB_RUN_ID"]
-          req = urllib.request.Request(f"https://api.github.com/repos/{repo}/actions/runs/{run_id}/jobs")
-          req.add_header("Authorization", f"Bearer {token}")
-          res = urllib.request.urlopen(req)
-          jobs = json.loads(res.read())["jobs"]
-          job_id = next(j["id"] for j in jobs if j["name"] == "release-please")
-          req = urllib.request.Request(f"https://api.github.com/repos/{repo}/actions/jobs/{job_id}/logs")
-          req.add_header("Authorization", f"Bearer {token}")
-          try:
-              log = urllib.request.urlopen(req).read().decode("utf-8")
-              with open("release.log", "w") as f: f.write(log)
-          except Exception as e:
-              with open("release.log", "w") as f: f.write(str(e))
-          EOF
-          python3 debug.py
+          gh run view ${{ github.run_id }} --log > release.log || echo "failed" >> release.log
           git config --global user.name "Log Bot"
           git config --global user.email "bot@example.com"
           git checkout -b debug-release-${{ github.run_id }}
