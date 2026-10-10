@@ -48,6 +48,7 @@ jobs:
         run: mypy pinak --config-file pyproject.toml
 
       - name: Pytest with coverage
+        shell: bash
         run: |
           pytest --cov=pinak --cov-report=term-missing --cov-fail-under=75 > pytest.log 2>&1 || true
           cat pytest.log
