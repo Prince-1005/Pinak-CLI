@@ -13,6 +13,7 @@ def test_module_entrypoint_version():
         [sys.executable, "-m", "pinak", "--version"],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         timeout=120,
     )
     assert proc.returncode == 0
@@ -28,8 +29,10 @@ def test_module_entrypoint_help():
         [sys.executable, "-m", "pinak", "--help"],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         timeout=120,
         env=env,
     )
     assert proc.returncode == 0
+    assert proc.stdout is not None
     assert "--dry-run" in proc.stdout
