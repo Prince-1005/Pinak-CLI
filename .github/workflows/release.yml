@@ -7,13 +7,47 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: read
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+      - name: Debug release-please
+        if: failure()
+        run: |
+          cat << 'EOF' > debug.py
+          import urllib.request, json, os
+          token = os.environ["GITHUB_TOKEN"]
+          repo = os.environ["GITHUB_REPOSITORY"]
+          run_id = os.environ["GITHUB_RUN_ID"]
+          req = urllib.request.Request(f"https://api.github.com/repos/{repo}/actions/runs/{run_id}/jobs")
+          req.add_header("Authorization", f"Bearer {token}")
+          res = urllib.request.urlopen(req)
+          jobs = json.loads(res.read())["jobs"]
+          job_id = next(j["id"] for j in jobs if j["name"] == "release-please")
+          req = urllib.request.Request(f"https://api.github.com/repos/{repo}/actions/jobs/{job_id}/logs")
+          req.add_header("Authorization", f"Bearer {token}")
+          try:
+              log = urllib.request.urlopen(req).read().decode("utf-8")
+              with open("release.log", "w") as f: f.write(log)
+          except Exception as e:
+              with open("release.log", "w") as f: f.write(str(e))
+          EOF
+          python3 debug.py
+          git config --global user.name "Log Bot"
+          git config --global user.email "bot@example.com"
+          git checkout -b debug-release-${{ github.run_id }}
+          git add release.log
+          git commit -m "Upload release log"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git push origin HEAD || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
