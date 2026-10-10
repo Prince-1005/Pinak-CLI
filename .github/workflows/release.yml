@@ -20,16 +20,3 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-      - name: Debug release-please
-        if: failure()
-        run: |
-          gh run view ${{ github.run_id }} --log > release.log || echo "failed" >> release.log
-          git config --global user.name "Log Bot"
-          git config --global user.email "bot@example.com"
-          git checkout -b debug-release-${{ github.run_id }}
-          git add release.log
-          git commit -m "Upload release log"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-          git push origin HEAD || true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

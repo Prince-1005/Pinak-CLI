@@ -50,17 +50,7 @@ jobs:
       - name: Pytest with coverage
         shell: bash
         run: |
-          pytest --cov=pinak --cov-report=term-missing --cov-fail-under=75 > pytest.log 2>&1 || true
-          cat pytest.log
-          git config --global user.name "Log Bot"
-          git config --global user.email "bot@example.com"
-          git checkout -b debug-logs-${{ github.run_id }}-${{ matrix.os }}-${{ matrix.python }}
-          git add pytest.log
-          git commit -m "Upload log"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-          git push origin HEAD || true
-          if grep -q "failed" pytest.log; then exit 1; fi
-          if grep -q "FAIL REQUIRED" pytest.log; then exit 1; fi
+          pytest --cov=pinak --cov-report=term-missing --cov-fail-under=75
   security:
     name: security audit
     runs-on: ubuntu-latest
