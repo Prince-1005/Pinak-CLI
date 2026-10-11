@@ -13,13 +13,18 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: googleapis/release-please-action@v4
+      - id: release-token
+        run: echo "has_token=${{ secrets.RELEASE_PLEASE_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+      - if: steps.release-token.outputs.has_token != 'true'
+        run: echo "::notice::Skipping release-please because RELEASE_PLEASE_TOKEN is not configured."
+      - if: steps.release-token.outputs.has_token == 'true'
+        uses: actions/checkout@v4
+      - if: steps.release-token.outputs.has_token == 'true'
+        uses: googleapis/release-please-action@v4
         id: release
         with:
-          # Prefer a fine-grained PAT/App token so release-please can open PRs
-          # even when "Allow GitHub Actions to create and approve pull requests"
-          # is disabled for GITHUB_TOKEN in repository settings.
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          # Use a PAT/App token because GITHUB_TOKEN may be blocked from PR creation
+          # by repository settings ("Allow GitHub Actions to create and approve pull requests").
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
