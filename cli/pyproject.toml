@@ -34,6 +34,7 @@ dependencies = [
     "platformdirs",
     "typer",
     "Pillow>=10.0.0",
+    "mutagen>=1.47",
 ]
 
 [project.optional-dependencies]

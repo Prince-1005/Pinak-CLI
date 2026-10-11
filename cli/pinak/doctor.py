@@ -153,14 +153,9 @@ def run_doctor(verbose: bool = False) -> bool:
     checks.append(("Config file valid", config_detail, config_ok, config_hint))
 
     try:
-        from .utils import _connect_timeout  # type: ignore[attr-defined]
-
-        timeout = float(_connect_timeout())
+        timeout = float(config.get("connect_timeout", 10))
     except Exception:
-        try:
-            timeout = float(config.get("connect_timeout", 10))
-        except Exception:
-            timeout = 10.0
+        timeout = 10.0
     try:
         # Fixed HTTPS connectivity probe — no user-controlled scheme. nosec B310
         urllib.request.urlopen("https://www.google.com", timeout=timeout).close()  # nosec B310

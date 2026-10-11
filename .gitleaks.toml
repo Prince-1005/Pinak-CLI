@@ -1,5 +1,2 @@
-[allowlist]
-paths = [
-  "cli/fb_info\\.json",
-  "cli/test_fb\\.py"
-]
+# Gitleaks configuration for Pinak CLI
+# No allowlist overrides required — scan all files.

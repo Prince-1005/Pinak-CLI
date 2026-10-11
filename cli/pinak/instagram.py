@@ -462,11 +462,11 @@ def _download_entry(
                 ) as progress:
                     _progress = progress
                     _task_id = progress.add_task("[cyan]Starting video download...", total=None)
-                    ydl.process_video_result(resolved, download=True)
+                    ydl.process_ie_result(resolved, download=True)
                     _progress = None
                     _task_id = None
             else:
-                ydl.process_video_result(resolved, download=True)
+                ydl.process_ie_result(resolved, download=True)
             _say(
                 f"{GREEN}[+] Slide {index} downloaded successfully.{RESET}",
                 locked=use_lock,

@@ -105,8 +105,6 @@ def print_help() -> None:
 
 
 def show_config() -> None:
-    import os
-
     from rich import box
 
     from ..config import CONFIG_FILE
