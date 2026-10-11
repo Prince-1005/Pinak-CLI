@@ -225,7 +225,6 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 "/batch",
                 "/delete_his",
                 "/instagram",
-                "/facebook",
             ]:
                 default_cmd = f"{cmd} "
                 continue

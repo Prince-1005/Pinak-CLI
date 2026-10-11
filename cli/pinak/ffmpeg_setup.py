@@ -31,23 +31,30 @@ def _is_executable(path: str) -> bool:
     return shutil.which(path) is not None or shutil.which(os.path.basename(path)) is not None
 
 
+_last_static_ffmpeg_id: int | None = None
+
+
 def _try_static_ffmpeg() -> bool:
     """Fetch static builds via the optional ``static-ffmpeg`` package.
 
     Returns True if an ffmpeg binary became available afterwards.
     """
+    global _last_static_ffmpeg_id
     try:
         import static_ffmpeg  # type: ignore
     except ImportError:
         log.debug("static-ffmpeg not installed; skipping auto-fetch")
         return False
-    try:
-        # Downloads version-pinned static builds into the user cache on
-        # first call, then prepends them to PATH for this process.
-        static_ffmpeg.add_paths()  # type: ignore[attr-defined]
-    except Exception as exc:
-        log.debug("static-ffmpeg fetch failed: %r", exc)
-        return False
+    current_id = id(static_ffmpeg)
+    if _last_static_ffmpeg_id != current_id:
+        try:
+            # Downloads version-pinned static builds into the user cache on
+            # first call, then prepends them to PATH for this process.
+            static_ffmpeg.add_paths()  # type: ignore[attr-defined]
+            _last_static_ffmpeg_id = current_id
+        except Exception as exc:
+            log.debug("static-ffmpeg fetch failed: %r", exc)
+            return False
     available = _is_executable(shutil.which("ffmpeg") or "") or _is_executable(get_ffmpeg_path())
     log.debug("static-ffmpeg fetch result: available=%s", available)
     return available

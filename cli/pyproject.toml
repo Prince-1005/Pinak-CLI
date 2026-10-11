@@ -70,7 +70,7 @@ include = ["pinak*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra -q --cov=pinak --cov-report=term-missing"
+addopts = "-ra -q"
 filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.coverage.run]

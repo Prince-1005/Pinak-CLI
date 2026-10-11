@@ -1,0 +1,11 @@
+# Set default behavior to automatically normalize text files to LF
+* text=auto eol=lf
+
+# Explicit binary files
+*.zip binary
+*.exe binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.db binary

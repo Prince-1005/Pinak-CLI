@@ -451,6 +451,9 @@ def _download_entry(
         # FIX #2: wrap video download in a rich progress bar (sequential mode only)
         _say(f"[*] Slide {index} contains video content. Downloading...", locked=use_lock)
         try:
+            process_fn = getattr(ydl, "process_video_result", None) or getattr(
+                ydl, "process_ie_result", None
+            )
             if show_progress:
                 with Progress(
                     SpinnerColumn(),
@@ -462,11 +465,17 @@ def _download_entry(
                 ) as progress:
                     _progress = progress
                     _task_id = progress.add_task("[cyan]Starting video download...", total=None)
-                    ydl.process_ie_result(resolved, download=True)
+                    if process_fn:
+                        process_fn(resolved, download=True)
+                    else:
+                        ydl.download([resolved.get("webpage_url") or resolved.get("url")])
                     _progress = None
                     _task_id = None
             else:
-                ydl.process_ie_result(resolved, download=True)
+                if process_fn:
+                    process_fn(resolved, download=True)
+                else:
+                    ydl.download([resolved.get("webpage_url") or resolved.get("url")])
             _say(
                 f"{GREEN}[+] Slide {index} downloaded successfully.{RESET}",
                 locked=use_lock,

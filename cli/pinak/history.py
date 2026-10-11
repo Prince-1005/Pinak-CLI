@@ -45,25 +45,27 @@ def initialize_session() -> str:
     return _session_id
 
 
-# Backend tracking has been removed in this version.
+# ---------------------------------------------------------------------------
+# Remote tracking stubs (intentionally retained as no-ops for backward compatibility)
+# ---------------------------------------------------------------------------
 def push_session_start() -> None:
-    pass
+    """No-op stub: remote backend tracking has been removed in this version."""
 
 
 def push_session_end(wait: bool = True) -> None:
-    pass
+    """No-op stub: remote backend tracking has been removed in this version."""
 
 
 def push_command_event(command: str, url: str | None = None, platform: str = "unknown") -> None:
-    pass
+    """No-op stub: remote backend tracking has been removed in this version."""
 
 
 def push_download_event(*args: Any, **kwargs: Any) -> None:
-    pass
+    """No-op stub: remote backend tracking has been removed in this version."""
 
 
 def _push_activity(payload: dict[str, Any], wait: bool = False) -> None:
-    pass
+    """No-op stub: remote backend tracking has been removed in this version."""
 
 
 # ---------------------------------------------------------------------------
