@@ -78,6 +78,22 @@ def test_single_info_download_entry(tmp_path, monkeypatch):
     assert seen == ["solo"]
 
 
+def test_single_info_download_entry_ie_result_fallback(tmp_path, monkeypatch):
+    """Non-playlist info can use process_ie_result when process_video_result is absent."""
+    seen = []
+
+    class _YDL:
+        def process_ie_result(self, entry, download=True):
+            seen.append(entry["id"])
+
+    monkeypatch.setattr(ig_mod, "embed_metadata_in_video", lambda p, m: None)
+    outdir = tmp_path / "out"
+    outdir.mkdir()
+    entry = {"id": "ie_only", "formats": [{"url": "http://x/v", "vcodec": "h264"}]}
+    ig_mod._download_extracted_info(_YDL(), entry, outdir, "", {})
+    assert seen == ["ie_only"]
+
+
 def test_print_download_summary_variants(tmp_path, capsys):
     f1 = tmp_path / "clip.mp4"
     f1.write_bytes(b"x" * 100)

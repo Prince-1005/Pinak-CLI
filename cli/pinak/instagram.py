@@ -451,9 +451,12 @@ def _download_entry(
         # FIX #2: wrap video download in a rich progress bar (sequential mode only)
         _say(f"[*] Slide {index} contains video content. Downloading...", locked=use_lock)
         try:
-            process_fn = getattr(ydl, "process_video_result", None) or getattr(
-                ydl, "process_ie_result", None
-            )
+            process_fn = None
+            for fn_name in ("process_video_result", "process_ie_result"):
+                candidate = getattr(ydl, fn_name, None)
+                if callable(candidate):
+                    process_fn = candidate
+                    break
             if show_progress:
                 with Progress(
                     SpinnerColumn(),
