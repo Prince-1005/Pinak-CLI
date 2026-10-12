@@ -157,17 +157,12 @@ Pinak CLI is strictly local-first and privacy-focused. All configuration, downlo
 
 ---
 
-## ⚖️ Legal disclaimer
+## ⚖️ Educational Purpose & Legal Disclaimer
 
-Pinak CLI is a general-purpose downloading tool. You are solely responsible
-for how you use it:
+Pinak CLI is developed as an **educational project, technical study of CLI architecture, and personal-archiving tool** wrapper around `yt-dlp` and `ffmpeg`. You are solely responsible for how you use it:
 
-- Only download content you own, that is freely licensed, or that you have
-  explicit permission to save.
-- Downloading copyrighted material without authorization may violate
-  copyright law in your country.
-- Automated downloading may violate the Terms of Service of platforms such
-  as YouTube or Instagram; your account could be restricted by those
-  platforms. Use at your own risk.
-- The authors provide this software "as is" (MIT License) and accept no
-  liability for misuse.
+- **Personal Archival Only:** Only download content you own, that is freely licensed (e.g., Creative Commons), or that you have explicit permission to save.
+- **Terms of Service:** Automated downloading may violate the Terms of Service of platforms such as YouTube, Instagram, or TikTok; your account or IP could be restricted by those platforms. Use at your own risk.
+- **Be Excellent to Creators:** Do not use this tool to pirate, redistribute, or monetize copyrighted material without authorization. Always support and respect creators.
+- **No DRM Circumvention:** Pinak CLI does not bypass or defeat Digital Rights Management (DRM) or access restrictions.
+- **Limitation of Liability:** The authors provide this software "as is" under the [MIT License](LICENSE) and accept no liability for misuse.
