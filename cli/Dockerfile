@@ -11,7 +11,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY pyproject.toml README.md ./
+COPY pyproject.toml CLI_README.md ./
 COPY pinak ./pinak
 COPY pinak_cli.py ./
 

@@ -140,12 +140,11 @@ Inside the interactive shell:
 D:\pinak Z\
 ├── README.md                          # Root README (this file)
 ├── PINAK_EXCELLENCE_DOCUMENTATION.md  # Comprehensive technical guide
-├── PINAK_FOLDER_ANALYSIS_REPORT.md    # Detailed codebase analysis
 ├── .gitignore                         # Git exclusions
 ├── .github/                           # CI/CD workflows
 │   └── workflows/ci.yml               # Multi-OS automated test & security pipeline
 └── cli/                               # CLI application
-    ├── README.md                      # CLI-specific documentation
+    ├── CLI_README.md                  # CLI-specific documentation
     ├── pyproject.toml                 # Packaging & dependencies
     ├── pinak_cli.py                   # Entry wrapper script
     ├── Dockerfile                     # Container image definition
@@ -247,8 +246,7 @@ See [Excellence Documentation](PINAK_EXCELLENCE_DOCUMENTATION.md#11-configuratio
 ## Documentation
 
 - **[PINAK_EXCELLENCE_DOCUMENTATION.md](PINAK_EXCELLENCE_DOCUMENTATION.md)** – Complete technical guide: architecture, features, config, testing, roadmap, troubleshooting.
-- **[PINAK_FOLDER_ANALYSIS_REPORT.md](PINAK_FOLDER_ANALYSIS_REPORT.md)** – In-depth folder/codebase analysis with strengths & recommendations.
-- **[cli/README.md](cli/README.md)** – CLI-specific documentation.
+- **[cli/CLI_README.md](cli/CLI_README.md)** – CLI-specific documentation.
 
 ## Roadmap
 

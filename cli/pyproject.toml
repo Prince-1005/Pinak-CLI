@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "pinak-cli"
 version = "1.0.0"
 description = "A powerful, aesthetic command-line media downloader using yt-dlp"
-readme = "README.md"
+readme = "CLI_README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [{ name = "Pinak Team" }]
