@@ -61,6 +61,7 @@ def test_record_download_respects_history_disabled(monkeypatch, isolated_history
 def test_session_helpers():
     sid = history_mod.initialize_session()
     assert isinstance(sid, str) and len(sid) > 0
+    assert history_mod.get_current_session_id() == sid
     # Telemetry stubs are intentional no-ops.
     history_mod.push_session_start()
     history_mod.push_session_end()

@@ -590,12 +590,12 @@ def _has_video_formats(info):
 
 
 # ---------------------------------------------------------------------------
-# FIX #9: sort thumbnails by actual pixel area (width × height)
+# FIX #9: sort thumbnails by actual pixel area (width x height)
 # ---------------------------------------------------------------------------
 def _best_thumbnail_url(entry):
     """
     Returns the URL of the highest-resolution thumbnail available,
-    sorted by width × height descending.
+    sorted by width x height descending.
     """
     thumbnails = entry.get("thumbnails") or []
 
@@ -641,7 +641,19 @@ def _download_binary_with_retry(url, output_file, headers=None):
         timeout = float(config.get("read_timeout", 30))
     except (TypeError, ValueError):
         timeout = 30.0
-    request = Request(url, headers=headers or {"User-Agent": "Mozilla/5.0"})
+    default_headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Sec-Fetch-Dest": "image",
+        "Sec-Fetch-Mode": "no-cors",
+        "Sec-Fetch-Site": "cross-site",
+    }
+    request_headers = {**default_headers, **(headers or {})}
+    request = Request(url, headers=request_headers)
 
     last_exc = None
     for attempt in range(1, max_attempts + 1):

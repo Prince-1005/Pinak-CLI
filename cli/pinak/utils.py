@@ -240,19 +240,6 @@ def has_embedded_subtitle(file_path: str) -> bool:
     return False
 
 
-def get_clipboard_text() -> str:
-    try:
-        import tkinter as tk
-
-        root = tk.Tk()
-        root.withdraw()
-        text = root.clipboard_get()
-        root.destroy()
-        return text.strip()
-    except Exception:
-        return ""
-
-
 def is_online(timeout: float = 5.0) -> bool:
     """Check internet connectivity with a configurable timeout (seconds)."""
     import urllib.request
@@ -265,11 +252,17 @@ def is_online(timeout: float = 5.0) -> bool:
             connect_timeout = float(_config.get("connect_timeout", timeout))
         except Exception:
             pass
-        probe = urllib.request.Request("https://www.google.com", headers={"User-Agent": "PinakCLI"})
-        # Fixed first-party HTTPS probe — no user-controlled scheme. nosec B310
-        with urllib.request.urlopen(probe, timeout=connect_timeout):  # nosec B310
-            pass
-        return True
+
+        # Try Google first, fall back to Cloudflare DNS endpoint
+        for host in ("https://www.google.com", "https://1.1.1.1"):
+            try:
+                probe = urllib.request.Request(host, headers={"User-Agent": "PinakCLI"})
+                # Fixed first-party HTTPS probe — no user-controlled scheme. nosec B310
+                with urllib.request.urlopen(probe, timeout=connect_timeout):  # nosec B310
+                    return True
+            except Exception:
+                continue
+        return False
     except Exception:
         return False
 

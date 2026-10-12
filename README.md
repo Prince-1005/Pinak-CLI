@@ -1,8 +1,8 @@
 # Pinak Z
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![CLI](https://img.shields.io/badge/CLI-Python%20Click-orange.svg)](cli/pyproject.toml)
+[![CLI](https://img.shields.io/badge/CLI-Python%20Typer-orange.svg)](cli/pyproject.toml)
 [![FFmpeg](https://img.shields.io/badge/Powered%20by-FFmpeg-red.svg)](https://ffmpeg.org/)
 
 > A fast, reliable, and privacy-focused media downloader CLI for direct URLs and Instagram content.
@@ -16,7 +16,7 @@ Pinak Z is a cross-platform Python CLI tool that makes downloading media simple 
 - 🎯 Rich terminal UX with progress bars & tables
 - 🔒 Privacy-first – all data stays local
 - ⚡ Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp) for broad URL support
-- 🎬 Bundled FFmpeg for seamless post-processing
+- 🎬 Seamless media processing via FFmpeg
 - 🩺 Built-in `doctor` for environment diagnostics
 
 ## Table of Contents
@@ -61,7 +61,7 @@ Pinak Z is a cross-platform Python CLI tool that makes downloading media simple 
 ## Quick Start
 
 ### Prerequisites
-- Python 3.8 or higher
+- Python 3.10 or higher
 - pip (or uv/pipx)
 
 ### Installation (from source)
@@ -88,150 +88,116 @@ python -m pinak --version
 ### Run Diagnostics
 
 ```bash
-pinak doctor
+pinak --doctor
 ```
 
-### Basic Usage
+### Direct CLI Usage
 
 ```bash
 # Download from URL
-pinak download "https://example.com/video.mp4"
+pinak "https://example.com/video.mp4"
 
-# Download Instagram reel
-pinak instagram "https://www.instagram.com/reel/REEL_ID/"
+# Extract audio directly as MP3
+pinak "https://youtu.be/VIDEO_ID" --audio
 
-# View history
-pinak history
+# Specify custom output and quality
+pinak "https://example.com/video.mp4" -o "downloads" --quality 1080p
 
-# Check config
-pinak config --show
-
-# Get help
-pinak --help
+# Dry-run inspection
+pinak "https://example.com/video.mp4" --dry-run
 ```
+
+### Interactive REPL Mode
+
+Launch the interactive prompt with auto-completion and rich features by running `pinak` with no arguments:
+
+```bash
+pinak
+```
+
+Inside the interactive shell:
+- `/doctor` – Validate environment, tools, and connectivity
+- `/history` – Browse or filter download history
+- `/stats` – View download analytics and statistics
+- `/config` – View active configuration
+- `/audio <URL>` – Download and extract audio as MP3
+- `/video <URL>` – Download video
+- `/instagram <URL>` – Download Instagram media
+- `/update` – Update yt-dlp and Pinak CLI
+- `/ffmpeg` – Download static FFmpeg build automatically
+- `/help` – Show all available slash commands
+- `/exit` – Exit interactive prompt
 
 ## Project Structure
 
 ```
 D:\pinak Z\
 ├── README.md                          # Root README (this file)
-├── PINAK_EXCELLENCE_DOCUMENTATION.md  # Comprehensive excellence guide
-├── PINAK_FOLDER_ANALYSIS_REPORT.md    # Detailed folder analysis
-├── PINAK_ANDROID_APP_EXCELLENCE_GUIDE.md # Android app guide
+├── PINAK_EXCELLENCE_DOCUMENTATION.md  # Comprehensive technical guide
+├── PINAK_FOLDER_ANALYSIS_REPORT.md    # Detailed codebase analysis
 ├── .gitignore                         # Git exclusions
-├── cli/                               # CLI application
-│   ├── README.md                      # CLI-specific docs
-│   ├── pyproject.toml                 # Packaging & dependencies
-│   ├── pinak_cli.py                   # Entry wrapper
-│   ├── ffmpeg.exe                     # Bundled FFmpeg (Windows)
-│   ├── ffprobe.exe                    # Bundled FFprobe (Windows)
-│   └── pinak/                         # Core package
-│       ├── cli.py                     # CLI interface
-│       ├── downloader.py              # Download engine
-│       ├── instagram.py               # Instagram handler
-│       ├── config.py                  # Config management
-│       ├── history.py                 # History tracking
-│       ├── doctor.py                  # Diagnostics
-│       ├── updater.py                 # Update checker
-│       ├── utils.py                   # Utilities
-│       ├── __init__.py                # Package init
-│       ├── __main__.py                # Module entry
-│       └── __pycache__/               # Compiled files
-└── downloads/                         # Default downloads folder
+├── .github/                           # CI/CD workflows
+│   └── workflows/ci.yml               # Multi-OS automated test & security pipeline
+└── cli/                               # CLI application
+    ├── README.md                      # CLI-specific documentation
+    ├── pyproject.toml                 # Packaging & dependencies
+    ├── pinak_cli.py                   # Entry wrapper script
+    ├── Dockerfile                     # Container image definition
+    ├── .dockerignore                  # Docker build ignore rules
+    ├── requirements-lock.txt          # Pinned lockfile for dependencies
+    ├── tests/                         # Pytest test suite (170+ tests)
+    └── pinak/                         # Core Python package
+        ├── __init__.py                # Package init & version
+        ├── __main__.py                # Module entry point
+        ├── cli.py                     # Typer CLI & interactive REPL shell
+        ├── commands/                  # REPL command handlers & UI panels
+        ├── downloader.py              # Download engine (yt-dlp wrapper)
+        ├── config.py                  # Pydantic Settings configuration
+        ├── history.py                 # SQLite download history & tracking
+        ├── doctor.py                  # Environment diagnostics
+        ├── ffmpeg_setup.py            # Static FFmpeg installer utility
+        ├── notify.py                  # Notifications & terminal banners
+        ├── updater.py                 # PyPI update checker
+        └── utils.py                   # Formatting & validation utilities
 ```
 
 ## CLI Usage
 
-### Download Command
+### Direct Command Syntax
 
 ```bash
-pinak download <URL> [OPTIONS]
+pinak [URL] [OPTIONS]
 ```
 
-| Option | Description | Default |
-|---|---|---|
-| `--output`, `-o` | Output directory | `downloads/` |
-| `--quality`, `-q` | Quality (best/worst/1080p/etc.) | `best` |
-| `--format`, `-f` | Output format (mp4/mp3/webm) | `mp4` |
-| `--no-merge` | Don't merge audio+video | `false` |
+| Option | Short | Description | Default |
+|---|---|---|---|
+| `--output` | `-o` | Output directory | `downloads/` |
+| `--audio` | | Extract audio directly as MP3 | `False` |
+| `--quality` | | Quality preset (`best`, `worst`, `720p`, `1080p`) | Config default |
+| `--force` | | Force download even if URL exists in history | `False` |
+| `--doctor` | | Run environment and dependency checks | `False` |
+| `--dry-run` | | Simulate extraction without downloading | `False` |
+| `--json` | | Output JSON metadata (pairs with `--dry-run`) | `False` |
+| `--verbose` | `-v` | Enable verbose debug output | `False` |
+| `--log-file` | | Save detailed logs to specified file | None |
+| `--version` | `-V` | Show version and exit | |
+| `--install-ffmpeg` | | Automatically download a static FFmpeg binary | |
+| `--config-path` | | Print absolute path to configuration file | |
 
 **Examples:**
 ```bash
-pinak download "https://youtu.be/VIDEO_ID" --quality 720p
-pinak download "https://example.com/video" --format mp4 --output "C:\Downloads"
+# Download best video
+pinak "https://youtu.be/VIDEO_ID"
+
+# Download 720p to custom folder
+pinak "https://example.com/video" --quality 720p -o "D:/Media"
+
+# Extract audio as MP3
+pinak "https://youtu.be/AUDIO_ID" --audio
+
+# Run diagnostic check
+pinak --doctor
 ```
-
-### Instagram Command
-
-```bash
-pinak instagram <URL> [OPTIONS]
-```
-
-| Option | Description | Default |
-|---|---|---|
-| `--output`, `-o` | Output directory | `downloads/` |
-| `--quality`, `-q` | Preferred quality | `best` |
-
-**Examples:**
-```bash
-pinak instagram "https://www.instagram.com/p/ABC123/"
-pinak instagram "https://www.instagram.com/reel/XYZ789/"
-pinak instagram "https://www.instagram.com/stories/username/"
-```
-
-### History Command
-
-```bash
-pinak history [OPTIONS]
-```
-
-| Option | Description |
-|---|---|
-| `--limit`, `-l` | Show last N entries (default: 10) |
-| `--all`, `-a` | Show all history entries |
-
-```bash
-pinak history --limit 5
-pinak history --all
-```
-
-### Config Command
-
-```bash
-pinak config [OPTIONS]
-```
-
-| Option | Description |
-|---|---|
-| `--show` | Display current configuration |
-| `--set KEY=VALUE` | Set a config value |
-
-```bash
-pinak config --show
-pinak config --set output_dir="D:/MyDownloads"
-pinak config --set default_quality="720p"
-```
-
-### Doctor Command
-
-```bash
-pinak doctor [OPTIONS]
-```
-
-Runs comprehensive environment checks.
-
-```bash
-pinak doctor
-pinak doctor --verbose
-```
-
-### Update Command
-
-```bash
-pinak update
-```
-
-Checks for newer versions.
 
 ## Configuration
 
@@ -261,8 +227,8 @@ See [Excellence Documentation](PINAK_EXCELLENCE_DOCUMENTATION.md#11-configuratio
 
 | Category | Technology | Purpose |
 |---|---|---|
-| **Language** | Python 3.8+ | Core implementation |
-| **CLI Framework** | [Click](https://click.palletsprojects.com/) | Command-line interface |
+| **Language** | Python 3.10+ | Core implementation |
+| **CLI Framework** | [Typer](https://typer.tiangolo.com/) | Command-line interface & argument parsing |
 | **Download Engine** | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | Media extraction/download |
 | **Media Processing** | [FFmpeg](https://ffmpeg.org/) | Merging, conversion, processing |
 | **Terminal UI** | [Rich](https://github.com/Textualize/rich), [tqdm](https://github.com/tqdm/tqdm) | Beautiful output & progress |
@@ -277,17 +243,16 @@ See [Excellence Documentation](PINAK_EXCELLENCE_DOCUMENTATION.md#11-configuratio
 - **[PINAK_EXCELLENCE_DOCUMENTATION.md](PINAK_EXCELLENCE_DOCUMENTATION.md)** – Complete technical guide: architecture, features, config, testing, roadmap, troubleshooting.
 - **[PINAK_FOLDER_ANALYSIS_REPORT.md](PINAK_FOLDER_ANALYSIS_REPORT.md)** – In-depth folder/codebase analysis with strengths & recommendations.
 - **[cli/README.md](cli/README.md)** – CLI-specific documentation.
-- **[PINAK_ANDROID_APP_EXCELLENCE_GUIDE.md](PINAK_ANDROID_APP_EXCELLENCE_GUIDE.md)** – Android app implementation excellence guide.
 
 ## Roadmap
 
-- [ ] Add comprehensive pytest test suite
-- [ ] Integrate ruff, black, mypy, pre-commit
-- [ ] GitHub Actions CI/CD pipeline
+- [x] Add comprehensive pytest test suite (170+ tests covering unit, e2e, security)
+- [x] Integrate ruff, black, mypy, pre-commit
+- [x] GitHub Actions CI/CD pipeline (cross-platform matrix + security audit)
+- [x] Cross-platform FFmpeg auto-detection & static downloader
+- [x] Docker support
 - [ ] Resume support for partial downloads
-- [ ] Cross-platform FFmpeg auto-detection
 - [ ] MkDocs documentation site
-- [ ] Docker support
 - [ ] Batch download queue
 
 ## Contributing

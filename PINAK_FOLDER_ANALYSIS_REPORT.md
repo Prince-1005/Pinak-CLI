@@ -26,26 +26,32 @@ Pinak Z enables users to download media from supported sources with features inc
 ```
 D:\pinak Z\
 ├── README.md                           # Root project README
-├── PINAK_ANDROID_APP_EXCELLENCE_GUIDE.md  # Android app excellence guide
+├── PINAK_EXCELLENCE_DOCUMENTATION.md   # Comprehensive technical excellence guide
+├── PINAK_FOLDER_ANALYSIS_REPORT.md     # Folder analysis report
 ├── .gitignore                          # Git ignore rules
+├── .github/                            # CI/CD workflows
+│   └── workflows/ci.yml                # Multi-OS CI & security audit
 ├── cli/                                # CLI application
 │   ├── README.md                       # CLI-specific documentation
 │   ├── pyproject.toml                  # Project metadata & dependencies
 │   ├── pinak_cli.py                    # CLI entry wrapper
-│   ├── ffmpeg.exe                      # Bundled FFmpeg (Windows)
-│   ├── ffprobe.exe                     # Bundled FFprobe (Windows)
+│   ├── Dockerfile                      # Container image definition
+│   ├── .dockerignore                   # Docker build exclusions
+│   ├── requirements-lock.txt           # Lockfile for reproducible builds
+│   ├── tests/                          # Automated test suite
 │   └── pinak/                          # Core Python package
 │       ├── __init__.py                 # Package init, version
 │       ├── __main__.py                 # Module entry point
-│       ├── cli.py                      # Main CLI interface
+│       ├── cli.py                      # Main CLI interface & REPL
+│       ├── commands/                   # REPL subcommands & UI panels
 │       ├── config.py                   # Configuration management
 │       ├── downloader.py               # Core download engine
 │       ├── doctor.py                   # Environment diagnostics
+│       ├── ffmpeg_setup.py             # Static FFmpeg installer
 │       ├── history.py                  # Download history tracking
-│       ├── instagram.py                # Instagram handler
+│       ├── notify.py                   # Desktop notifications
 │       ├── updater.py                  # Update checker
-│       ├── utils.py                    # Utility functions
-│       └── __pycache__/                # Compiled Python files
+│       └── utils.py                    # Utility functions
 └── downloads/                          # Default download directory
 ```
 
@@ -54,9 +60,9 @@ D:\pinak Z\
 ### Root Level
 | File | Status | Notes |
 |---|---|---|
-| `README.md` | Minimal | Basic project intro; needs expansion with usage, structure, and setup. |
-| `PINAK_ANDROID_APP_EXCELLENCE_GUIDE.md` | Comprehensive | Detailed Android implementation guide with architecture, UI/UX, best practices. |
-| `.gitignore` | Good | Covers Python artifacts, venvs, IDE files, OS files, logs, configs. |
+| `README.md` | Complete | Clear project overview, badges, quickstart, CLI options, and REPL docs. |
+| `PINAK_EXCELLENCE_DOCUMENTATION.md` | Comprehensive | Complete technical guide covering architecture, UX, security, and tests. |
+| `.gitignore` | Production-Grade | Covers Python artifacts, venvs, IDE files, OS files, and caches. |
 
 ### CLI Core (`cli/pinak/`)
 | Module | Purpose | Analysis |

@@ -28,7 +28,7 @@ def notify(title: str, message: str) -> None:
     if _toast is not None:  # pragma: no cover - requires Windows + dependency
 
         def _show() -> None:
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(BaseException):
                 _toast(title, message, duration="short")
 
         threading.Thread(target=_show, daemon=True).start()

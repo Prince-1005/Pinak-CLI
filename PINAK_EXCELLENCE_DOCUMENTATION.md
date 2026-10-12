@@ -79,7 +79,7 @@ Pinak Z helps users download media content efficiently with support for multiple
 ```text
 ┌─────────────────────────────────────────────────────────────┐
 │                        CLI Layer                             │
-│  cli.py (Click + Rich) - Commands, Options, UX               │
+│  cli.py (Typer + Rich) - Commands, Options, REPL UX          │
 └──────────────────────────────┬────────────────────────────────┘
                                │
                                ▼
@@ -137,26 +137,30 @@ pinak-z/
 ├── README.md
 ├── PINAK_EXCELLENCE_DOCUMENTATION.md
 ├── PINAK_FOLDER_ANALYSIS_REPORT.md
-├── PINAK_ANDROID_APP_EXCELLENCE_GUIDE.md
 ├── .gitignore
+├── .github/
+│   └── workflows/ci.yml
 ├── cli/
 │   ├── README.md
 │   ├── pyproject.toml
 │   ├── pinak_cli.py
-│   ├── ffmpeg.exe
-│   ├── ffprobe.exe
+│   ├── Dockerfile
+│   ├── .dockerignore
+│   ├── requirements-lock.txt
+│   ├── tests/
 │   └── pinak/
 │       ├── __init__.py
 │       ├── __main__.py
 │       ├── cli.py
+│       ├── commands/
 │       ├── config.py
 │       ├── downloader.py
 │       ├── doctor.py
+│       ├── ffmpeg_setup.py
 │       ├── history.py
-│       ├── instagram.py
+│       ├── notify.py
 │       ├── updater.py
-│       ├── utils.py
-│       └── __pycache__/
+│       └── utils.py
 └── downloads/
 ```
 
@@ -177,17 +181,16 @@ pinak-z/
 | `requests` | Latest | HTTP requests for updates/network checks |
 | `tqdm` | Latest | Progress bars |
 | `rich` | Latest | Rich terminal output, tables, colors |
-| `click` | Latest | CLI framework |
-| `pyyaml` | Latest | YAML config support (if used) |
-| `pydantic` | Latest | Data validation (config/history models) |
-| `appdirs` | Latest | Cross-platform user data/config dirs |
+| `typer` | Latest | CLI framework & argument parsing |
+| `pydantic-settings` | Latest | Configuration management & validation |
+| `platformdirs` | Latest | Cross-platform user data/config dirs |
 | `packaging` | Latest | Version parsing/comparison |
 
 ### Build & Runtime
-- **Language:** Python 3.8+
+- **Language:** Python 3.10+
 - **Build Backend:** setuptools
-- **Entry Point:** `pinak = pinak.cli:main`
-- **FFmpeg:** Bundled (ffmpeg.exe, ffprobe.exe) for Windows
+- **Entry Point:** `pinak = pinak.cli:run_cli`
+- **FFmpeg:** System PATH or auto-installed via `pinak --install-ffmpeg`
 
 ## 8. Features
 
@@ -231,7 +234,7 @@ pinak-z/
 ## 9. Installation
 
 ### Prerequisites
-- Python 3.8 or higher
+- Python 3.10 or higher
 - pip/uv/pipx (recommended)
 
 ### From Source (Current Directory)
@@ -276,27 +279,36 @@ This validates Python, FFmpeg, dependencies, network, disk space.
 
 ### Basic Syntax
 ```bash
-pinak [GLOBAL_OPTIONS] COMMAND [COMMAND_OPTIONS] [ARGS]
+pinak [URL] [OPTIONS]
 ```
 
-### Global Options
-| Option | Description |
-|---|---|
-| `--verbose` / `-v` | Increase verbosity |
-| `--quiet` / `-q` | Suppress non-essential output |
-| `--config PATH` | Use custom config file |
-| `--help` | Show help |
+### Direct CLI Flags
+| Option | Short | Description | Default |
+|---|---|---|---|
+| `--output` | `-o` | Output directory | `downloads/` |
+| `--audio` | | Extract audio directly as MP3 | `False` |
+| `--quality` | | Quality preset (`best`, `worst`, `720p`, `1080p`) | Config default |
+| `--force` | | Force download even if URL exists in history | `False` |
+| `--doctor` | | Run environment and dependency checks | `False` |
+| `--dry-run` | | Simulate extraction without downloading | `False` |
+| `--json` | | Output JSON metadata (pairs with `--dry-run`) | `False` |
+| `--verbose` | `-v` | Enable verbose debug output | `False` |
+| `--log-file` | | Save detailed logs to specified file | None |
+| `--version` | `-V` | Show version and exit | |
+| `--install-ffmpeg` | | Automatically download a static FFmpeg binary | |
+| `--config-path` | | Print absolute path to configuration file | |
 
-### Commands Overview
-
-| Command | Purpose | Example |
-|---|---|---|
-| `download` / `d` | Download from URL | `pinak download <URL>` |
-| `instagram` / `ig` | Download Instagram content | `pinak instagram <URL>` |
-| `history` | View download history | `pinak history --limit 10` |
-| `config` | Manage configuration | `pinak config --show` |
-| `doctor` | Run diagnostics | `pinak doctor` |
-| `update` | Check for updates | `pinak update` |
+### Interactive REPL Mode
+Running `pinak` without arguments launches an interactive shell with auto-completion:
+- `/doctor` – Health check
+- `/history` – Search and inspect history
+- `/stats` – View download stats
+- `/audio <URL>` – Download as MP3
+- `/video <URL>` – Download video
+- `/instagram <URL>` – Download Instagram content
+- `/batch <file>` – Download batch list of URLs
+- `/update` – Update tools to latest versions
+- `/exit` – Exit interactive prompt
 
 ### Examples
 
@@ -581,29 +593,21 @@ Check CLI output with `--verbose`. Future: add `--log-file` for persistent logs.
 
 ## 18. Roadmap
 
-### Short-Term (0–3 months)
-- [ ] Add pytest test suite (unit + integration)
-- [ ] Add ruff + black + mypy + pre-commit
-- [ ] GitHub Actions CI (lint, typecheck, test, build)
-- [ ] Improve error messages with suggestions
-- [ ] Add `--log-file` option
+### Completed Milestones
+- [x] Comprehensive pytest test suite (170+ unit, integration, and security tests)
+- [x] Integrate ruff + black + mypy linting and type checking
+- [x] Multi-OS GitHub Actions CI (Ubuntu, Windows, macOS on Python 3.10–3.12)
+- [x] Security audit CI job (bandit static analysis + pip-audit dependency scanner)
+- [x] Automated CycloneDX SBOM generation
+- [x] Docker support with pre-installed FFmpeg
+- [x] Cross-platform static FFmpeg auto-installer (`pinak --install-ffmpeg`)
+- [x] Persistent `--log-file` logging option
 
-### Mid-Term (3–6 months)
+### Future Roadmap
 - [ ] Resume support for partial downloads
-- [ ] Progress persistence/recovery
-- [ ] Config validation with Pydantic models
-- [ ] Cross-platform FFmpeg auto-detection
-- [ ] Enhanced Instagram session handling docs
-- [ ] `pip-audit` + `bandit` in CI
-
-### Long-Term (6–12 months)
 - [ ] MkDocs documentation site
-- [ ] Docker image (`Dockerfile`)
-- [ ] Download queue/batch support
-- [ ] Parallel downloads for multi-item posts
+- [ ] Download queue/batch progress enhancement
 - [ ] Plugin system for custom sources
-- [ ] SBOM generation
-- [ ] Release automation (semantic release)
 
 ### Quality Goals
 - **Test Coverage:** >= 80% on core modules
@@ -665,19 +669,19 @@ See Section 5 for layered architecture and data flow.
 ### C. Command Reference Quick Card
 ```bash
 pinak --help
-pinak download --help
-pinak instagram --help
-pinak history --help
-pinak config --help
-pinak doctor --help
-pinak update --help
+pinak "<URL>"
+pinak "<URL>" --audio
+pinak "<URL>" --quality 1080p
+pinak --doctor
+pinak --install-ffmpeg
+pinak --config-path
 ```
 
 ### D. Environment Checklist
-Run `pinak doctor` to validate:
-- [ ] Python 3.8+ installed
+Run `pinak --doctor` to validate:
+- [ ] Python 3.10+ installed
 - [ ] All dependencies installed
-- [ ] FFmpeg/ffprobe available (bundled or system)
+- [ ] FFmpeg/ffprobe available (system or static build)
 - [ ] Network connectivity
 - [ ] Disk space sufficient
 - [ ] Output directory writable
@@ -693,11 +697,11 @@ Current: `1.0.0`
 
 ### F. Acknowledgements
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) – Powerful download engine
-- [Click](https://click.palletsprojects.com/) – CLI framework
+- [Typer](https://typer.tiangolo.com/) – CLI framework
 - [Rich](https://github.com/Textualize/rich) – Beautiful terminal output
 - [tqdm](https://github.com/tqdm/tqdm) – Progress bars
 - [FFmpeg](https://ffmpeg.org/) – Media processing
-- [appdirs](https://github.com/ActiveState/appdirs) – Cross-platform dirs
+- [platformdirs](https://github.com/tox-dev/platformdirs) – Cross-platform dirs
 - [Pydantic](https://docs.pydantic.dev/) – Data validation
 
 ---

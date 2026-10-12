@@ -156,16 +156,21 @@ def run_doctor(verbose: bool = False) -> bool:
         timeout = float(config.get("connect_timeout", 10))
     except Exception:
         timeout = 10.0
-    try:
-        # Fixed HTTPS connectivity probe — no user-controlled scheme. nosec B310
-        urllib.request.urlopen("https://www.google.com", timeout=timeout).close()  # nosec B310
-        internet_ok = True
-    except Exception:
-        internet_ok = False
+    internet_ok = False
+    connected_host = ""
+    for host in ("https://www.google.com", "https://1.1.1.1"):
+        try:
+            # Fixed HTTPS connectivity probe — no user-controlled scheme. nosec B310
+            urllib.request.urlopen(host, timeout=timeout).close()  # nosec B310
+            internet_ok = True
+            connected_host = host.split("//")[-1]
+            break
+        except Exception:
+            continue
     checks.append(
         (
             "Internet Connection",
-            "www.google.com accessible" if internet_ok else "unreachable",
+            f"{connected_host} accessible" if internet_ok else "unreachable",
             internet_ok,
             "" if internet_ok else "Check network/VPN/firewall, then retry.",
         )

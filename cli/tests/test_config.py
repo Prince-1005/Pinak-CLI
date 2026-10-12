@@ -3,7 +3,8 @@
 import pytest
 from pydantic import ValidationError
 
-from pinak.config import PinakSettings, _migrate_legacy_keys
+from pinak.config import PinakSettings, _migrate_legacy_keys, validate_settings
+from pinak.exceptions import ConfigError
 
 
 def test_defaults_are_sane():
@@ -61,3 +62,16 @@ def test_duplicate_action_validator():
 def test_migrate_legacy_keys():
     migrated = _migrate_legacy_keys({"retries": 5, "timeout": 60, "bogus": 1})
     assert migrated == {"retry_count": 5, "read_timeout": 60}
+
+
+def test_validate_settings_success():
+    settings = validate_settings({"quality": "720p", "retries": 4})
+    assert settings.quality == "720p"
+    assert settings.retry_count == 4
+
+
+def test_validate_settings_raises_config_error():
+    with pytest.raises(ConfigError) as exc_info:
+        validate_settings({"quality": "invalid_quality_mode"})
+    assert "Invalid configuration" in str(exc_info.value)
+    assert exc_info.value.hint != ""

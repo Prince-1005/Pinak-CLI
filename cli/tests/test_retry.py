@@ -1,6 +1,6 @@
 """Unit tests for pinak.retry — backoff math & retry behaviour."""
 
-from pinak.retry import backoff_delay, is_retryable, retry_with_backoff
+from pinak.retry import backoff_delay, is_retryable, retry_with_backoff, sleep_with_interrupt
 
 
 def test_backoff_delay_grows_exponentially():
@@ -68,3 +68,16 @@ def test_retry_with_backoff_does_not_retry_permanent(monkeypatch):
     except ValueError:
         pass
     assert calls["n"] == 1
+
+
+def test_sleep_with_interrupt_normal(monkeypatch):
+    monkeypatch.setattr("pinak.retry.time.sleep", lambda s: None)
+    assert sleep_with_interrupt(0.1) is True
+
+
+def test_sleep_with_interrupt_interrupted(monkeypatch):
+    def fake_sleep(_s):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("pinak.retry.time.sleep", fake_sleep)
+    assert sleep_with_interrupt(0.1) is False

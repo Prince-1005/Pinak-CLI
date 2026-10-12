@@ -19,11 +19,14 @@ build/
 .pinak_history.json
 .pinak_history.db
 .pinak_cli_history
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
 
-PINAK_ANDROID_APP_EXCELLENCE_GUIDE.md
-
-# --- Server runtime artifact ---
-pinak_pending_events.json
+# --- Local environment variables ---
+.env
 
 # --- OS / Editor ---
 .DS_Store
@@ -32,12 +35,6 @@ Thumbs.db
 *.swo
 .vscode/
 .idea/
-
-# Next.js
-node_modules/
-.next/
-.env.local
-.env
 
 # --- Testing ---
 .coverage

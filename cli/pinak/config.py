@@ -9,6 +9,8 @@ import platformdirs
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .exceptions import ConfigError
+
 APP_NAME = "pinak-cli"
 APP_AUTHOR = "pinak"
 
@@ -54,10 +56,6 @@ class PinakSettings(BaseSettings):
     username: str = Field(default="", description="User's preferred name")
     greeting: str = Field(default="Har Har Mahadev", description="Greeting message")
     last_update_check: float = Field(default=0.0, description="Timestamp of the last update check")
-    device_id: str = Field(
-        default_factory=lambda: __import__("uuid").uuid4().hex,
-        description="Unique device identifier",
-    )
 
     model_config = SettingsConfigDict(
         env_prefix="PINAK_",
@@ -165,19 +163,30 @@ def init_config() -> dict[str, Any]:
     return config
 
 
+def validate_settings(config_data: dict[str, Any]) -> PinakSettings:
+    """Validate a settings dictionary against PinakSettings schema, raising ConfigError on failure."""
+    try:
+        clean = _migrate_legacy_keys(config_data)
+        return PinakSettings(**clean)
+    except Exception as exc:
+        raise ConfigError(f"Invalid configuration: {exc}") from exc
+
+
 def save_config(config_data: dict[str, Any] | None = None) -> bool:
     global config
     if config_data is not None:
         config.update(config_data)
 
     try:
-        # Validate data before saving
-        clean = _migrate_legacy_keys(config)
-        valid_settings = PinakSettings(**clean)
+        valid_settings = validate_settings(config)
         config.update(valid_settings.model_dump())
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             f.write(valid_settings.model_dump_json(indent=4))
         return True
+    except ConfigError as ce:
+        print(f"\033[91m[X] Could not write {CONFIG_FILE}: {ce}\033[0m")
+        print(f"\033[93m[!] Tip: {ce.hint}\033[0m")
+        return False
     except Exception as e:
         print(f"\033[91m[X] Could not write {CONFIG_FILE}: {e}\033[0m")
         print(

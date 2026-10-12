@@ -1,0 +1,30 @@
+# Bytecode and runtime caches
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Testing and coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+tests/
+
+# Linters and type checkers
+.mypy_cache/
+.ruff_cache/
+
+# Git metadata
+.git/
+.gitignore
+
+# Package build artifacts and local outputs
+dist/
+build/
+*.egg-info/
+downloads/

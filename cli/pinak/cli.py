@@ -45,8 +45,6 @@ from .history import (
     get_history_ids_desc,
     init_db,
     initialize_session,
-    push_command_event,
-    push_session_start,
 )
 from .logging_setup import setup_logging
 from .notify import print_offline_notice
@@ -182,8 +180,6 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
     has_shown_update = False
     has_shown_pinak_update = False
     updater.start_background_update_check()
-    initialize_session()  # Generate a fresh session ID for telemetry tracking
-    push_session_start()  # Fire session_start event to backend
 
     while True:
         try:
@@ -230,15 +226,11 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 continue
 
             if lower_cmd in ["/exit", "exit", "quit"]:
-                push_command_event(
-                    "/exit"
-                )  # Log exit as a command; session_start already marks session open
                 print_exit_screen(interrupted=False)
                 print_separator()
                 break
 
             if lower_cmd == "/ffmpeg":
-                push_command_event("/ffmpeg")
                 from .ffmpeg_setup import ensure_ffmpeg, install_ffmpeg_extra
 
                 existing = ensure_ffmpeg()
@@ -260,7 +252,6 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 continue
 
             if lower_cmd == "/update":
-                push_command_event("/update")
                 console.print("[cyan]🔄 Updating the downloader engine and Pinak itself...[/]")
                 try:
                     with console.status("[cyan]Downloading and installing...[/]", spinner="dots"):
@@ -282,7 +273,6 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 continue
 
             if lower_cmd == "/delete_his" or lower_cmd.startswith("/delete_his "):
-                push_command_event(cmd)
                 arg = cmd[11:].strip()
                 if not arg:
                     console.print(
@@ -358,38 +348,31 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 continue
 
             if lower_cmd in ("/", "/help"):
-                push_command_event("/help")
                 print_help()
                 continue
 
             if lower_cmd == "/doctor" or lower_cmd.startswith("/doctor "):
-                push_command_event("/doctor")
                 _doc_verbose = "--verbose" in lower_cmd or " -v" in lower_cmd
                 run_doctor(verbose=_doc_verbose)
                 continue
 
             if lower_cmd == "/config":
-                push_command_event("/config")
                 show_config()
                 continue
 
             if lower_cmd == "/stats":
-                push_command_event("/stats")
                 show_stats()
                 continue
 
             if lower_cmd == "/open":
-                push_command_event("/open")
                 open_output_folder()
                 continue
 
             if lower_cmd.startswith("/history"):
-                push_command_event("/history")
                 show_history_rendered(cmd[8:].strip())
                 continue
 
             if lower_cmd == "/username" or lower_cmd.startswith("/username "):
-                push_command_event("/username")
                 new_username = cmd[9:].strip()
                 if not new_username:
                     try:
@@ -413,7 +396,6 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 or lower_cmd == "/gretting"
                 or lower_cmd.startswith("/gretting ")
             ):
-                push_command_event("/greeting")
                 # Determine prefix length based on the actual command typed
                 if lower_cmd.startswith("/greeting"):
                     arg_start = len("/greeting")
@@ -437,7 +419,6 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 continue
 
             if lower_cmd == "/video_quality" or lower_cmd.startswith("/video_quality "):
-                push_command_event(cmd)
                 arg = cmd[14:].strip()
                 if not arg:
                     options = ["best", "1080p", "720p", "480p", "360p", "worst"]
@@ -470,7 +451,6 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                     continue
 
             if lower_cmd == "/audio_quality" or lower_cmd.startswith("/audio_quality "):
-                push_command_event(cmd)
                 arg = cmd[14:].strip()
                 if not arg:
                     options = ["320", "256", "192", "128", "96"]
@@ -502,7 +482,6 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                     continue
 
             if lower_cmd == "/video_format" or lower_cmd.startswith("/video_format "):
-                push_command_event(cmd)
                 arg = cmd[14:].strip()
                 if not arg:
                     options = ["mp4", "mkv", "webm", "flv", "avi"]
@@ -534,7 +513,6 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                     continue
 
             if lower_cmd == "/audio_format" or lower_cmd.startswith("/audio_format "):
-                push_command_event(cmd)
                 arg = cmd[14:].strip()
                 if not arg:
                     options = ["mp3", "m4a", "wav", "flac", "opus"]
@@ -565,7 +543,6 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                         )
                     continue
             if lower_cmd == "/subs":
-                push_command_event("/subs")
                 config["embed_subs"] = not config.get("embed_subs", False)
                 save_config()
                 state = "enabled" if config["embed_subs"] else "disabled"
@@ -573,7 +550,6 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 continue
 
             if lower_cmd == "/sort":
-                push_command_event("/sort")
                 config["auto_sort"] = not config.get("auto_sort", False)
                 save_config()
                 state = "enabled" if config["auto_sort"] else "disabled"
@@ -601,7 +577,6 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 continue
 
             if lower_cmd.startswith("/setout "):
-                push_command_event(cmd)
                 new_dir = cmd[8:].strip()
                 if new_dir:
                     config["output_dir"] = new_dir
@@ -612,13 +587,11 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 continue
 
             if lower_cmd.startswith("/platform"):
-                push_command_event(cmd)
                 search_term = cmd[9:].strip()
                 show_platforms(search_term)
                 continue
 
             if lower_cmd.startswith("/batch "):
-                push_command_event("/batch")
                 filename = cmd[7:].strip()
                 if not os.path.exists(filename):
                     print(f"{RED}[!] Error: Batch file '{filename}' not found.{RESET}")
@@ -670,9 +643,6 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                     f"\n{YELLOW}[!] Download in progress. Exiting now might corrupt files. Please wait...{RESET}"
                 )
             else:
-                push_command_event(
-                    "/exit"
-                )  # Ctrl+C exit — log as command, no redundant session_end
                 print_exit_screen(interrupted=True)
                 break
 
@@ -766,12 +736,12 @@ def main(
 ):
     init_config()
     init_db()
+    initialize_session()
     # Persist CLI-level logging prefs so retries/errors also land in the file.
     if log_file:
         config["log_file"] = log_file
         save_config()
     setup_logging(verbose=verbose, log_file=log_file or config.get("log_file") or None)
-    initialize_session()  # Generate session ID for telemetry even in single-command mode
     updater.start_background_update_check()
     maybe_print_offline_notice()
 

@@ -1,7 +1,6 @@
 import contextlib
 import datetime
 import os
-import time
 
 import yt_dlp
 from rich.console import Console
@@ -30,7 +29,7 @@ from .history import record_download, url_downloaded_successfully
 from .instagram import download_instagram_media
 from .logging_setup import get_logger
 from .notify import notify, print_instagram_notice
-from .retry import backoff_delay, is_retryable
+from .retry import backoff_delay, is_retryable, sleep_with_interrupt
 from .utils import (
     GREEN,
     RED,
@@ -269,7 +268,7 @@ def print_download_summary(result):
     # Rate limits have been removed as per user request.
 
 
-def download_instagram_content(
+def download_media_content(
     post_url,
     target_dir,
     extract_audio=False,
@@ -277,6 +276,7 @@ def download_instagram_content(
     filename_suffix="",
     trim_range=None,
 ):
+    """Download media from any supported platform using yt-dlp."""
     global is_downloading
 
     import urllib.parse
@@ -312,7 +312,6 @@ def download_instagram_content(
     audio_quality = str(config.get("audio_quality", "192"))
     suffix = f" {filename_suffix}" if filename_suffix else ""
     info = {}
-    images_downloaded = 0
 
     ydl_opts = {
         "outtmpl": f"{target_dir}/%(title)s{suffix}.%(ext)s",
@@ -486,7 +485,7 @@ def download_instagram_content(
             get_logger("pinak.downloader").warning("%s (url=%s)", msg, post_url)
             console.print(f"[yellow][!] Warning: {msg}[/]")
         new_files = valid_files
-        success = bool(info or images_downloaded or new_files)
+        success = bool(info or new_files)
         if bad_files and not success:
             logger.errors.append("All downloaded files failed integrity verification.")
 
@@ -544,6 +543,10 @@ def download_instagram_content(
             "errors": logger.errors + [str(e)],
             "trim_range": trim_range,
         }
+
+
+# Backward compatibility alias
+download_instagram_content = download_media_content
 
 
 def parse_download_text(text):
@@ -681,7 +684,7 @@ def handle_download(
         print(
             f"{YELLOW}[!] Notice: The URL does not match any officially supported platform.{RESET}"
         )
-        print(f"    You can use the /platform command to see valid platforms.{RESET}")
+        print("    You can use the /platform command to see valid platforms.")
     else:
         print(f"{GREEN}[*] Detected Platform: {detected_platform}{RESET}")
 
@@ -733,9 +736,7 @@ def handle_download(
                 f"{YELLOW}[~] Retry {attempt}/{retries} after {wait}s (exponential backoff)...{RESET}"
             )
             log.debug("Retry %d/%d for %s after %.1fs", attempt, retries, url, wait)
-            try:
-                time.sleep(wait)
-            except KeyboardInterrupt:
+            if not sleep_with_interrupt(wait):
                 print(f"\n{RED}[!] Cancelled during retry wait.{RESET}")
                 result = {
                     "success": False,
@@ -758,7 +759,7 @@ def handle_download(
                 )
 
             else:
-                result = download_instagram_content(
+                result = download_media_content(
                     url,
                     output_dir,
                     extract_audio=extract_audio,

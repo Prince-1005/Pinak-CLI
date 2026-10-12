@@ -96,7 +96,7 @@ def print_help() -> None:
     output_dir = config.get("output_dir", "downloads")
     tips = f"""[bold]Download Tips:[/]
   - Paste any media URL directly to start downloading.
-  - To bypass the safety rate limit, append [yellow]--force[/] to your URL.
+  - Append [yellow]--force[/] to re-download a URL already in your history.
   - Current output: [yellow]{output_dir}[/]
   - Current quality: [yellow]{config.get("quality", "best")}[/]
   - Legal: only download content you own or are allowed to save (see README).
@@ -380,7 +380,7 @@ def show_stats() -> None:
 
     rate = stats["success_rate"]
     bar_width = 10
-    filled = int(round((rate / 100.0) * bar_width))
+    filled = round((rate / 100.0) * bar_width)
     bar_str = f"[{'█' * filled}{'░' * (bar_width - filled)}]"
     if rate >= 80:
         bar_formatted = f"[bold green]{bar_str}[/bold green]"

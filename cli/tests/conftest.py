@@ -24,3 +24,12 @@ def tmp_output_dir(tmp_path):
     out = tmp_path / "downloads"
     out.mkdir(exist_ok=True)
     return str(out)
+
+
+@pytest.fixture(autouse=True)
+def _silence_desktop_toasts(monkeypatch):
+    """Ensure automated tests never spawn real desktop toasts or background COM threads."""
+    import pinak.notify as notify_mod
+
+    if notify_mod._toast is not None:
+        monkeypatch.setattr(notify_mod, "_toast", lambda *a, **k: None)

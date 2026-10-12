@@ -9,7 +9,7 @@ PINAK CLI is a powerful, highly aesthetic command-line media downloader wrapper 
 *   **Interactive REPL Shell**: Features a terminal command prompt with auto-completions, command suggestions, and command history.
 *   **Aesthetic UI**: Powered by `rich` and `prompt-toolkit` with vibrant color themes, tables, custom progress bars, and desktop toast notifications.
 *   **Media Formats**: Download as best-quality video, select resolutions (360p, 720p, 1080p, etc.), or convert directly to high-quality MP3 audio.
-*   **Telemetry Tracking**: Silently pushes download statistics and command executions to the central Pinak Receiver Server.
+*   **Local-First & Private**: All data, settings, and download histories remain strictly local on your machine with zero remote tracking.
 *   **Self-Diagnostics**: High-detail environmental doctor checks (`/doctor`) to verify internet, dependencies, rate limits, and configuration.
 *   **Local SQLite History**: Keeps record of your download URLs, sizes, durations, and output paths in a local SQLite database (`history.db`).
 
@@ -22,27 +22,26 @@ cli/
 ├── pinak/                      # Core Package Folder
 │   ├── __init__.py
 │   ├── __main__.py             # Entry point (python -m pinak)
-│   ├── cli.py                  # REPL Interactive Shell & CLI handler
+│   ├── cli.py                  # REPL Interactive Shell & Typer CLI handler
+│   ├── commands/               # Modular REPL & info subcommands
 │   ├── downloader.py           # yt-dlp & FFmpeg downloader logic
 │   ├── config.py               # Application configurations (Pydantic-Settings)
-│   ├── history.py              # SQLite storage & Receiver integration
+│   ├── history.py              # SQLite storage & local tracking
 │   ├── doctor.py               # Dependencies & connection diagnostics
-│   └── utils.py                # Formatting & clipboard utility helpers
-├── extra/                      # Unnecessary / legacy resources & tools
-│   ├── .pinak_history.json.bak # History backup
-│   ├── PINAK_CLI_EXCELLENCE_GUIDE.md # Blueprint / guides
-│   ├── instagram.py            # Legacy Instagram downloader module
-│   └── supabase_setup.sql      # Legacy database setup schema
-├── downloads/                  # Default output folder (excluded)
+│   ├── ffmpeg_setup.py         # Static FFmpeg installer utility
+│   ├── notify.py               # Desktop notifications & terminal banners
+│   ├── updater.py              # Update checker
+│   └── utils.py                # Formatting & utility helpers
+├── tests/                      # Automated test suite (pytest)
 ├── pyproject.toml              # Pyproject packaging config
-├── pinak_cli.py                # Wrapper startup script
-├── LICENSE                     # MIT license
-└── Dockerfile                  # Container image (ffmpeg included)
+├── requirements-lock.txt       # Locked dependencies for reproducible installs
+├── Dockerfile                  # Container image (ffmpeg included)
+├── .dockerignore               # Docker build ignore patterns
+└── LICENSE                     # MIT license
 ```
 
 > **Note:** FFmpeg is *not* bundled with the PyPI package. See
 > [FFmpeg setup](#-ffmpeg-setup) below — one command installs it.
-```
 
 ---
 
@@ -123,13 +122,16 @@ When running the interactive REPL shell (`pinak`), the following commands are av
 | `/help` | Display the list of all available commands and shortcuts |
 | `/doctor` | Run comprehensive environment and connectivity checks |
 | `/audio <url>` | Download the media from the URL as an MP3 audio track |
-| `/quality <val>`| Change download quality (e.g. `best`, `worst`, `720p`, `1080p`) |
+| `/video <url>` | Download video from a URL |
+| `/instagram <url>` | Download Instagram post, reel, or IGTV with metadata |
+| `/batch <file>` | Download multiple URLs from a text file |
 | `/history` | View a list of recent downloads from your history database |
 | `/config` | Print out the current config settings and environment |
 | `/setout <dir>` | Change the output downloads directory |
 | `/open` | Open the downloads directory in File Explorer |
-| `/paste` | Retrieve a URL from clipboard and trigger download |
 | `/platform [q]` | List supported platforms or search filter them |
+| `/update` | Update yt-dlp and Pinak CLI to the latest versions |
+| `/ffmpeg` | Download a static FFmpeg build automatically |
 | `/exit` | Terminate the interactive REPL shell |
 
 ---
@@ -149,16 +151,9 @@ folder with `/setout <absolute_path>`.
 
 ---
 
-## 🔒 Telemetry Tracker
+## 🔒 Privacy & Local-First
 
-The CLI contains an asynchronous background thread that pushes tracking events (`session_start`, `session_end`, `download`, `command`) to the **Pinak Receiver Server** to log activity. 
-
-To configure a custom server URL or token, set the following environment variables:
-```bash
-$env:PINAK_PROXY_URL = "https://your-receiver-space.hf.space"
-$env:PINAK_API_TOKEN = "your-api-token"
-```
-If the server is unreachable or offline, the CLI will fail-soft, allowing you to download files offline with zero interruptions.
+Pinak CLI is strictly local-first and privacy-focused. All configuration, download history, and media files remain on your local machine. No external tracking or telemetry is performed.
 
 ---
 

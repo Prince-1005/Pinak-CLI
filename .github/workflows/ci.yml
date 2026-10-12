@@ -10,7 +10,7 @@ jobs:
     name: lint-typecheck-test (${{ matrix.os }}, py${{ matrix.python }})
     runs-on: ${{ matrix.os }}
     permissions:
-      contents: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -70,7 +70,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install bandit pip-audit
-          pip install -e .
+          pip install -e ".[dev]"
 
       - name: Bandit (static security, fail on MEDIUM+)
         # Remaining low findings are benign idioms (no-shell subprocess,
@@ -82,7 +82,6 @@ jobs:
 
       - name: SBOM (CycloneDX)
         run: |
-          pip install -e ".[dev]"
           cyclonedx-py environment --output-format json --output-file sbom.json
 
       - name: Upload SBOM artifact

@@ -1,8 +1,10 @@
 """
 pinak/history.py
 ================
-Handles all local SQLite history storage AND remote activity tracking.
+Handles all local SQLite history storage.
 
+Remote activity tracking was removed; the push_* functions below are
+no-op stubs retained only for call-site backward compatibility.
 """
 
 from __future__ import annotations
@@ -27,21 +29,23 @@ os.makedirs(data_dir, exist_ok=True)
 DB_FILE = os.path.join(data_dir, "history.db")
 LOCAL_HISTORY = ".pinak_history.json"
 LEGACY_DB_FILE = os.path.expanduser("~/.pinak_history.db")
-DEVICE_ID_FILE = os.path.join(data_dir, "device.id")
 
 
 # ---------------------------------------------------------------------------
 # In-memory session tracking
 # ---------------------------------------------------------------------------
 _session_id: str | None = None
-_session_start_time: float | None = None
 
 
 def initialize_session() -> str:
     """Generate and store a new session ID. Call once at CLI startup."""
-    global _session_id, _session_start_time
+    global _session_id
     _session_id = str(uuid.uuid4())
-    _session_start_time = time.time()
+    return _session_id
+
+
+def get_current_session_id() -> str | None:
+    """Return the active in-memory session ID, if initialized."""
     return _session_id
 
 
@@ -229,22 +233,6 @@ def record_download(
     conn.commit()
     conn.close()
 
-    # --- Push to remote backend (fire-and-forget, non-blocking) ---
-    _push_activity(
-        {
-            "activity_type": "download",
-            "url": url,
-            "status": status,
-            "mode": mode,
-            "quality": quality or "unknown",
-            "files": files,  # pass actual file list so format can be extracted
-            "duration": int(duration),
-            "size": total_size,
-            "session_id": _session_id or "",
-            "platform": get_platform(url),
-        }
-    )
-
 
 def url_downloaded_successfully(url: str) -> bool:
     conn = get_db_connection()
@@ -289,6 +277,7 @@ def get_history(filter_text: str = "") -> list[dict[str, Any]]:
             files = json.loads(r["files"]) if r["files"] else []
         except (json.JSONDecodeError, TypeError):
             files = []
+        row_keys = r.keys()
         results.append(
             {
                 "time": r["time"],
@@ -299,6 +288,7 @@ def get_history(filter_text: str = "") -> list[dict[str, Any]]:
                 "files": files,
                 "duration": r["duration"],
                 "size": r["size"],
+                "is_forced": bool(r["is_forced"]) if "is_forced" in row_keys else False,
             }
         )
     return results
@@ -317,10 +307,8 @@ def delete_history_by_ids(ids_to_delete: list[int]) -> None:
         return
     conn = get_db_connection()
     cursor = conn.cursor()
-    placeholders = ",".join("?" for _ in ids_to_delete)
-    # Fully parameterized: only "?" placeholders, no user input in the SQL.
-    query = f"DELETE FROM downloads WHERE id IN ({placeholders})"  # nosec B608
-    cursor.execute(query, ids_to_delete)
+    # Fully static SQL query using executemany — zero string interpolation or SQL injection risk.
+    cursor.executemany("DELETE FROM downloads WHERE id = ?", [(i,) for i in ids_to_delete])
     conn.commit()
     conn.close()
 
