@@ -155,10 +155,12 @@ def test_ensure_ffmpeg_uses_fetched_binary(tmp_path, monkeypatch):
 
     fake_bin = tmp_path / "ffmpeg"
     fake_bin.write_bytes(b"x")
+    fake_bin.chmod(0o755)
     fake_mod = types.ModuleType("static_ffmpeg")
     fake_mod.add_paths = lambda: True  # noqa: E731
     monkeypatch.setitem(sys.modules, "static_ffmpeg", fake_mod)
     monkeypatch.setattr(ff_mod, "get_ffmpeg_path", lambda: str(fake_bin))
+    monkeypatch.setattr(ff_mod.shutil, "which", lambda name: str(fake_bin))
     assert ff_mod.ensure_ffmpeg() == str(fake_bin)
 
 

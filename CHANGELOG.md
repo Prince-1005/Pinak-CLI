@@ -7,6 +7,11 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-10-13
+
+### Fixed
+- Fixed CI test failure in `test_ensure_ffmpeg_uses_fetched_binary` on Linux runners: added executable permission (`chmod 0o755`) to dummy test binary and isolated `shutil.which` to prevent fallback to host system `/usr/bin/ffmpeg`.
+
 ## [1.1.0] - 2026-10-12
 
 ### Added
