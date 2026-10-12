@@ -143,9 +143,6 @@ def test_handle_download_keyboard_interrupt_during_retry(monkeypatch):
 
     monkeypatch.setattr(dl_mod, "download_instagram_content", _fail_once)
 
-    def _ki_wait(seconds):
-        raise KeyboardInterrupt()
-
-    monkeypatch.setattr(dl_mod.time, "sleep", _ki_wait)
+    monkeypatch.setattr(dl_mod, "sleep_with_interrupt", lambda seconds: False)
     result = dl_mod.handle_download("https://x.com/v", interactive=False)
     assert result.get("canceled") is True
