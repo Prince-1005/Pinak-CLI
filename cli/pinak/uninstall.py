@@ -12,11 +12,12 @@ from rich.panel import Panel
 from rich.prompt import Confirm
 
 from .config import config_dir
-from .history import data_dir
+from .history import LEGACY_DB_FILE, data_dir
 from .logging_setup import get_logger
 
 log = get_logger("pinak.uninstall")
 console = Console()
+legacy_db_file = LEGACY_DB_FILE
 
 
 def detect_uninstall_cmd() -> list[str]:
@@ -77,11 +78,10 @@ def purge_user_data(include_cache: bool = True) -> list[str]:
                 log.debug("Failed to purge %s: %r", target, exc)
 
     # Also clean legacy ~/.pinak_history.db if present
-    legacy_db = os.path.expanduser("~/.pinak_history.db")
-    if os.path.exists(legacy_db):
+    if legacy_db_file and os.path.exists(legacy_db_file):
         try:
-            os.remove(legacy_db)
-            removed.append(legacy_db)
+            os.remove(legacy_db_file)
+            removed.append(legacy_db_file)
         except Exception as exc:
             log.debug("Failed to remove legacy db: %r", exc)
 
@@ -100,10 +100,13 @@ def execute_uninstallation(cmd: list[str], detached: bool = True) -> bool:
         # On Windows, running binaries/DLLs are locked while in use.
         # Launch a detached PowerShell process that pauses briefly to let pinak exit, then uninstalls.
         powershell_script = f"Start-Sleep -Seconds 1; {cmd_str}"
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(
+            subprocess, "DETACHED_PROCESS", 0
+        )
         try:
             subprocess.Popen(  # nosec B603, B607
                 ["powershell", "-NoProfile", "-Command", powershell_script],
-                creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,  # type: ignore[attr-defined]
+                creationflags=flags,
                 close_fds=True,
             )
             return True

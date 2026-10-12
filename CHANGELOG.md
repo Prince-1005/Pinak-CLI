@@ -7,6 +7,12 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-13
+
+### Fixed
+- Fixed cross-platform `AttributeError` on non-Windows environments by using safe `getattr(subprocess, ...)` fallback for creation flags in `execute_uninstallation()`.
+- Isolated user directory purging in unit tests to prevent `expanduser` side effects across test runs.
+
 ## [1.2.0] - 2026-10-13
 
 ### Added

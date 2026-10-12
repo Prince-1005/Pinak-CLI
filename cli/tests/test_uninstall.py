@@ -54,9 +54,7 @@ def test_purge_user_data(tmp_path, monkeypatch):
 
     monkeypatch.setattr(uninst_mod, "config_dir", str(cfg_dir))
     monkeypatch.setattr(uninst_mod, "data_dir", str(data_dir))
-    monkeypatch.setattr(
-        uninst_mod.os.path, "expanduser", lambda p: str(legacy_db) if "history" in p else p
-    )
+    monkeypatch.setattr(uninst_mod, "legacy_db_file", str(legacy_db))
 
     removed = uninst_mod.purge_user_data(include_cache=False)
     assert str(cfg_dir) in removed
@@ -79,6 +77,8 @@ def test_execute_uninstallation_posix(monkeypatch):
 
 def test_execute_uninstallation_windows(monkeypatch):
     monkeypatch.setattr(uninst_mod.sys, "platform", "win32")
+    monkeypatch.setattr(uninst_mod.subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
+    monkeypatch.setattr(uninst_mod.subprocess, "DETACHED_PROCESS", 0x00000008, raising=False)
     popen_called = []
 
     def mock_popen(cmd, *a, **k):
