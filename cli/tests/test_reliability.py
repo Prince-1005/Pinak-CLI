@@ -34,6 +34,9 @@ def test_ensure_ffmpeg_prefers_existing(tmp_path, monkeypatch):
 
 
 def test_ensure_ffmpeg_graceful_without_static_ffmpeg(monkeypatch):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "static_ffmpeg", None)
     monkeypatch.setattr(ff_mod, "get_ffmpeg_path", lambda: "/nonexistent/ffmpeg")
     # static-ffmpeg is not installed in test env -> must fall back, never raise.
     assert ff_mod.ensure_ffmpeg() == "/nonexistent/ffmpeg"

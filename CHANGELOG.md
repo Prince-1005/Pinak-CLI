@@ -7,7 +7,14 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-12
+
 ### Added
+- Promoted `static-ffmpeg>=2.5` to core package dependencies (`dependencies` in `pyproject.toml`): automatic zero-configuration FFmpeg/FFprobe binary provisioning on first execution across all platforms.
+- Instagram high-resolution media extraction: `_best_thumbnail_url()` detects master `display_url` and direct CDN image URLs, eliminating low-resolution thumbnail fallback.
+- Added URL regex dimension parser (`_infer_area_from_url`) to extract width and height from Instagram CDN paths (`s1080x1080`, `p1080x1080`, `1080w`) when API metadata omits dimensions.
+- Added direct image URL validator (`_is_direct_image_url`) to filter out post webpage links.
+- Preserved list ordering ties in candidate ranking to favor higher-quality candidates in ascending thumbnail sequences.
 - `pinak/commands/` package: REPL display (`panels`, `info`) and single-command
   execution (`run`) extracted from the monolithic `cli.py` (1207 → ~700 lines).
 - Single-command CLI flags: `--dry-run` (preview plan), `--json` (machine-readable
@@ -58,6 +65,7 @@ versioning follows [Semantic Versioning](https://semver.org/).
 - Pydantic-validated configuration with legacy key migration.
 
 ### Fixed
+- Fixed unit test isolation for static-ffmpeg missing fallback tests by explicitly mocking `sys.modules["static_ffmpeg"] = None`.
 - Removed stale rate-limit code paths referencing deleted history helpers
   (runtime `ImportError` / `NameError`).
 - Bare `except:` clauses, ambiguous loop variables, and assorted lint findings.

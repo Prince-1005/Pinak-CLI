@@ -1,5 +1,6 @@
 import contextlib
 import os
+import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -592,23 +593,129 @@ def _has_video_formats(info):
 # ---------------------------------------------------------------------------
 # FIX #9: sort thumbnails by actual pixel area (width x height)
 # ---------------------------------------------------------------------------
-def _best_thumbnail_url(entry):
-    """
-    Returns the URL of the highest-resolution thumbnail available,
-    sorted by width x height descending.
-    """
-    thumbnails = entry.get("thumbnails") or []
+def _is_direct_image_url(url: str | None) -> bool:
+    """Checks whether a URL points directly to an image asset rather than a post page."""
+    if not url or not isinstance(url, str):
+        return False
+    if not url.startswith(("http://", "https://")):
+        return False
+    lower = url.lower()
+    for segment in ("/p/", "/reel/", "/reels/", "/tv/", "/stories/"):
+        if segment in lower and "cdninstagram.com" not in lower and "fbcdn.net" not in lower:
+            return False
+    return True
 
-    def _area(t):
-        w = t.get("width") or 0
-        h = t.get("height") or 0
-        return w * h
 
-    for thumb in sorted(thumbnails, key=_area, reverse=True):
-        url = thumb.get("url")
-        if url:
-            return url
-    return entry.get("thumbnail")
+def _infer_area_from_url(url: str) -> int:
+    """Extracts pixel area from dimensions embedded in Instagram CDN URL paths."""
+    if not url:
+        return 0
+    dim_match = re.search(r"[/_ps]?(\d{3,4})x(\d{3,4})", url)
+    if dim_match:
+        try:
+            return int(dim_match.group(1)) * int(dim_match.group(2))
+        except (ValueError, TypeError):
+            pass
+    width_match = re.search(r"[/_](\d{3,4})w[/_.]", url)
+    if width_match:
+        try:
+            w = int(width_match.group(1))
+            return w * w
+        except (ValueError, TypeError):
+            pass
+    return 0
+
+
+def _best_thumbnail_url(entry: dict) -> str | None:
+    """Returns the URL of the highest-resolution image available for an entry.
+
+    Prioritizes:
+    1. Direct master display URL (`display_url`) when present.
+    2. Candidates from `thumbnails`, `formats`, `url`, and `thumbnail`, ranked
+       by explicit pixel area (width x height), regex-inferred dimensions from
+       Instagram CDN paths, and list position (preferring later candidates).
+    """
+    if not entry or not isinstance(entry, dict):
+        return None
+
+    display_url = entry.get("display_url")
+    if _is_direct_image_url(display_url):
+        display_area = _infer_area_from_url(display_url) or (1080 * 1080)
+    else:
+        display_url = None
+        display_area = 0
+
+    candidates: list[tuple[int, int, str]] = []  # (area, index, url)
+    candidate_urls: set[str] = set()
+
+    def add_candidate(
+        url: str | None,
+        width: object = None,
+        height: object = None,
+        idx: int = 0,
+        default_area: int = 0,
+    ) -> None:
+        if not _is_direct_image_url(url) or url in candidate_urls:
+            return
+        candidate_urls.add(url)  # type: ignore[arg-type]
+        area = 0
+        try:
+            w = int(width) if width is not None else 0  # type: ignore[arg-type]
+            h = int(height) if height is not None else 0  # type: ignore[arg-type]
+            if w > 0 and h > 0:
+                area = w * h
+        except (ValueError, TypeError):
+            area = 0
+
+        if area == 0:
+            area = _infer_area_from_url(url)  # type: ignore[arg-type]
+        if area == 0:
+            area = default_area
+
+        candidates.append((area, idx, url))  # type: ignore[arg-type]
+
+    # Add display_url if valid
+    if display_url:
+        add_candidate(display_url, idx=999, default_area=display_area)
+
+    # Add items from thumbnails list (yt-dlp lists them in ascending order of quality)
+    raw_thumbnails = entry.get("thumbnails") or []
+    for idx, thumb in enumerate(raw_thumbnails):
+        if isinstance(thumb, dict):
+            add_candidate(
+                thumb.get("url"),
+                width=thumb.get("width"),
+                height=thumb.get("height"),
+                idx=idx,
+                default_area=idx,
+            )
+
+    # Add items from formats (for image formats if present)
+    for idx, fmt in enumerate(entry.get("formats") or []):
+        if isinstance(fmt, dict) and fmt.get("vcodec") in (None, "none"):
+            add_candidate(
+                fmt.get("url"),
+                width=fmt.get("width"),
+                height=fmt.get("height"),
+                idx=idx,
+            )
+
+    # Add single entry url if it points directly to an image asset
+    entry_url = entry.get("url")
+    if _is_direct_image_url(entry_url) and not _has_video_formats(entry):
+        add_candidate(entry_url, idx=100, default_area=1080 * 1080)
+
+    # Add fallback thumbnail
+    fallback_thumb = entry.get("thumbnail")
+    if _is_direct_image_url(fallback_thumb):
+        add_candidate(fallback_thumb, idx=50, default_area=0)
+
+    if not candidates:
+        return None
+
+    # Sort by area descending, then list index descending (later elements preferred on ties)
+    candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return candidates[0][2]
 
 
 def _image_filename(entry, output_dir, index, filename_suffix):

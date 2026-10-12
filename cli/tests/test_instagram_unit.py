@@ -39,6 +39,52 @@ def test_best_thumbnail_falls_back_to_thumbnail():
     assert ig_mod._best_thumbnail_url({}) is None
 
 
+def test_best_thumbnail_prefers_display_url():
+    entry = {
+        "display_url": "https://cdninstagram.com/master_1080.jpg",
+        "thumbnails": [
+            {"url": "https://cdninstagram.com/preview_150.jpg", "width": 150, "height": 150}
+        ],
+    }
+    assert ig_mod._best_thumbnail_url(entry) == "https://cdninstagram.com/master_1080.jpg"
+
+
+def test_best_thumbnail_infers_dimensions_from_url():
+    entry = {
+        "thumbnails": [
+            {"url": "https://cdninstagram.com/s150x150/preview.jpg"},
+            {"url": "https://cdninstagram.com/s1080x1080/full.jpg"},
+            {"url": "https://cdninstagram.com/s640x640/medium.jpg"},
+        ]
+    }
+    assert ig_mod._best_thumbnail_url(entry) == "https://cdninstagram.com/s1080x1080/full.jpg"
+
+
+def test_best_thumbnail_ignores_webpage_urls():
+    entry = {
+        "url": "https://www.instagram.com/p/ABC123xyz/",
+        "thumbnail": "https://cdninstagram.com/actual_thumb.jpg",
+    }
+    assert ig_mod._best_thumbnail_url(entry) == "https://cdninstagram.com/actual_thumb.jpg"
+
+
+def test_best_thumbnail_single_image_entry_url():
+    entry = {
+        "url": "https://cdninstagram.com/direct_post.jpg",
+    }
+    assert ig_mod._best_thumbnail_url(entry) == "https://cdninstagram.com/direct_post.jpg"
+
+
+def test_best_thumbnail_prefers_later_thumbnail_on_tie():
+    entry = {
+        "thumbnails": [
+            {"url": "https://cdninstagram.com/first.jpg"},
+            {"url": "https://cdninstagram.com/second_higher_quality.jpg"},
+        ]
+    }
+    assert ig_mod._best_thumbnail_url(entry) == "https://cdninstagram.com/second_higher_quality.jpg"
+
+
 def test_has_video_formats():
     assert ig_mod._has_video_formats({"formats": [{"url": "u", "vcodec": "h264"}]}) is True
     assert ig_mod._has_video_formats({"formats": [{"url": "u", "vcodec": "none"}]}) is False

@@ -128,7 +128,10 @@ def test_is_executable_variants(tmp_path, monkeypatch):
     assert ff_mod._is_executable("ffmpeg") is True
 
 
-def test_try_static_ffmpeg_without_package():
+def test_try_static_ffmpeg_without_package(monkeypatch):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "static_ffmpeg", None)
     assert ff_mod._try_static_ffmpeg() is False
 
 

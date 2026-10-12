@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pinak-cli"
-version = "1.0.0"
+version = "1.1.0"
 description = "A powerful, aesthetic command-line media downloader using yt-dlp"
 readme = "CLI_README.md"
 requires-python = ">=3.10"
@@ -25,6 +25,7 @@ keywords = ["yt-dlp", "downloader", "cli", "video", "media", "instagram"]
 urls = { Homepage = "https://github.com/pinak-project/pinak-cli", Repository = "https://github.com/pinak-project/pinak-cli" }
 dependencies = [
     "yt-dlp>=2025.1.1",
+    "static-ffmpeg>=2.5",
     "rich>=13.0.0",
     "prompt-toolkit>=3.0.0",
     "win11toast; sys_platform == 'win32'",
