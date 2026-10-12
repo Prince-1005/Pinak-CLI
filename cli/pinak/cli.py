@@ -118,6 +118,7 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
         "/update": "Update yt-dlp and Pinak itself to the latest versions",
         "/username": "Change and save your username",
         "/greeting": "Change and save your greeting statement",
+        "/uninstall": "Completely remove Pinak CLI and its data from your system",
         "/exit": "Exit the CLI safely",
     }
 
@@ -229,6 +230,14 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 print_exit_screen(interrupted=False)
                 print_separator()
                 break
+
+            if lower_cmd == "/uninstall":
+                from .uninstall import run_uninstall
+
+                code = run_uninstall(yes=False)
+                if code == 0:
+                    break
+                continue
 
             if lower_cmd == "/ffmpeg":
                 from .ffmpeg_setup import ensure_ffmpeg, install_ffmpeg_extra
@@ -681,6 +690,14 @@ def _config_path_callback(value: bool) -> None:
         raise typer.Exit()
 
 
+def _uninstall_callback(value: bool) -> None:
+    if value:
+        from .uninstall import run_uninstall
+
+        code = run_uninstall(yes=False)
+        raise typer.Exit(code=code)
+
+
 def maybe_print_offline_notice() -> bool:
     """Print an offline notice when the device has no internet. Returns online state."""
     from .utils import is_online
@@ -732,6 +749,13 @@ def main(
         callback=_config_path_callback,
         is_eager=True,
         help="Print the config file path and exit",
+    ),
+    uninstall: bool = typer.Option(
+        False,
+        "--uninstall",
+        callback=_uninstall_callback,
+        is_eager=True,
+        help="Completely uninstall Pinak CLI and its configurations from your system",
     ),
 ):
     init_config()

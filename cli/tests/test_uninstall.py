@@ -1,0 +1,141 @@
+"""Tests for pinak.uninstall: detection, user data purging, process execution, and prompts."""
+
+from __future__ import annotations
+
+import types
+from unittest.mock import MagicMock
+
+import pinak.uninstall as uninst_mod
+
+
+def test_detect_uninstall_cmd_uv(monkeypatch):
+    monkeypatch.setattr(uninst_mod.shutil, "which", lambda cmd: "/bin/uv" if cmd == "uv" else None)
+
+    def mock_run(cmd, *a, **k):
+        if cmd == ["uv", "tool", "list"]:
+            return types.SimpleNamespace(returncode=0, stdout="pinak-cli v1.1.1\n")
+        return types.SimpleNamespace(returncode=1, stdout="")
+
+    monkeypatch.setattr(uninst_mod.subprocess, "run", mock_run)
+    assert uninst_mod.detect_uninstall_cmd() == ["uv", "tool", "uninstall", "pinak-cli"]
+
+
+def test_detect_uninstall_cmd_pipx(monkeypatch):
+    monkeypatch.setattr(
+        uninst_mod.shutil, "which", lambda cmd: "/bin/pipx" if cmd == "pipx" else None
+    )
+
+    def mock_run(cmd, *a, **k):
+        if cmd == ["pipx", "list", "--short"]:
+            return types.SimpleNamespace(returncode=0, stdout="pinak-cli 1.1.1\n")
+        return types.SimpleNamespace(returncode=1, stdout="")
+
+    monkeypatch.setattr(uninst_mod.subprocess, "run", mock_run)
+    assert uninst_mod.detect_uninstall_cmd() == ["pipx", "uninstall", "pinak-cli"]
+
+
+def test_detect_uninstall_cmd_fallback_pip(monkeypatch):
+    monkeypatch.setattr(uninst_mod.shutil, "which", lambda cmd: None)
+    cmd = uninst_mod.detect_uninstall_cmd()
+    assert cmd[-3:] == ["pip", "uninstall", "-y"] or cmd[-1] == "pinak-cli"
+
+
+def test_purge_user_data(tmp_path, monkeypatch):
+    cfg_dir = tmp_path / "cfg"
+    cfg_dir.mkdir()
+    (cfg_dir / "config.json").write_text("{}", encoding="utf-8")
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "history.db").write_bytes(b"dummy")
+
+    legacy_db = tmp_path / "legacy_history.db"
+    legacy_db.write_bytes(b"old")
+
+    monkeypatch.setattr(uninst_mod, "config_dir", str(cfg_dir))
+    monkeypatch.setattr(uninst_mod, "data_dir", str(data_dir))
+    monkeypatch.setattr(
+        uninst_mod.os.path, "expanduser", lambda p: str(legacy_db) if "history" in p else p
+    )
+
+    removed = uninst_mod.purge_user_data(include_cache=False)
+    assert str(cfg_dir) in removed
+    assert str(data_dir) in removed
+    assert str(legacy_db) in removed
+    assert not cfg_dir.exists()
+    assert not data_dir.exists()
+    assert not legacy_db.exists()
+
+
+def test_execute_uninstallation_posix(monkeypatch):
+    monkeypatch.setattr(uninst_mod.sys, "platform", "linux")
+
+    def mock_run(cmd, *a, **k):
+        return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(uninst_mod.subprocess, "run", mock_run)
+    assert uninst_mod.execute_uninstallation(["pip", "uninstall", "pinak-cli"]) is True
+
+
+def test_execute_uninstallation_windows(monkeypatch):
+    monkeypatch.setattr(uninst_mod.sys, "platform", "win32")
+    popen_called = []
+
+    def mock_popen(cmd, *a, **k):
+        popen_called.append(cmd)
+        return MagicMock()
+
+    monkeypatch.setattr(uninst_mod.subprocess, "Popen", mock_popen)
+    assert uninst_mod.execute_uninstallation(["uv", "tool", "uninstall", "pinak-cli"]) is True
+    assert len(popen_called) == 1
+    assert popen_called[0][0] == "powershell"
+
+
+def test_execute_uninstallation_failure(monkeypatch):
+    monkeypatch.setattr(uninst_mod.sys, "platform", "linux")
+
+    def mock_run(cmd, *a, **k):
+        raise OSError("failed to execute")
+
+    monkeypatch.setattr(uninst_mod.subprocess, "run", mock_run)
+    assert uninst_mod.execute_uninstallation(["pip", "uninstall", "pinak-cli"]) is False
+
+
+def test_run_uninstall_cancelled(monkeypatch):
+    monkeypatch.setattr(uninst_mod.Confirm, "ask", lambda *a, **k: False)
+    exit_code = uninst_mod.run_uninstall(yes=False)
+    assert exit_code == 0
+
+
+def test_run_uninstall_confirmed(monkeypatch):
+    monkeypatch.setattr(uninst_mod.Confirm, "ask", lambda *a, **k: True)
+    monkeypatch.setattr(uninst_mod, "purge_user_data", lambda **k: ["/path/dummy"])
+    monkeypatch.setattr(
+        uninst_mod, "detect_uninstall_cmd", lambda: ["pip", "uninstall", "-y", "pinak-cli"]
+    )
+    monkeypatch.setattr(uninst_mod, "execute_uninstallation", lambda cmd, **k: True)
+
+    exit_code = uninst_mod.run_uninstall(yes=False)
+    assert exit_code == 0
+
+
+def test_run_uninstall_yes_flag(monkeypatch):
+    monkeypatch.setattr(uninst_mod, "purge_user_data", lambda **k: [])
+    monkeypatch.setattr(
+        uninst_mod, "detect_uninstall_cmd", lambda: ["pip", "uninstall", "-y", "pinak-cli"]
+    )
+    monkeypatch.setattr(uninst_mod, "execute_uninstallation", lambda cmd, **k: True)
+
+    exit_code = uninst_mod.run_uninstall(yes=True)
+    assert exit_code == 0
+
+
+def test_run_uninstall_exec_failure(monkeypatch):
+    monkeypatch.setattr(uninst_mod, "purge_user_data", lambda **k: [])
+    monkeypatch.setattr(
+        uninst_mod, "detect_uninstall_cmd", lambda: ["pip", "uninstall", "-y", "pinak-cli"]
+    )
+    monkeypatch.setattr(uninst_mod, "execute_uninstallation", lambda cmd, **k: False)
+
+    exit_code = uninst_mod.run_uninstall(yes=True)
+    assert exit_code == 1

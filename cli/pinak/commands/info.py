@@ -85,6 +85,7 @@ def print_help() -> None:
         ),
         ("/update", "Update yt-dlp and Pinak itself to the latest versions"),
         ("/ffmpeg", "Download a static FFmpeg build automatically"),
+        ("/uninstall", "Completely remove Pinak CLI and its data from your system"),
         ("/exit, exit, quit", "Exit the CLI safely"),
     ]
 

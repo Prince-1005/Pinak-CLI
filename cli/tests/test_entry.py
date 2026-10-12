@@ -36,3 +36,4 @@ def test_module_entrypoint_help():
     assert proc.returncode == 0
     assert proc.stdout is not None
     assert "--dry-run" in proc.stdout
+    assert "--uninstall" in proc.stdout

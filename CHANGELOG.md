@@ -7,6 +7,15 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-13
+
+### Added
+- Interactive self-uninstallation feature via `pinak --uninstall` and REPL `/uninstall` command.
+- Expressive confirmation dialog with emojis (`🥺💔`, `🗑️`, `📁`, `📜`, `🛡️`, `✨🎉`, `🌸✨`), protecting user downloaded media files in `./downloads/`.
+- Automated detection of package manager installer (`uv tool`, `pipx`, or standard `pip`).
+- Automated purging of saved configuration settings, history database (`history.db`), and local caches across Windows, Linux, and macOS.
+- Detached background uninstaller process for Windows to bypass running executable file locks cleanly.
+
 ## [1.1.1] - 2026-10-13
 
 ### Fixed
