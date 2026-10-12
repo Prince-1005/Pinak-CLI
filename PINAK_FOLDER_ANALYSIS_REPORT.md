@@ -1,4 +1,4 @@
-# Pinak Z – Folder Analysis Report
+# Pinak – Folder Analysis Report
 
 **Date:** October 4, 2026  
 **Location:** `D:\pinak Z`  
@@ -6,13 +6,13 @@
 
 ## 1. Executive Summary
 
-Pinak Z is a cross-platform media downloader utility with a Python-based CLI application and supporting Android documentation. The codebase is well-structured, modular, and follows good separation of concerns. It provides direct URL downloads, Instagram content extraction, media processing via FFmpeg, configuration management, download history, and built-in diagnostics.
+Pinak is a cross-platform media downloader utility with a Python-based CLI application and supporting Android documentation. The codebase is well-structured, modular, and follows good separation of concerns. It provides direct URL downloads, Instagram content extraction, media processing via FFmpeg, configuration management, download history, and built-in diagnostics.
 
 Overall code quality is solid with clear module boundaries. With the addition of tests, CI/CD, and stricter type/linting enforcement, this project can easily reach production-grade open-source quality.
 
 ## 2. Project Purpose
 
-Pinak Z enables users to download media from supported sources with features including:
+Pinak enables users to download media from supported sources with features including:
 - Direct URL media downloads
 - Instagram posts, reels, stories, highlights, IGTV, and profile downloads
 - Quality and format selection
@@ -174,6 +174,6 @@ D:\pinak Z\
 
 ## 11. Conclusion
 
-Pinak Z demonstrates solid software engineering practices with clear architecture, good modularity, and user-focused features. The codebase is readable, maintainable, and extensible. The existing Android excellence guide also reflects a commitment to quality documentation. Implementing the suggested improvements will elevate this project to a polished, production-ready open-source tool.
+Pinak demonstrates solid software engineering practices with clear architecture, good modularity, and user-focused features. The codebase is readable, maintainable, and extensible. The existing Android excellence guide also reflects a commitment to quality documentation. Implementing the suggested improvements will elevate this project to a polished, production-ready open-source tool.
 
 **Overall Rating:** ★★★★☆ (Very Good – approaching Excellence)

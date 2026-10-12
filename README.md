@@ -1,4 +1,4 @@
-# Pinak Z
+# Pinak
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -9,12 +9,12 @@
 
 > [!IMPORTANT]
 > **Educational & Personal Archival Purpose**  
-> Pinak Z is an open-source educational project and terminal interface wrapper around [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) and [`FFmpeg`](https://ffmpeg.org/), designed for learning CLI architecture and personal media archiving.  
+> Pinak is an open-source educational project and terminal interface wrapper around [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) and [`FFmpeg`](https://ffmpeg.org/), designed for learning CLI architecture and personal media archiving.  
 > ⚠️ **Notice:** Downloading content may violate a platform's Terms of Service. Only download media that you own, that is freely licensed, or that you have explicit permission to keep. Respect copyright laws and **be excellent to creators!**
 
 ## Overview
 
-Pinak Z is a cross-platform Python CLI tool and educational wrapper around `yt-dlp` that makes personal media archiving simple and reliable. It supports direct URL downloads, Instagram posts/reels/stories/highlights, quality and format selection, audio-video merging via FFmpeg, download history, and built-in diagnostics.
+Pinak is a cross-platform Python CLI tool and educational wrapper around `yt-dlp` that makes personal media archiving simple and reliable. It supports direct URL downloads, Instagram posts/reels/stories/highlights, quality and format selection, audio-video merging via FFmpeg, download history, and built-in diagnostics.
 
 **Key Highlights:**
 - 🚀 Clean, modular architecture
@@ -207,7 +207,7 @@ pinak --doctor
 
 ## Configuration
 
-Pinak Z uses a JSON config file stored in your user data directory. Use `pinak config --show` to view current settings.
+Pinak uses a JSON config file stored in your user data directory. Use `pinak config --show` to view current settings.
 
 **Common settings:**
 - `output_dir` – Default download location
@@ -272,19 +272,19 @@ Contributions are welcome! Please read our [Excellence Documentation](PINAK_EXCE
 ## Security Notes
 
 - **Local-First:** All config, history, and downloads stay on your machine.
-- **No Telemetry:** Pinak Z collects no usage data.
+- **No Telemetry:** Pinak collects no usage data.
 - **Safe Paths:** Filenames are sanitized to prevent path traversal.
 - **Credential Awareness:** If using Instagram sessions/cookies, handle them securely and never commit to git.
 - **Dependencies:** Keep packages updated. Consider running `pip-audit` regularly.
 
 ## Educational Purpose & Legal Disclaimer
 
-Pinak Z is developed exclusively as an **educational project, technical study of CLI architecture, and personal-archiving tool**. It serves as an open-source terminal wrapper around `yt-dlp` and `FFmpeg`.
+Pinak is developed exclusively as an **educational project, technical study of CLI architecture, and personal-archiving tool**. It serves as an open-source terminal wrapper around `yt-dlp` and `FFmpeg`.
 
 - **Personal Archival Only:** This tool is intended for backing up your own media, downloading public domain material, freely licensed content (such as Creative Commons), or media you have explicit permission to save.
 - **Platform Terms of Service:** Downloading content may violate the Terms of Service of platforms such as YouTube, Instagram, or TikTok. Users are solely responsible for ensuring compliance with all applicable platform policies and regional copyright laws.
 - **Be Excellent to Creators:** Do not use this tool to pirate, re-upload, distribute, or monetize copyrighted works. Support the creators whose work you enjoy.
-- **No DRM Circumvention:** Pinak Z does not circumvent or bypass Digital Rights Management (DRM), encryption, or access paywalls.
+- **No DRM Circumvention:** Pinak does not circumvent or bypass Digital Rights Management (DRM), encryption, or access paywalls.
 - **Limitation of Liability:** The software is provided "as is" under the [MIT License](LICENSE) without warranty of any kind. The authors and contributors assume no liability or responsibility for any misuse of this software.
 
 ## License

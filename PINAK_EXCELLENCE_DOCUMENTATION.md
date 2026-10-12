@@ -1,4 +1,4 @@
-# Pinak Z – Excellence Documentation
+# Pinak – Excellence Documentation
 
 **Version:** 1.0.0  
 **Last Updated:** October 4, 2026  
@@ -29,9 +29,9 @@
 
 ## 1. Executive Summary
 
-Pinak Z is a robust, user-friendly media downloader CLI designed for reliability, simplicity, and cross-platform portability. It combines direct URL downloading with Instagram content extraction, powered by yt-dlp and FFmpeg for high-quality media processing.
+Pinak is a robust, user-friendly media downloader CLI designed for reliability, simplicity, and cross-platform portability. It combines direct URL downloading with Instagram content extraction, powered by yt-dlp and FFmpeg for high-quality media processing.
 
-This documentation defines the standards, architecture, and practices that make Pinak Z an excellence-driven project—from clean code and intuitive UX to security, performance, and maintainability.
+This documentation defines the standards, architecture, and practices that make Pinak an excellence-driven project—from clean code and intuitive UX to security, performance, and maintainability.
 
 ## 2. Vision & Mission
 
@@ -54,7 +54,7 @@ This documentation defines the standards, architecture, and practices that make 
 ## 4. Project Overview
 
 ### Purpose
-Pinak Z helps users download media content efficiently with support for multiple sources, format control, and persistent state management.
+Pinak helps users download media content efficiently with support for multiple sources, format control, and persistent state management.
 
 ### Key Capabilities
 - Direct URL downloads from supported platforms (via yt-dlp)
@@ -706,4 +706,4 @@ Current: `1.0.0`
 
 ---
 
-**Excellence is a habit, not an act.** This documentation reflects Pinak Z's commitment to quality, clarity, and user-centric design.
+**Excellence is a habit, not an act.** This documentation reflects Pinak's commitment to quality, clarity, and user-centric design.
