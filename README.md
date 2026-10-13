@@ -74,7 +74,7 @@ Pinak is a cross-platform Python CLI tool and educational wrapper around `yt-dlp
 
 ```bash
 # Navigate to CLI directory
-cd "D:\pinak Z\cli"
+cd "D:\pinak\cli"
 
 # Install in editable mode (recommended for development)
 pip install -e .
