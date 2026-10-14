@@ -60,6 +60,32 @@ def test_open_output_folder_tmp(tmp_path, monkeypatch):
     assert opened  # opened via startfile (win) or browser (other OS)
 
 
+def test_open_output_folder_macos_and_linux(tmp_path, monkeypatch):
+    import shutil
+    import subprocess
+    import sys
+
+    import pinak.commands.info as info_m
+
+    monkeypatch.setitem(info_m.config, "output_dir", str(tmp_path / "dl2"))
+
+    # Test macOS
+    runs = []
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(shutil, "which", lambda cmd: "/usr/bin/open" if cmd == "open" else None)
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: runs.append(cmd))
+    info_m.open_output_folder()
+    assert runs and runs[-1][0] == "open"
+
+    # Test Linux xdg-open
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(
+        shutil, "which", lambda cmd: "/usr/bin/xdg-open" if cmd == "xdg-open" else None
+    )
+    info_m.open_output_folder()
+    assert runs and runs[-1][0] == "xdg-open"
+
+
 def test_show_history_fallback(monkeypatch, capsys, isolated_history_db):
     from pinak import history as history_mod
 

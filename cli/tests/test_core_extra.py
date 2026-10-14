@@ -81,6 +81,19 @@ def test_logging_setup_with_file(tmp_path):
     setup_logging(verbose=False, log_file=None)
 
 
+def test_logging_setup_with_none_stderr(monkeypatch):
+    import sys
+
+    import pinak.logging_setup as log_setup
+
+    monkeypatch.setattr(log_setup, "_configured", False)
+    monkeypatch.setattr(sys, "stderr", None)
+    logger = log_setup.setup_logging(verbose=False)
+    assert logger is not None
+    # Reset for other tests
+    monkeypatch.setattr(log_setup, "_configured", False)
+
+
 def test_script_dir_finds_directory_with_binary():
     found = utils.script_dir()
     # After cleanup, bundled binaries may not exist; ensure script_dir returns a directory.
@@ -107,6 +120,7 @@ def test_ffmpeg_available_false(monkeypatch):
 
 
 def test_is_online_branches(monkeypatch):
+    import socket
     import urllib.request
 
     class _Resp:
@@ -123,6 +137,10 @@ def test_is_online_branches(monkeypatch):
         raise OSError("offline")
 
     monkeypatch.setattr(urllib.request, "urlopen", _boom)
+    monkeypatch.setattr(socket, "create_connection", lambda *a, **k: _Resp())
+    assert utils.is_online() is True
+
+    monkeypatch.setattr(socket, "create_connection", _boom)
     assert utils.is_online() is False
 
 

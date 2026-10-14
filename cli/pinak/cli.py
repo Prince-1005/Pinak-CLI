@@ -56,36 +56,58 @@ console = Console()
 def ask_with_esc(q):
     """Wrapper to allow Esc key to cancel questionary prompts."""
     try:
+        try:
 
-        @q.application.key_bindings.add(Keys.Escape, eager=True)
-        def _(event):
-            event.app.exit(result=None)
+            @q.application.key_bindings.add(Keys.Escape, eager=True)
+            def _(event):
+                event.app.exit(result=None)
 
-    except AttributeError:
-        from prompt_toolkit.key_binding import KeyBindings, merge_key_bindings
+        except AttributeError:
+            from prompt_toolkit.key_binding import KeyBindings, merge_key_bindings
 
-        kb = KeyBindings()
+            kb = KeyBindings()
 
-        @kb.add(Keys.Escape, eager=True)
-        def _(event):
-            event.app.exit(result=None)
+            @kb.add(Keys.Escape, eager=True)
+            def _(event):
+                event.app.exit(result=None)
 
-        q.application.key_bindings = merge_key_bindings([q.application.key_bindings, kb])
+            q.application.key_bindings = merge_key_bindings([q.application.key_bindings, kb])
+    except Exception:
+        pass
 
     # Catch internal KeyboardInterrupt from Ctrl+C to avoid redundant messages
     try:
         return q.ask(kbi_msg="")
     except TypeError:
         # Fallback if kbi_msg is not supported in the user's questionary version
-        return q.ask()
+        try:
+            return q.ask()
+        except Exception:
+            try:
+                msg = getattr(q, "message", "Enter value: ")
+                return input(str(msg)).strip()
+            except (EOFError, KeyboardInterrupt):
+                return None
+    except Exception:
+        # Fallback to standard input if prompt_toolkit / terminal fails
+        try:
+            msg = getattr(q, "message", "Enter value: ")
+            return input(str(msg)).strip()
+        except (EOFError, KeyboardInterrupt):
+            return None
 
 
 def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
     print_banner()
     username = config.get("username", "").strip()
     if not username:
-        console.print("[yellow][!] Before we begin, please tell us your name.[/]")
-        username = ask_with_esc(questionary.text("Enter your name:"))
+        try:
+            username = ask_with_esc(questionary.text("Enter your name:"))
+        except Exception:
+            try:
+                username = input("Enter your name: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                username = None
         if not username:
             print(f"\n{CYAN}[*] Goodbye!{RESET}")
             sys.exit(0)
@@ -102,6 +124,7 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
         "/open": "Open the current output folder",
         "/history": "View download history",
         "/batch": "Download multiple URLs from a text file",
+        "/any": "Download content from any platform supported by yt-dlp",
         "/instagram": "Download post, reel, igtv from Instagram",
         "/video": "Download video from a URL",
         "/audio": "Download video/song directly as MP3",
@@ -143,6 +166,7 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
         def append_string(self, string: str) -> None:
             lower_str = string.strip().lower()
             if lower_str in [
+                "/any",
                 "/video",
                 "/audio",
                 "/trim",
@@ -155,7 +179,10 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
             super().append_string(string)
 
     history_file = os.path.expanduser("~/.pinak_cli_history")
-    session = PromptSession(history=FilteredHistory(history_file))
+    try:
+        session = PromptSession(history=FilteredHistory(history_file))
+    except Exception:
+        session = None
 
     kb = KeyBindings()
 
@@ -164,6 +191,7 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
         buffer = event.current_buffer
         text = buffer.text.strip().lower()
         if text in [
+            "/any",
             "/video",
             "/audio",
             "/trim",
@@ -196,25 +224,44 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 print_update_notice(updater.PINAK_PACKAGE, updater.PINAK_UPDATE_AVAILABLE)
                 has_shown_pinak_update = True
 
-            cmd = session.prompt(
-                "Pinak 🔱 > ",
-                default=default_cmd,
-                completer=commands_completer,
-                complete_while_typing=True,
-                style=custom_style,
-                mouse_support=False,
-                key_bindings=kb,
-            ).strip()
+            if session is not None:
+                try:
+                    cmd = session.prompt(
+                        "Pinak 🔱 > ",
+                        default=default_cmd,
+                        completer=commands_completer,
+                        complete_while_typing=True,
+                        style=custom_style,
+                        mouse_support=False,
+                        key_bindings=kb,
+                    ).strip()
+                except (EOFError, KeyboardInterrupt):
+                    print_exit_screen(interrupted=True)
+                    break
+                except Exception:
+                    try:
+                        cmd = input("Pinak 🔱 > ").strip()
+                    except (EOFError, KeyboardInterrupt):
+                        print_exit_screen(interrupted=True)
+                        break
+            else:
+                try:
+                    cmd = input("Pinak 🔱 > ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    print_exit_screen(interrupted=True)
+                    break
 
             default_cmd = ""
+            cmd = cmd.strip().lstrip("\ufeff")
 
             if not cmd:
                 continue
 
             lower_cmd = cmd.lower()
 
-            # Fallback if somehow submitted (e.g. mouse double click)
-            if lower_cmd in [
+            # Fallback if somehow submitted (e.g. mouse double click in prompt_toolkit)
+            if session is not None and lower_cmd in [
+                "/any",
                 "/video",
                 "/audio",
                 "/trim",
@@ -626,20 +673,66 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
 
             if cmd.startswith("/"):
                 if not (
-                    lower_cmd.startswith("/audio ")
+                    lower_cmd.startswith("/any ")
+                    or lower_cmd.startswith("/audio ")
                     or lower_cmd.startswith("/video ")
                     or lower_cmd.startswith("/instagram ")
+                    or lower_cmd in ("/any", "/video", "/audio", "/instagram")
                 ):
                     print(f"{YELLOW}[!] Unknown command: {cmd}. Type /help for assistance.{RESET}")
                     continue
+                if lower_cmd in ("/any", "/video", "/audio", "/instagram"):
+                    try:
+                        raw_url = input("Enter URL to download: ").strip()
+                    except (KeyboardInterrupt, EOFError):
+                        print(f"{YELLOW}[*] Canceled.{RESET}")
+                        continue
+                    if not raw_url:
+                        print(f"{RED}[!] Error: No URL provided.{RESET}")
+                        continue
+                    cmd = f"{cmd} {raw_url}"
+                    lower_cmd = cmd.lower()
+                is_any = lower_cmd.startswith("/any ")
                 url, extract_audio, force, quality = parse_download_text(cmd)
-                handle_download(url, extract_audio=extract_audio, force=force, quality=quality)
+                handle_download(
+                    url,
+                    extract_audio=extract_audio,
+                    force=force,
+                    quality=quality,
+                    is_any_command=is_any,
+                )
             else:
-                if cmd.lower().startswith("http"):
-                    print(
-                        f"{YELLOW}[!] Direct URL detected. Use /video, /audio, or /instagram before the link."
+                if lower_cmd.startswith("any "):
+                    url, extract_audio, force, quality = parse_download_text(cmd)
+                    handle_download(
+                        url,
+                        extract_audio=extract_audio,
+                        force=force,
+                        quality=quality,
+                        is_any_command=True,
                     )
-                    print(f"    Example: /instagram {cmd}{RESET}")
+                elif lower_cmd == "any":
+                    try:
+                        raw_url = input("Enter URL to download: ").strip()
+                    except (KeyboardInterrupt, EOFError):
+                        print(f"{YELLOW}[*] Canceled.{RESET}")
+                        continue
+                    if not raw_url:
+                        print(f"{RED}[!] Error: No URL provided.{RESET}")
+                        continue
+                    url, extract_audio, force, quality = parse_download_text(f"/any {raw_url}")
+                    handle_download(
+                        url,
+                        extract_audio=extract_audio,
+                        force=force,
+                        quality=quality,
+                        is_any_command=True,
+                    )
+                elif cmd.lower().startswith("http"):
+                    print(
+                        f"{YELLOW}[!] Direct URL detected. Use /any, /video, /audio, or /instagram before the link."
+                    )
+                    print(f"    Example: /any {cmd}{RESET}")
                 else:
                     print(
                         f"{YELLOW}[!] Unknown input: '{cmd}'. Type /help to see all commands.{RESET}"
@@ -711,11 +804,17 @@ def maybe_print_offline_notice() -> bool:
 @app.command()
 def main(
     url: str | None = typer.Argument(None, help="The URL to download from"),
+    extra_arg: str | None = typer.Argument(
+        None, help="Optional secondary URL or command argument (e.g. pinak any <url>)"
+    ),
     output: str | None = typer.Option(None, "-o", "--output", help="Output directory"),
     force: bool = typer.Option(False, "--force", help="Force download despite duplicates"),
     audio: bool = typer.Option(False, "--audio", help="Extract audio directly as MP3"),
     quality: str | None = typer.Option(
         None, "--quality", help="Quality: best, worst, audio, 360p, 720p, 1080p"
+    ),
+    any_link: bool = typer.Option(
+        False, "--any", help="Allow any type of link supported by yt-dlp"
     ),
     doctor: bool = typer.Option(False, "--doctor", help="Run environment checks and exit"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose debug output"),
@@ -769,8 +868,13 @@ def main(
     updater.start_background_update_check()
     maybe_print_offline_notice()
 
+    if url in ("any", "/any"):
+        any_link = True
+        url = extra_arg
+
     has_args = bool(
         url
+        or any_link
         or output
         or force
         or audio
@@ -786,7 +890,18 @@ def main(
         from .commands.run import run_single
 
         raise typer.Exit(
-            code=run_single(url, output, force, audio, quality, doctor, verbose, dry_run, as_json)
+            code=run_single(
+                url,
+                output,
+                force,
+                audio,
+                quality,
+                doctor,
+                verbose,
+                dry_run,
+                as_json,
+                is_any=any_link,
+            )
         )
     repl_loop()
 

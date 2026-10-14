@@ -1,7 +1,7 @@
 # Pinak – Excellence Documentation
 
-**Version:** 1.2.1  
-**Last Updated:** October 13, 2026  
+**Version:** 1.3.0  
+**Last Updated:** October 14, 2026  
 **Location:** `D:\pinak Z`
 
 ## Table of Contents
@@ -693,7 +693,7 @@ Follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 - **MINOR:** New features (backward compatible)
 - **PATCH:** Bug fixes
 
-Current: `1.2.1`
+Current: `1.3.0`
 
 ### F. Acknowledgements
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) – Powerful download engine

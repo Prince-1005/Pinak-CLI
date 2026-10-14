@@ -128,3 +128,52 @@ def test_updater_silent_on_network_error(monkeypatch):
     updater_mod.UPDATE_AVAILABLE = None
     updater_mod._check_update_thread()  # must not raise
     assert updater_mod.UPDATE_AVAILABLE is None
+
+
+def test_doctor_internet_socket_fallback(monkeypatch, tmp_path):
+    import socket
+
+    monkeypatch.setattr(doctor_mod, "ensure_ffmpeg", lambda: "ffmpeg.exe")
+    monkeypatch.setattr(doctor_mod, "ensure_ffprobe", lambda: "ffprobe.exe")
+    monkeypatch.setattr(doctor_mod.shutil, "which", lambda name: "pinak")
+
+    class _R:
+        returncode = 0
+        stdout = "ffmpeg version 7.0"
+        stderr = ""
+
+    monkeypatch.setattr(doctor_mod, "run_cmd", lambda *a, **k: _R())
+    config_path = tmp_path / "config.json"
+    monkeypatch.setitem(doctor_mod.config, "output_dir", str(tmp_path / "out"))
+    monkeypatch.setattr(doctor_mod, "CONFIG_FILE", str(config_path))
+    config_path.write_text("{}", encoding="utf-8")
+
+    # Simulate HTTPS failing completely
+    def _boom(*a, **k):
+        raise OSError("https blocked")
+
+    monkeypatch.setattr(urllib.request, "urlopen", _boom)
+
+    # Simulate socket succeeding
+    class _MockSock:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(socket, "create_connection", lambda *a, **k: _MockSock())
+
+    out_dir = str(tmp_path / "out")
+
+    def _exists(p):
+        p_str = str(p)
+        return p_str in (
+            "ffmpeg.exe",
+            "ffprobe.exe",
+            out_dir,
+            str(config_path),
+        ) or p_str.startswith(out_dir)
+
+    monkeypatch.setattr("os.path.exists", _exists)
+    assert doctor_mod.run_doctor() is True

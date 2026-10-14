@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -148,17 +149,34 @@ def init_config() -> dict[str, Any]:
         elif os.path.exists(LOCAL_CONFIG):
             shutil.copy(LOCAL_CONFIG, CONFIG_FILE)
 
+    def _load_from_path(path: str) -> bool:
+        if not os.path.exists(path):
+            return False
+        with open(path, encoding="utf-8") as f:
+            raw = f.read().strip()
+        if not raw:
+            return False
+        data = json.loads(raw)
+        if isinstance(data, dict):
+            data = _migrate_legacy_keys(data)
+            settings = PinakSettings(**data)
+            config.update(settings.model_dump())
+            return True
+        return False
+
+    loaded = False
     try:
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, encoding="utf-8") as f:
-                data = json.load(f)
-            if isinstance(data, dict):
-                data = _migrate_legacy_keys(data)
-                # Load with Pydantic for validation
-                settings = PinakSettings(**data)
-                config.update(settings.model_dump())
+        loaded = _load_from_path(CONFIG_FILE)
     except Exception:
-        pass
+        loaded = False
+
+    # Fallback to backup file if primary CONFIG_FILE was missing, empty, or corrupted
+    if not loaded:
+        bak_file = CONFIG_FILE + ".bak"
+        with contextlib.suppress(Exception):
+            if _load_from_path(bak_file):
+                with contextlib.suppress(Exception):
+                    shutil.copy2(bak_file, CONFIG_FILE)
 
     return config
 
@@ -177,11 +195,28 @@ def save_config(config_data: dict[str, Any] | None = None) -> bool:
     if config_data is not None:
         config.update(config_data)
 
+    temp_file = CONFIG_FILE + ".tmp"
+    bak_file = CONFIG_FILE + ".bak"
     try:
         valid_settings = validate_settings(config)
         config.update(valid_settings.model_dump())
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            f.write(valid_settings.model_dump_json(indent=4))
+        serialized = valid_settings.model_dump_json(indent=4)
+
+        parent_dir = os.path.dirname(CONFIG_FILE)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+
+        with open(temp_file, "w", encoding="utf-8") as f:
+            f.write(serialized)
+            f.flush()
+            with contextlib.suppress(AttributeError, OSError):
+                os.fsync(f.fileno())
+
+        if os.path.exists(CONFIG_FILE):
+            with contextlib.suppress(Exception):
+                shutil.copy2(CONFIG_FILE, bak_file)
+
+        os.replace(temp_file, CONFIG_FILE)
         return True
     except ConfigError as ce:
         print(f"\033[91m[X] Could not write {CONFIG_FILE}: {ce}\033[0m")
@@ -193,3 +228,7 @@ def save_config(config_data: dict[str, Any] | None = None) -> bool:
             "\033[93m[!] Tip: check that values are valid (e.g. quality=best/720p, video_format=mp4). Run `pinak --doctor` for details.\033[0m"
         )
         return False
+    finally:
+        if os.path.exists(temp_file):
+            with contextlib.suppress(Exception):
+                os.remove(temp_file)

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import contextlib
 import importlib.metadata
 import json
+import shutil
 import sys
 import threading
 import time
 import urllib.request
+from pathlib import Path
 
 from .config import config, save_config
 
@@ -91,6 +94,29 @@ def _package_version(package: str) -> str | None:
     return _installed_version(package)
 
 
+def _find_pinak_binary() -> Path | None:
+    """Locate the pinak executable on Windows to work around file locks during update."""
+    for name in ("pinak.exe", "pinak"):
+        found = shutil.which(name)
+        if found:
+            p = Path(found)
+            if p.is_file():
+                return p
+
+    scripts_dir = Path(sys.prefix) / ("Scripts" if sys.platform.startswith("win") else "bin")
+    for name in ("pinak.exe", "pinak"):
+        p = scripts_dir / name
+        if p.is_file():
+            return p
+
+    if sys.argv and sys.argv[0]:
+        p = Path(sys.argv[0])
+        if p.is_file() and p.stem.lower() == "pinak":
+            return p
+
+    return None
+
+
 def perform_update(timeout: float = 300.0) -> dict[str, str]:
     """Upgrade yt-dlp and pinak-cli itself via pip.
 
@@ -107,17 +133,56 @@ def perform_update(timeout: float = 300.0) -> dict[str, str]:
     results: dict[str, str] = {}
     for package in (UPDATE_PACKAGE, PINAK_PACKAGE):
         before = _package_version(package)
+        renamed_bin: Path | None = None
+        pinak_bin: Path | None = None
+        if package == PINAK_PACKAGE and sys.platform.startswith("win"):
+            pinak_bin = _find_pinak_binary()
+            if pinak_bin and pinak_bin.exists():
+                old_target = pinak_bin.with_name(f"{pinak_bin.name}.old")
+                with contextlib.suppress(OSError):
+                    if old_target.exists():
+                        old_target.unlink()
+                try:
+                    pinak_bin.rename(old_target)
+                    renamed_bin = old_target
+                except OSError:
+                    renamed_bin = None
+
         try:
             result = run_cmd(
                 [sys.executable, "-m", "pip", "install", "--upgrade", package],
                 timeout=timeout,
             )
         except Exception as exc:
+            if renamed_bin and pinak_bin and not pinak_bin.exists():
+                with contextlib.suppress(OSError):
+                    renamed_bin.rename(pinak_bin)
             results[package] = f"Update error: {exc}"
             continue
+
         if result.returncode != 0:
-            results[package] = f"Update failed. Error:\n{result.stderr}"
+            if renamed_bin and pinak_bin and not pinak_bin.exists():
+                with contextlib.suppress(OSError):
+                    renamed_bin.rename(pinak_bin)
+            err = (result.stderr or result.stdout or "").strip()
+            if "winerror 32" in err.lower() or "being used by another process" in err.lower():
+                results[package] = (
+                    f"Update failed: {package} binary is currently in use on Windows.\n"
+                    f"Please exit Pinak (/exit) and run in your terminal:\n"
+                    f"  pip install --upgrade {package}"
+                )
+            else:
+                results[package] = f"Update failed. Error:\n{result.stderr}"
             continue
+
+        if renamed_bin:
+            if pinak_bin and not pinak_bin.exists():
+                with contextlib.suppress(OSError):
+                    renamed_bin.rename(pinak_bin)
+            else:
+                with contextlib.suppress(OSError):
+                    renamed_bin.unlink()
+
         if package == UPDATE_PACKAGE:
             UPDATE_AVAILABLE = None
         else:

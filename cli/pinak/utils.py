@@ -51,6 +51,49 @@ def script_dir() -> str:
     return cli_dir  # best guess even if binary not found there
 
 
+def _get_platform_candidate_dirs() -> list[str]:
+    """Return well-known fallback directories for package managers and environments."""
+    dirs: list[str] = []
+    if sys.platform.startswith("win"):
+        local_app = os.environ.get("LOCALAPPDATA", "")
+        if local_app:
+            dirs.append(os.path.join(local_app, "Microsoft", "WinGet", "Links"))
+        user_prof = os.environ.get("USERPROFILE", "")
+        if user_prof:
+            dirs.append(os.path.join(user_prof, "scoop", "shims"))
+            dirs.append(os.path.join(user_prof, "scoop", "apps", "ffmpeg", "current", "bin"))
+        dirs.append(r"C:\ProgramData\chocolatey\bin")
+        dirs.append(r"C:\ffmpeg\bin")
+    else:
+        dirs.extend(
+            [
+                "/data/data/com.termux/files/usr/bin",  # Android Termux
+                "/usr/local/bin",
+                "/opt/homebrew/bin",  # macOS Apple Silicon Homebrew
+                "/opt/local/bin",  # macOS MacPorts
+                "/usr/bin",
+                "/snap/bin",
+            ]
+        )
+    return [d for d in dirs if os.path.isdir(d)]
+
+
+_static_ffmpeg_initialized = False
+
+
+def _ensure_static_ffmpeg_paths() -> None:
+    """Ensure static-ffmpeg binaries are prepended to PATH if installed."""
+    global _static_ffmpeg_initialized
+    if not _static_ffmpeg_initialized:
+        _static_ffmpeg_initialized = True
+        try:
+            import static_ffmpeg  # type: ignore
+
+            static_ffmpeg.add_paths()
+        except Exception:
+            pass
+
+
 def _resolve_binary(
     names: tuple[str, ...],
     config_override: str | None = None,
@@ -61,7 +104,9 @@ def _resolve_binary(
     2. System PATH via ``shutil.which`` (cross-platform friendly).
     3. Bundled binary next to ``cli/`` (``ffmpeg.exe`` on Windows,
        ``ffmpeg`` on Linux/macOS).
-    4. Bare command name as a last resort (lets subprocess raise a clear error).
+    4. Well-known package manager / environment locations (Winget, Scoop, Choco, Termux, Homebrew).
+    5. static-ffmpeg package (if installed in the python environment).
+    6. Bare command name as a last resort (lets subprocess raise a clear error).
     """
     if config_override:
         expanded = os.path.abspath(os.path.expanduser(config_override))
@@ -76,6 +121,17 @@ def _resolve_binary(
         candidate = os.path.join(base, name)
         if os.path.exists(candidate):
             return candidate
+    for d in _get_platform_candidate_dirs():
+        for name in names:
+            candidate = os.path.join(d, name)
+            if os.path.exists(candidate):
+                return candidate
+    # Try static-ffmpeg if installed
+    _ensure_static_ffmpeg_paths()
+    for name in names:
+        found = shutil.which(name)
+        if found:
+            return found
     return names[0]
 
 
@@ -152,29 +208,37 @@ def human_size(bytes_sz: object) -> str:
     return f"{bytes_sz:.1f} TB"
 
 
-def get_all_files(folder: str) -> dict[str, float]:
+def get_all_files(folder: str) -> dict[str, tuple[float, int]]:
     import contextlib
 
-    files: dict[str, float] = {}
+    files: dict[str, tuple[float, int]] = {}
     for root, _, filenames in os.walk(folder):
         for f in filenames:
             full_path = os.path.join(root, f)
             with contextlib.suppress(OSError):
-                files[full_path] = os.path.getmtime(full_path)
+                st = os.stat(full_path)
+                files[full_path] = (st.st_mtime, st.st_size)
     return files
 
 
-def get_file_snapshot(folder: str) -> dict[str, float]:
+def get_file_snapshot(folder: str) -> dict[str, Any]:
     if not os.path.exists(folder):
         return {}
     return get_all_files(folder)
 
 
-def changed_files(before: dict[str, float], after: dict[str, float]) -> list[str]:
+def changed_files(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
     files = []
     for path, state in after.items():
-        if before.get(path) != state:
+        before_state = before.get(path)
+        if before_state is None:
             files.append(path)
+        elif before_state != state:
+            if isinstance(before_state, (int, float)) and isinstance(state, tuple):
+                if before_state != state[0]:
+                    files.append(path)
+            else:
+                files.append(path)
     return sorted(files)
 
 
@@ -241,7 +305,13 @@ def has_embedded_subtitle(file_path: str) -> bool:
 
 
 def is_online(timeout: float = 5.0) -> bool:
-    """Check internet connectivity with a configurable timeout (seconds)."""
+    """Check internet connectivity with a configurable timeout (seconds).
+
+    Uses a tiered fallback approach:
+      1. Major HTTPS endpoints (Google, Cloudflare direct IP, Cloudflare web, Httpbin).
+      2. Low-level TCP socket connection to known reliable DNS IPs (1.1.1.1, 8.8.8.8 on port 53).
+    """
+    import socket
     import urllib.request
 
     try:
@@ -253,8 +323,14 @@ def is_online(timeout: float = 5.0) -> bool:
         except Exception:
             pass
 
-        # Try Google first, fall back to Cloudflare DNS endpoint
-        for host in ("https://www.google.com", "https://1.1.1.1"):
+        # Tier 1: HTTPS probes across multiple independent CDNs/hosts
+        hosts = (
+            "https://www.google.com",
+            "https://1.1.1.1",
+            "https://www.cloudflare.com",
+            "https://httpbin.org/status/200",
+        )
+        for host in hosts:
             try:
                 probe = urllib.request.Request(host, headers={"User-Agent": "PinakCLI"})
                 # Fixed first-party HTTPS probe — no user-controlled scheme. nosec B310
@@ -262,6 +338,16 @@ def is_online(timeout: float = 5.0) -> bool:
                     return True
             except Exception:
                 continue
+
+        # Tier 2: Low-level socket fallback (bypasses HTTP proxy, TLS, or DNS issues)
+        sock_timeout = min(connect_timeout, 2.0)
+        for ip, port in (("1.1.1.1", 53), ("8.8.8.8", 53)):
+            try:
+                with socket.create_connection((ip, port), timeout=sock_timeout):
+                    return True
+            except Exception:
+                continue
+
         return False
     except Exception:
         return False
@@ -280,6 +366,92 @@ def get_platform(url: str) -> str:
     return "Unknown"
 
 
+def is_url_supported_by_ytdlp(url: str) -> tuple[bool, str]:
+    """Check if a URL is an allowed/supported link type by yt-dlp.
+
+    Returns ``(is_supported, platform_or_reason)``.
+    Supports:
+      1. Any platform with a dedicated yt-dlp extractor (YouTube, TikTok, Twitter/X, Instagram,
+         Facebook, Reddit, Vimeo, SoundCloud, Twitch, Bilibili, and 1700+ others).
+      2. Direct media URLs (.mp4, .mp3, .m3u8, .mpd, .webm, .mkv, etc.) handled by yt-dlp.
+    Rejects:
+      - Non-HTTP/HTTPS URLs (ftp, file, mailto, invalid text).
+      - Generic websites with no supported media/extractor (e.g. google.com, github.com).
+    """
+    if not url or not isinstance(url, str) or not url.strip():
+        return False, "Empty URL"
+
+    clean_url = url.strip()
+    if not (clean_url.startswith("http://") or clean_url.startswith("https://")):
+        return False, "Not an allowed link type: URL must start with http:// or https://"
+
+    platform = get_platform(clean_url)
+    if platform != "Unknown":
+        return True, platform
+
+    import urllib.parse
+
+    parsed = urllib.parse.urlparse(clean_url)
+    path = parsed.path.lower()
+    media_exts = (
+        ".mp4",
+        ".m4a",
+        ".m4v",
+        ".mp3",
+        ".mkv",
+        ".webm",
+        ".flv",
+        ".avi",
+        ".mov",
+        ".wav",
+        ".aac",
+        ".flac",
+        ".opus",
+        ".ogg",
+        ".ogv",
+        ".m3u8",
+        ".mpd",
+        ".ts",
+    )
+    if any(path.endswith(ext) for ext in media_exts):
+        return True, "Direct Media"
+
+    try:
+        import yt_dlp
+
+        class _QuietProbeLogger:
+            def debug(self, msg):
+                pass
+
+            def info(self, msg):
+                pass
+
+            def warning(self, msg):
+                pass
+
+            def error(self, msg):
+                pass
+
+        ydl = yt_dlp.YoutubeDL(
+            {
+                "logger": _QuietProbeLogger(),
+                "simulate": True,
+                "skip_download": True,
+                "socket_timeout": 5,
+            }
+        )
+        info = ydl.extract_info(clean_url, download=False)
+        if info:
+            domain = parsed.netloc.split(":")[0]
+            if domain.startswith("www."):
+                domain = domain[4:]
+            return True, domain.capitalize() if domain else "Web Media"
+    except Exception:
+        pass
+
+    return False, f"Not an allowed link type: '{clean_url}' is not supported by yt-dlp."
+
+
 def normalize_quality(value: str | None) -> str | None:
     value = (value or "best").strip().lower()
     aliases = {"audio": "audio", "mp3": "audio", "best": "best", "worst": "worst"}
@@ -291,10 +463,15 @@ def normalize_quality(value: str | None) -> str | None:
     return None
 
 
-def video_format_for_quality(quality: str | None) -> str:
+def video_format_for_quality(quality: str | None, has_ffmpeg: bool = True) -> str:
     quality = normalize_quality(quality) or "best"
     if quality == "worst":
         return "worst"
+    if not has_ffmpeg:
+        if quality.endswith("p"):
+            height = quality[:-1]
+            return f"best[height<={height}][ext=mp4]/best[height<={height}]/best"
+        return "best[ext=mp4]/best"
     if quality.endswith("p"):
         height = quality[:-1]
         return f"bestvideo[height<={height}]+bestaudio/best[height<={height}]/best"

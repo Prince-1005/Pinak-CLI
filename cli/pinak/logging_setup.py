@@ -22,18 +22,22 @@ def setup_logging(verbose: bool = False, log_file: str | None = None) -> logging
 
     logger = logging.getLogger("pinak")
     level = logging.DEBUG if verbose else logging.INFO
+    console_level = logging.DEBUG if verbose else logging.WARNING
     logger.setLevel(level)
 
     if not _configured:
-        handler = logging.StreamHandler(sys.stderr)
-        handler.setLevel(level)
-        handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
-        logger.addHandler(handler)
+        if sys.stderr is not None:
+            handler = logging.StreamHandler(sys.stderr)
+            handler.setLevel(console_level)
+            handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+            logger.addHandler(handler)
+        else:
+            logger.addHandler(logging.NullHandler())
         _configured = True
     else:
         for h in logger.handlers:
             if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler):
-                h.setLevel(level)
+                h.setLevel(console_level)
 
     if log_file and log_file != _file_handler_path:
         import contextlib

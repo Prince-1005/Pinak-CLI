@@ -1,5 +1,7 @@
 """Unit tests for pinak.utils — pure helpers with no network/FFmpeg."""
 
+import os
+
 from pinak import utils
 
 
@@ -50,6 +52,12 @@ def test_video_format_for_quality():
     fmt = utils.video_format_for_quality("720p")
     assert "720" in fmt and "bestaudio" in fmt
 
+    # Fallback when FFmpeg is not installed
+    assert utils.video_format_for_quality("best", has_ffmpeg=False) == "best[ext=mp4]/best"
+    assert utils.video_format_for_quality("worst", has_ffmpeg=False) == "worst"
+    fmt_no_ffmpeg = utils.video_format_for_quality("720p", has_ffmpeg=False)
+    assert "720" in fmt_no_ffmpeg and "bestaudio" not in fmt_no_ffmpeg
+
 
 def test_sanitize_filename_removes_illegal_chars():
     assert utils.sanitize_filename('a<b>c:d"e/f\\g|h?i*j') == "a_b_c_d_e_f_g_h_i_j"
@@ -69,6 +77,23 @@ def test_changed_files_detects_new_and_modified(tmp_path):
     assert changed == ["/b.mp4", "/c.mp4"]
 
 
+def test_changed_files_detects_size_change_with_same_mtime():
+    before = {"/a.mp4": (100.0, 1024)}
+    after = {"/a.mp4": (100.0, 4096), "/b.mp4": (100.0, 2048)}
+    changed = utils.changed_files(before, after)
+    assert changed == ["/a.mp4", "/b.mp4"]
+
+
+def test_get_all_files_returns_mtime_and_size(tmp_path):
+    f = tmp_path / "video.mp4"
+    f.write_bytes(b"hello world")
+    snap = utils.get_file_snapshot(str(tmp_path))
+    assert str(f) in snap
+    mtime, size = snap[str(f)]
+    assert isinstance(mtime, float)
+    assert size == len(b"hello world")
+
+
 def test_get_file_snapshot_missing_folder(tmp_path):
     missing = str(tmp_path / "does-not-exist")
     assert utils.get_file_snapshot(missing) == {}
@@ -80,3 +105,24 @@ def test_get_ffmpeg_path_returns_string():
     assert isinstance(path, str) and len(path) > 0
     probe = utils.get_ffprobe_path()
     assert isinstance(probe, str) and len(probe) > 0
+
+
+def test_get_platform_candidate_dirs():
+    dirs = utils._get_platform_candidate_dirs()
+    assert isinstance(dirs, list)
+    for d in dirs:
+        assert os.path.isdir(d)
+
+
+def test_resolve_binary_from_candidate_dirs(monkeypatch, tmp_path):
+    custom_bin_dir = tmp_path / "custom_tools"
+    custom_bin_dir.mkdir()
+    fake_ffmpeg = custom_bin_dir / "ffmpeg.exe"
+    fake_ffmpeg.write_text("binary", encoding="utf-8")
+
+    monkeypatch.setattr(utils.shutil, "which", lambda name: None)
+    monkeypatch.setattr(utils, "script_dir", lambda: str(tmp_path / "empty"))
+    monkeypatch.setattr(utils, "_get_platform_candidate_dirs", lambda: [str(custom_bin_dir)])
+
+    resolved = utils._resolve_binary(("ffmpeg.exe", "ffmpeg"))
+    assert resolved == str(fake_ffmpeg)

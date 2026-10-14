@@ -24,6 +24,7 @@ from .exceptions import (
     InvalidURLError,
     NetworkError,
     OutputDirError,
+    UnsupportedLinkTypeError,
 )
 from .history import record_download, url_downloaded_successfully
 from .instagram import download_instagram_media
@@ -45,6 +46,7 @@ from .utils import (
     human_duration,
     human_size,
     is_online,
+    is_url_supported_by_ytdlp,
     normalize_quality,
     video_format_for_quality,
 )
@@ -84,6 +86,7 @@ def _resilience_opts() -> dict:
     - ``continuedl`` keeps partial files so retries *resume* instead of restarting.
     - ``retries``/``fragment_retries`` handle transient segment failures.
     - ``socket_timeout`` prevents infinite hangs.
+    - ``extractor_args`` enables YouTube player client fallback against blocks.
     """
     retries = _retry_count()
     return {
@@ -93,12 +96,22 @@ def _resilience_opts() -> dict:
         "skip_unavailable_fragments": True,
         "socket_timeout": _socket_timeout(),
         "nocheckcertificate": False,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "ios", "web"],
+            }
+        },
     }
 
 
 def _classify_download_error(exc: Exception, url: str) -> Exception:
     """Map raw exceptions to actionable Pinak errors."""
     text = f"{type(exc).__name__}: {exc}".lower()
+    if "unsupported url" in text:
+        return UnsupportedLinkTypeError(
+            f"Not an allowed link type: '{url}' is not supported by yt-dlp.",
+            hint=UnsupportedLinkTypeError.hint,
+        )
     if "instagram" in url.lower() or "instagram" in text:
         if "429" in text or "rate" in text:
             from .exceptions import InstagramRateLimitedError
@@ -348,7 +361,9 @@ def download_media_content(
         except Exception as e:
             console.print(f"[yellow][!] Error parsing trim range: {e}. Downloading full file.[/]")
 
-    if config.get("embed_subs", False) and not extract_audio:
+    has_ffmpeg = ffmpeg_available()
+
+    if config.get("embed_subs", False) and not extract_audio and has_ffmpeg:
         ydl_opts["writesubtitles"] = True
         ydl_opts["writeautomaticsub"] = True
         ydl_opts["subtitleslangs"] = ["en", "all"]
@@ -365,41 +380,48 @@ def download_media_content(
             }
         )
 
-    ydl_opts["postprocessors"].append(
-        {
-            "key": "FFmpegMetadata",
-            "add_metadata": True,
-        }
-    )
+    if has_ffmpeg:
+        ydl_opts["postprocessors"].append(
+            {
+                "key": "FFmpegMetadata",
+                "add_metadata": True,
+            }
+        )
 
     if extract_audio:
-        ydl_opts["format"] = "bestaudio/best"
-        ydl_opts["writethumbnail"] = True
-        ydl_opts["postprocessors"].insert(
-            0,
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": config.get("audio_format", "mp3"),
-                "preferredquality": audio_quality,
-            },
-        )
-        ydl_opts["postprocessors"].append(
-            {
-                "key": "FFmpegThumbnailsConvertor",
-                "format": "jpg",
-            }
-        )
-        ydl_opts["postprocessors"].append(
-            {
-                "key": "EmbedThumbnail",
-                "already_have_thumbnail": False,
-            }
-        )
-        ydl_opts["postprocessor_args"] = {"ffmpeg": ["-id3v2_version", "3"]}
+        if has_ffmpeg:
+            ydl_opts["format"] = "bestaudio/best"
+            ydl_opts["writethumbnail"] = True
+            ydl_opts["postprocessors"].insert(
+                0,
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": config.get("audio_format", "mp3"),
+                    "preferredquality": audio_quality,
+                },
+            )
+            ydl_opts["postprocessors"].append(
+                {
+                    "key": "FFmpegThumbnailsConvertor",
+                    "format": "jpg",
+                }
+            )
+            ydl_opts["postprocessors"].append(
+                {
+                    "key": "EmbedThumbnail",
+                    "already_have_thumbnail": False,
+                }
+            )
+            ydl_opts["postprocessor_args"] = {"ffmpeg": ["-id3v2_version", "3"]}
+        else:
+            console.print(
+                "[yellow]ℹ Notice: FFmpeg not detected. Downloading direct audio stream without transcoding.[/]"
+            )
+            ydl_opts["format"] = "bestaudio[ext=m4a]/bestaudio/best"
     else:
-        ydl_opts["format"] = video_format_for_quality(chosen_quality)
+        ydl_opts["format"] = video_format_for_quality(chosen_quality, has_ffmpeg=has_ffmpeg)
         vid_fmt = config.get("video_format", "mp4")
-        if vid_fmt:
+        if vid_fmt and has_ffmpeg:
             ydl_opts["merge_output_format"] = vid_fmt
 
     mode = "AUDIO" if extract_audio else "MEDIA"
@@ -432,7 +454,7 @@ def download_media_content(
             rich_progress = None
             rich_task = None
 
-            if extract_audio and info:
+            if extract_audio and info and has_ffmpeg:
                 audio_fmt = config.get("audio_format", "mp3")
                 filename = ydl.prepare_filename(info)
                 base = os.path.splitext(filename)[0]
@@ -476,6 +498,53 @@ def download_media_content(
 
         after_files = get_file_snapshot(actual_dir)
         new_files = changed_files(before_files, after_files)
+
+        if not new_files and info:
+            candidates: list[str] = []
+            if "_filename" in info and isinstance(info["_filename"], str):
+                candidates.append(info["_filename"])
+            with contextlib.suppress(Exception):
+                candidates.append(ydl.prepare_filename(info))
+            for req in info.get("requested_downloads", []):
+                if isinstance(req, dict):
+                    if req.get("filepath") and isinstance(req["filepath"], str):
+                        candidates.append(req["filepath"])
+                    if req.get("_filename") and isinstance(req["_filename"], str):
+                        candidates.append(req["_filename"])
+            for entry in info.get("entries", []):
+                if isinstance(entry, dict):
+                    if entry.get("_filename") and isinstance(entry["_filename"], str):
+                        candidates.append(entry["_filename"])
+                    with contextlib.suppress(Exception):
+                        candidates.append(ydl.prepare_filename(entry))
+                    for req in entry.get("requested_downloads", []):
+                        if isinstance(req, dict):
+                            if req.get("filepath") and isinstance(req["filepath"], str):
+                                candidates.append(req["filepath"])
+                            if req.get("_filename") and isinstance(req["_filename"], str):
+                                candidates.append(req["_filename"])
+
+            expanded: list[str] = []
+            target_ext = (
+                config.get("audio_format", "mp3")
+                if extract_audio
+                else config.get("video_format", "mp4")
+            )
+            for c in candidates:
+                expanded.append(c)
+                base = os.path.splitext(c)[0]
+                if target_ext:
+                    expanded.append(f"{base}.{target_ext}")
+
+            for c in expanded:
+                if (
+                    c
+                    and os.path.exists(c)
+                    and os.path.getsize(c) > 0
+                    and not c.endswith((".part", ".ytdl"))
+                    and c not in new_files
+                ):
+                    new_files.append(c)
         # Integrity check: drop missing/empty files so corrupt partials
         # are never recorded as successes.
         valid_files, bad_files = verify_files(new_files)
@@ -564,6 +633,12 @@ def parse_download_text(text):
     elif raw.lower().startswith("/instagram "):
         extract_audio = False
         raw = raw[11:].strip()
+    elif raw.lower().startswith("/any "):
+        extract_audio = False
+        raw = raw[5:].strip()
+    elif raw.lower().startswith("any "):
+        extract_audio = False
+        raw = raw[4:].strip()
 
     parts = raw.split()
     cleaned = []
@@ -627,6 +702,7 @@ def handle_download(
     quality=None,
     interactive=True,
     trim_range=None,
+    is_any_command=False,
 ):
     global is_downloading
     log = get_logger("pinak.downloader")
@@ -655,6 +731,27 @@ def handle_download(
             "quality": quality or config.get("quality", "best"),
         }
 
+    any_platform_reason = None
+    if is_any_command:
+        supported, any_platform_reason = is_url_supported_by_ytdlp(url)
+        if not supported:
+            err = UnsupportedLinkTypeError(
+                f"Not an allowed link type: {url} is not supported by yt-dlp.",
+                hint=UnsupportedLinkTypeError.hint,
+            )
+            print(f"{RED}[!] Error: Not an allowed link type.{RESET}")
+            print(f"{YELLOW}    '{url}' is not supported by yt-dlp.{RESET}")
+            print(f"{YELLOW}Tip: {err.hint}{RESET}")
+            log.warning("Unsupported link type for /any: %s", url)
+            return {
+                "success": False,
+                "error": "unsupported_link_type",
+                "url": url,
+                "files": [],
+                "audio": extract_audio,
+                "quality": quality or config.get("quality", "best"),
+            }
+
     if quality is not None and normalize_quality(quality) is None:
         err = InvalidQualityError(f"Invalid quality: {quality!r}")
         print(f"{RED}[!] Error: {err}{RESET}")
@@ -677,14 +774,18 @@ def handle_download(
             print(f"{YELLOW}Tip: {err.hint}{RESET}")
             log.warning("ffmpeg not found; continuing — merging/conversion may fail")
         else:
-            log.info("ffmpeg provisioned via fallback: %s", fetched)
+            log.debug("ffmpeg provisioned via fallback: %s", fetched)
 
     detected_platform = get_platform(url)
     if detected_platform == "Unknown":
-        print(
-            f"{YELLOW}[!] Notice: The URL does not match any officially supported platform.{RESET}"
-        )
-        print("    You can use the /platform command to see valid platforms.")
+        if is_any_command and any_platform_reason:
+            detected_platform = any_platform_reason
+            print(f"{GREEN}[*] Detected Platform: {detected_platform}{RESET}")
+        else:
+            print(
+                f"{YELLOW}[!] Notice: The URL does not match any officially supported platform.{RESET}"
+            )
+            print("    You can use the /platform command to see valid platforms.")
     else:
         print(f"{GREEN}[*] Detected Platform: {detected_platform}{RESET}")
 
@@ -750,13 +851,44 @@ def handle_download(
         is_downloading = True
         try:
             if detected_platform == "Instagram":
-                result = download_instagram_media(
-                    url,
-                    output_dir,
-                    extract_audio=extract_audio,
-                    quality=quality,
-                    filename_suffix=filename_suffix,
-                )
+                try:
+                    result = download_instagram_media(
+                        url,
+                        output_dir,
+                        extract_audio=extract_audio,
+                        quality=quality,
+                        filename_suffix=filename_suffix,
+                    )
+                except Exception as ig_err:
+                    log.warning(
+                        "Instagram scraper failed (%s), falling back to generic engine", ig_err
+                    )
+                    console.print(
+                        "[yellow]ℹ Instagram scraper error; falling back to generic engine...[/]"
+                    )
+                    result = download_media_content(
+                        url,
+                        output_dir,
+                        extract_audio=extract_audio,
+                        quality=quality,
+                        filename_suffix=filename_suffix,
+                        trim_range=trim_range,
+                    )
+                else:
+                    if not result.get("success") and not result.get("canceled"):
+                        log.info(
+                            "Instagram scraper did not produce a file, trying generic engine fallback"
+                        )
+                        fallback_result = download_media_content(
+                            url,
+                            output_dir,
+                            extract_audio=extract_audio,
+                            quality=quality,
+                            filename_suffix=filename_suffix,
+                            trim_range=trim_range,
+                        )
+                        if fallback_result.get("success"):
+                            result = fallback_result
 
             else:
                 result = download_media_content(

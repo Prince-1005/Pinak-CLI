@@ -10,6 +10,7 @@ def test_exception_hints_are_actionable():
         exceptions.NetworkError,
         exceptions.FFmpegNotFoundError,
         exceptions.DownloadFailedError,
+        exceptions.UnsupportedLinkTypeError,
         exceptions.InstagramError,
         exceptions.InstagramRateLimitedError,
         exceptions.InstagramPrivateContentError,
@@ -24,6 +25,7 @@ def test_exception_hints_are_actionable():
 def test_exception_hierarchy():
     assert issubclass(exceptions.InstagramRateLimitedError, exceptions.InstagramError)
     assert issubclass(exceptions.InstagramError, exceptions.DownloadFailedError)
+    assert issubclass(exceptions.UnsupportedLinkTypeError, exceptions.DownloadFailedError)
     assert issubclass(exceptions.DownloadFailedError, exceptions.PinakError)
 
 
@@ -56,3 +58,20 @@ def test_parse_download_text_plain_url():
     assert url == "https://example.com/v"
     assert force is False
     assert quality is None
+
+
+def test_parse_download_text_any():
+    url, audio, force, quality = parse_download_text("/any https://example.com/v")
+    assert url == "https://example.com/v"
+    assert audio is False
+
+    url, audio, force, quality = parse_download_text(
+        "/any https://example.com/v --audio --quality=720p"
+    )
+    assert url == "https://example.com/v"
+    assert audio is True
+    assert quality == "720p"
+
+    url, audio, force, quality = parse_download_text("any https://example.com/v --force")
+    assert url == "https://example.com/v"
+    assert force is True

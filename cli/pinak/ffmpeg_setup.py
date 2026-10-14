@@ -69,7 +69,7 @@ def ensure_ffmpeg() -> str:
     path = get_ffmpeg_path()
     if _is_executable(path):
         return path
-    log.info("ffmpeg not found at %s; attempting static fallback", path)
+    log.debug("ffmpeg not found at %s; attempting static fallback", path)
     if _try_static_ffmpeg():
         refreshed = get_ffmpeg_path()
         if _is_executable(refreshed):

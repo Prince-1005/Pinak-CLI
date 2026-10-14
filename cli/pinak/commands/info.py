@@ -23,12 +23,40 @@ def open_output_folder() -> None:
     os.makedirs(output_dir, exist_ok=True)
     path = os.path.abspath(output_dir)
     try:
+        import shutil
+        import subprocess
         import webbrowser
 
+        opened = False
         if sys.platform.startswith("win"):
-            os.startfile(path)
-        else:
+            if hasattr(os, "startfile"):
+                try:
+                    os.startfile(path)
+                    opened = True
+                except Exception:
+                    pass
+            if not opened and shutil.which("explorer"):
+                try:
+                    subprocess.run(["explorer", path], check=False)  # nosec B603, B607
+                    opened = True
+                except Exception:
+                    pass
+        elif sys.platform == "darwin" and shutil.which("open"):
+            try:
+                subprocess.run(["open", path], check=False)  # nosec B603, B607
+                opened = True
+            except Exception:
+                pass
+        elif shutil.which("xdg-open"):
+            try:
+                subprocess.run(["xdg-open", path], check=False)  # nosec B603, B607
+                opened = True
+            except Exception:
+                pass
+
+        if not opened:
             webbrowser.open(Path(path).as_uri())
+
         print(f"{GREEN}[+] Opened: {path}{RESET}")
     except Exception as e:
         print(f"{RED}[X] Could not open folder: {e}{RESET}")
@@ -51,6 +79,10 @@ def print_help() -> None:
             "View history; filters: failed, audio, media, search <text>",
         ),
         ("/batch <file>", "Download multiple URLs from a text file"),
+        (
+            "/any <url>",
+            "Download content from any platform supported by yt-dlp",
+        ),
         (
             "/instagram <url>",
             "Download post, reel, igtv from Instagram with description & metadata",

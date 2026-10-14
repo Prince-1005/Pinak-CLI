@@ -10,6 +10,7 @@ All helpers are best-effort and never raise.
 from __future__ import annotations
 
 import contextlib
+import io
 import threading
 
 from rich.console import Console
@@ -23,17 +24,78 @@ except ImportError:  # pragma: no cover - platform dependent
 console = Console()
 
 
+def _show_native_notification(title: str, message: str) -> bool:
+    """Attempt native desktop notification on Windows, macOS, or Linux.
+
+    Returns True if a native toast/notification was dispatched.
+    """
+    import shutil
+    import subprocess
+    import sys
+
+    # Tier 1: Windows win11toast
+    if sys.platform.startswith("win") and _toast is not None:
+
+        def _show_win() -> None:
+            with (
+                contextlib.suppress(BaseException),
+                contextlib.redirect_stdout(io.StringIO()),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                _toast(
+                    title,
+                    message,
+                    duration="short",
+                    on_click=lambda *a, **k: None,
+                    on_dismissed=lambda *a, **k: None,
+                    on_failed=lambda *a, **k: None,
+                )
+
+        threading.Thread(target=_show_win, daemon=True).start()
+        return True
+
+    # Tier 2: macOS osascript
+    if sys.platform == "darwin" and shutil.which("osascript"):
+
+        def _show_mac() -> None:
+            with contextlib.suppress(Exception):
+                safe_title = title.replace('"', '\\"')
+                safe_msg = message.replace('"', '\\"')
+                cmd = [
+                    "osascript",
+                    "-e",
+                    f'display notification "{safe_msg}" with title "{safe_title}"',
+                ]
+                subprocess.run(cmd, capture_output=True, timeout=5.0)  # nosec B603
+
+        threading.Thread(target=_show_mac, daemon=True).start()
+        return True
+
+    # Tier 3: Linux notify-send
+    if (sys.platform.startswith("linux") or "bsd" in sys.platform) and shutil.which("notify-send"):
+
+        def _show_linux() -> None:
+            with contextlib.suppress(Exception):
+                subprocess.run(
+                    ["notify-send", title, message], capture_output=True, timeout=5.0
+                )  # nosec B603, B607
+
+        threading.Thread(target=_show_linux, daemon=True).start()
+        return True
+
+    return False
+
+
 def notify(title: str, message: str) -> None:
-    """Show a desktop toast on Windows, otherwise an inline Rich panel."""
-    if _toast is not None:  # pragma: no cover - requires Windows + dependency
+    """Show a desktop toast on Windows/macOS/Linux, falling back to an inline Rich panel."""
+    shown = False
+    try:
+        shown = _show_native_notification(title, message)
+    except Exception:
+        shown = False
 
-        def _show() -> None:
-            with contextlib.suppress(BaseException):
-                _toast(title, message, duration="short")
-
-        threading.Thread(target=_show, daemon=True).start()
-        return
-    console.print(Panel(f"[bold]{title}[/]\n{message}", border_style="cyan"))
+    if not shown:
+        console.print(Panel(f"[bold]{title}[/]\n{message}", border_style="cyan"))
 
 
 def print_offline_notice() -> None:

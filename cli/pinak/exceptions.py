@@ -57,6 +57,13 @@ class DownloadFailedError(PinakError):
     )
 
 
+class UnsupportedLinkTypeError(DownloadFailedError):
+    hint = (
+        "This link type is not supported by yt-dlp. "
+        "Use /platform to view supported platforms or supply a direct media stream URL."
+    )
+
+
 class InstagramError(DownloadFailedError):
     hint = (
         "Instagram download failed. Make sure the post/reel/story is public "

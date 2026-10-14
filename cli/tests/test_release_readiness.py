@@ -47,6 +47,63 @@ def test_notify_uses_toast_when_available(monkeypatch):
     assert calls and calls[0][:2] == ("T", "M")
 
 
+def test_notify_uses_macos_osascript(monkeypatch):
+    import shutil
+    import subprocess
+    import sys
+
+    _no_toast(monkeypatch)
+    _sync_threads(monkeypatch)
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(
+        shutil, "which", lambda cmd: "/usr/bin/osascript" if cmd == "osascript" else None
+    )
+
+    runs = []
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: runs.append(cmd))
+    notify_mod.notify("Mac Title", "Mac Message")
+    assert runs and runs[0][0] == "osascript"
+    assert "display notification" in runs[0][2]
+
+
+def test_notify_uses_linux_notifysend(monkeypatch):
+    import shutil
+    import subprocess
+    import sys
+
+    _no_toast(monkeypatch)
+    _sync_threads(monkeypatch)
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(
+        shutil, "which", lambda cmd: "/usr/bin/notify-send" if cmd == "notify-send" else None
+    )
+
+    runs = []
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: runs.append(cmd))
+    notify_mod.notify("Linux Title", "Linux Message")
+    assert runs and runs[0] == ["notify-send", "Linux Title", "Linux Message"]
+
+
+def test_notify_silences_toast_callbacks_and_output(monkeypatch, capsys):
+    toast_kwargs = {}
+
+    def _mock_toast(*a, **kwargs):
+        toast_kwargs.update(kwargs)
+        print("ToastDismissalReason.TIMED_OUT")
+        if callable(kwargs.get("on_dismissed")):
+            kwargs["on_dismissed"]("reason")
+
+    monkeypatch.setattr(notify_mod, "_toast", _mock_toast)
+    _sync_threads(monkeypatch)
+    notify_mod.notify("Title", "Message")
+
+    out = capsys.readouterr().out
+    assert "ToastDismissalReason.TIMED_OUT" not in out
+    assert callable(toast_kwargs.get("on_dismissed"))
+    assert callable(toast_kwargs.get("on_click"))
+    assert callable(toast_kwargs.get("on_failed"))
+
+
 def test_offline_notice_panel(monkeypatch, capsys):
     _no_toast(monkeypatch)
     monkeypatch.setattr(notify_mod, "notify", lambda *a, **k: None)

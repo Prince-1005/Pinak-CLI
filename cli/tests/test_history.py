@@ -52,3 +52,31 @@ def test_stats_with_data(isolated_history_db, tmp_output_dir):
     assert stats["total_attempts"] == 1
     assert stats["successes"] == 1
     assert stats["success_rate"] == 100.0
+
+
+def test_history_recovers_from_corrupt_db(isolated_history_db):
+    # Corrupt the database file with invalid header / bytes
+    with open(isolated_history_db, "wb") as f:
+        f.write(b"NOT A VALID SQLITE DATABASE FILE HEADER")
+
+    # Accessing history should self-heal and create a fresh DB
+    history_mod.record_download("https://example.com/healed", status="success")
+    rows = history_mod.get_history("")
+    assert len(rows) == 1
+    assert rows[0]["url"] == "https://example.com/healed"
+
+
+def test_history_graceful_on_total_db_failure(monkeypatch):
+    def _boom():
+        raise OSError("disk failure")
+
+    monkeypatch.setattr(history_mod, "get_db_connection", _boom)
+
+    # All public history functions must fail gracefully without raising
+    history_mod.record_download("https://example.com/fail")
+    assert history_mod.url_downloaded_successfully("https://example.com/fail") is False
+    assert history_mod.get_history("") == []
+    assert history_mod.get_history_ids_desc() == []
+    assert history_mod.get_stats_data() is None
+    history_mod.delete_history_by_ids([1, 2])
+    history_mod.clear_all_history()

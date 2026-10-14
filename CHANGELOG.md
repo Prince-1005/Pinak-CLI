@@ -7,6 +7,19 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-14
+
+### Added
+- New `/any <url>` REPL command and CLI command `pinak any <url>` to download media from any URL supported by `yt-dlp` (including direct media links and generic video/audio embeds).
+- Real-time generic webpage media probing: automatically detects downloadable streams on platforms without dedicated extractors (e.g. Voicy soundboards, podcasts, and generic HTML5/OpenGraph video embeds).
+- Multi-tier network fallback: Tier 1 fast HTTP HEAD request with a 2-second timeout, falling back to Tier 2 low-level TCP socket check on port 53 against `1.1.1.1` and `8.8.8.8` to prevent false offline detections behind corporate/restrictive proxies.
+- Resilient notification fallback chain: Windows 10/11 native toast notifications via `win11toast`, falling back to macOS `osascript`, Linux desktop notifications, and Rich console status panels.
+
+### Fixed
+- Fixed static-ffmpeg discovery when packaged in site-packages bin directories without `ffmpeg.exe` in root, eliminating persistent `ffmpeg not found at ffmpeg.exe` notices.
+- Fixed premature link rejection on generic sound and media sites like Voicy (`voicy.network`) by probing `yt-dlp` generic extractors when no dedicated extractor matches.
+- Cleaned up duplicate/missing platform indicators in download summaries and dry-run output tables.
+
 ## [1.2.1] - 2026-10-13
 
 ### Fixed

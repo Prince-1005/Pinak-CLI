@@ -117,6 +117,7 @@ def run_single(
     verbose: bool,
     dry_run: bool,
     as_json: bool,
+    is_any: bool = False,
 ) -> int:
     """Execute single-command mode. Returns the process exit code."""
     if output:
@@ -161,6 +162,7 @@ def run_single(
         force=force,
         quality=norm_quality,
         interactive=False,
+        is_any_command=is_any,
     )
     if as_json:
         print(json.dumps(result_to_jsonable(result), indent=2))

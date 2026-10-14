@@ -75,23 +75,7 @@ def _push_activity(payload: dict[str, Any], wait: bool = False) -> None:
 # ---------------------------------------------------------------------------
 # Local SQLite helpers
 # ---------------------------------------------------------------------------
-def get_db_connection() -> sqlite3.Connection:
-    # Migrate legacy DB if it exists and new one doesn't
-    if not os.path.exists(DB_FILE) and os.path.exists(LEGACY_DB_FILE):
-        try:
-            import shutil
-
-            shutil.copy(LEGACY_DB_FILE, DB_FILE)
-        except Exception:
-            pass
-
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def init_db() -> None:
-    conn = get_db_connection()
+def _create_schema(conn: sqlite3.Connection) -> None:
     cursor = conn.cursor()
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS downloads (
@@ -110,7 +94,52 @@ def init_db() -> None:
     with contextlib.suppress(sqlite3.OperationalError):  # Column already exists
         cursor.execute("ALTER TABLE downloads ADD COLUMN is_forced INTEGER DEFAULT 0")
     conn.commit()
-    conn.close()
+
+
+def get_db_connection() -> sqlite3.Connection:
+    # Migrate legacy DB if it exists and new one doesn't
+    if not os.path.exists(DB_FILE) and os.path.exists(LEGACY_DB_FILE):
+        try:
+            import shutil
+
+            shutil.copy(LEGACY_DB_FILE, DB_FILE)
+        except Exception:
+            pass
+
+    parent = os.path.dirname(DB_FILE)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_FILE, timeout=5.0)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA schema_version")
+        return conn
+    except (sqlite3.DatabaseError, OSError):
+        if conn is not None:
+            with contextlib.suppress(Exception):
+                conn.close()
+        # Self-healing: quarantine corrupt database and start clean
+        with contextlib.suppress(Exception):
+            corrupt_target = f"{DB_FILE}.corrupt.{int(time.time())}"
+            if os.path.exists(DB_FILE):
+                os.replace(DB_FILE, corrupt_target)
+
+        conn = sqlite3.connect(DB_FILE, timeout=5.0)
+        conn.row_factory = sqlite3.Row
+        with contextlib.suppress(Exception):
+            _create_schema(conn)
+        return conn
+
+
+def init_db() -> None:
+    try:
+        conn = get_db_connection()
+        _create_schema(conn)
+        conn.close()
+    except Exception:
+        pass
 
     # Run migration if legacy JSON history exists
     local_paths = [
@@ -211,65 +240,76 @@ def record_download(
     current_time = time.time()
 
     # --- Save to local SQLite ---
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-    INSERT INTO downloads (time, url, status, mode, quality, files, duration, size, is_forced)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """,
-        (
-            current_time,
-            url,
-            status,
-            mode,
-            quality,
-            files_str,
-            int(duration),
-            total_size,
-            int(is_forced),
-        ),
-    )
-    conn.commit()
-    conn.close()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+        INSERT INTO downloads (time, url, status, mode, quality, files, duration, size, is_forced)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                current_time,
+                url,
+                status,
+                mode,
+                quality,
+                files_str,
+                int(duration),
+                total_size,
+                int(is_forced),
+            ),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
 
 def url_downloaded_successfully(url: str) -> bool:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM downloads WHERE url = ? AND status = 'success'", (url,))
-    count = cursor.fetchone()[0]
-    conn.close()
-    return count > 0
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) FROM downloads WHERE url = ? AND status = 'success'", (url,)
+        )
+        count = cursor.fetchone()[0]
+        conn.close()
+        return count > 0
+    except Exception:
+        return False
 
 
 def get_history(filter_text: str = "") -> list[dict[str, Any]]:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
     filter_text = (filter_text or "").strip().lower()
 
-    if filter_text in ("failed", "success"):
-        cursor.execute(
-            "SELECT * FROM downloads WHERE LOWER(status) = ? ORDER BY time ASC",
-            (filter_text,),
-        )
-    elif filter_text in ("audio", "media"):
-        cursor.execute(
-            "SELECT * FROM downloads WHERE LOWER(mode) = ? ORDER BY time ASC",
-            (filter_text,),
-        )
-    elif filter_text.startswith("search "):
-        term = "%" + filter_text[7:].strip() + "%"
-        cursor.execute(
-            "SELECT * FROM downloads WHERE url LIKE ? OR files LIKE ? ORDER BY time ASC",
-            (term, term),
-        )
-    else:
-        cursor.execute("SELECT * FROM downloads ORDER BY time ASC")
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    rows = cursor.fetchall()
-    conn.close()
+        if filter_text in ("failed", "success"):
+            cursor.execute(
+                "SELECT * FROM downloads WHERE LOWER(status) = ? ORDER BY time ASC",
+                (filter_text,),
+            )
+        elif filter_text in ("audio", "media"):
+            cursor.execute(
+                "SELECT * FROM downloads WHERE LOWER(mode) = ? ORDER BY time ASC",
+                (filter_text,),
+            )
+        elif filter_text.startswith("search "):
+            term = "%" + filter_text[7:].strip() + "%"
+            cursor.execute(
+                "SELECT * FROM downloads WHERE url LIKE ? OR files LIKE ? ORDER BY time ASC",
+                (term, term),
+            )
+        else:
+            cursor.execute("SELECT * FROM downloads ORDER BY time ASC")
+
+        rows = cursor.fetchall()
+        conn.close()
+    except Exception:
+        return []
 
     results = []
     for r in rows:
@@ -295,56 +335,68 @@ def get_history(filter_text: str = "") -> list[dict[str, Any]]:
 
 
 def clear_all_history() -> None:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM downloads")
-    conn.commit()
-    conn.close()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM downloads")
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
 
 def delete_history_by_ids(ids_to_delete: list[int]) -> None:
     if not ids_to_delete:
         return
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    # Fully static SQL query using executemany — zero string interpolation or SQL injection risk.
-    cursor.executemany("DELETE FROM downloads WHERE id = ?", [(i,) for i in ids_to_delete])
-    conn.commit()
-    conn.close()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        # Fully static SQL query using executemany — zero string interpolation or SQL injection risk.
+        cursor.executemany("DELETE FROM downloads WHERE id = ?", [(i,) for i in ids_to_delete])
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
 
 def get_history_ids_desc() -> list[int]:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id FROM downloads ORDER BY time DESC")
-    rows = cursor.fetchall()
-    conn.close()
-    return [r["id"] for r in rows]
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM downloads ORDER BY time DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        return [r["id"] for r in rows]
+    except Exception:
+        return []
 
 
 def get_stats_data() -> dict[str, Any] | None:
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(*) FROM downloads")
-    total_attempts = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM downloads")
+        total_attempts = cursor.fetchone()[0]
 
-    if total_attempts == 0:
+        if total_attempts == 0:
+            conn.close()
+            return None
+
+        cursor.execute("SELECT COUNT(*) FROM downloads WHERE status = 'success'")
+        successes = cursor.fetchone()[0]
+
+        cursor.execute("SELECT SUM(size) FROM downloads WHERE status = 'success'")
+        total_size_bytes = cursor.fetchone()[0] or 0
+
+        cursor.execute("SELECT SUM(duration) FROM downloads WHERE status = 'success'")
+        total_duration_sec = cursor.fetchone()[0] or 0
+
+        cursor.execute("SELECT url FROM downloads WHERE status = 'success'")
+        urls = [r["url"] for r in cursor.fetchall()]
         conn.close()
+    except Exception:
         return None
-
-    cursor.execute("SELECT COUNT(*) FROM downloads WHERE status = 'success'")
-    successes = cursor.fetchone()[0]
-
-    cursor.execute("SELECT SUM(size) FROM downloads WHERE status = 'success'")
-    total_size_bytes = cursor.fetchone()[0] or 0
-
-    cursor.execute("SELECT SUM(duration) FROM downloads WHERE status = 'success'")
-    total_duration_sec = cursor.fetchone()[0] or 0
-
-    cursor.execute("SELECT url FROM downloads WHERE status = 'success'")
-    urls = [r["url"] for r in cursor.fetchall()]
-    conn.close()
 
     platform_counts: dict[str, int] = {}
     for url in urls:

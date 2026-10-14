@@ -158,15 +158,37 @@ def run_doctor(verbose: bool = False) -> bool:
         timeout = 10.0
     internet_ok = False
     connected_host = ""
-    for host in ("https://www.google.com", "https://1.1.1.1"):
+    for host in (
+        "https://www.google.com",
+        "https://1.1.1.1",
+        "https://www.cloudflare.com",
+        "https://httpbin.org/status/200",
+    ):
         try:
             # Fixed HTTPS connectivity probe — no user-controlled scheme. nosec B310
-            urllib.request.urlopen(host, timeout=timeout).close()  # nosec B310
-            internet_ok = True
-            connected_host = host.split("//")[-1]
-            break
+            req = urllib.request.Request(host, headers={"User-Agent": "PinakCLI"})
+            with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
+                if hasattr(resp, "close"):
+                    resp.close()
+                internet_ok = True
+                connected_host = host.split("//")[-1].split("/")[0]
+                break
         except Exception:
             continue
+
+    if not internet_ok:
+        import socket
+
+        sock_timeout = min(timeout, 2.0)
+        for ip, port in (("1.1.1.1", 53), ("8.8.8.8", 53)):
+            try:
+                with socket.create_connection((ip, port), timeout=sock_timeout):
+                    internet_ok = True
+                    connected_host = f"{ip}:{port} (socket fallback)"
+                    break
+            except Exception:
+                continue
+
     checks.append(
         (
             "Internet Connection",

@@ -75,3 +75,44 @@ def test_validate_settings_raises_config_error():
         validate_settings({"quality": "invalid_quality_mode"})
     assert "Invalid configuration" in str(exc_info.value)
     assert exc_info.value.hint != ""
+
+
+def test_save_config_creates_backup_and_atomic_replace(tmp_path, monkeypatch):
+    import pinak.config as cfg_mod
+
+    cfg_file = tmp_path / "config.json"
+    monkeypatch.setattr(cfg_mod, "CONFIG_FILE", str(cfg_file))
+    monkeypatch.setattr(cfg_mod, "config", cfg_mod.PinakSettings().model_dump())
+
+    # First save: creates config.json
+    assert cfg_mod.save_config({"quality": "720p"}) is True
+    assert cfg_file.exists()
+    assert not (tmp_path / "config.json.bak").exists()
+
+    # Second save: creates config.json.bak from previous config.json
+    assert cfg_mod.save_config({"quality": "1080p"}) is True
+    bak_file = tmp_path / "config.json.bak"
+    assert bak_file.exists()
+    assert "720p" in bak_file.read_text(encoding="utf-8")
+    assert "1080p" in cfg_file.read_text(encoding="utf-8")
+
+
+def test_init_config_recovers_from_backup_when_primary_corrupted(tmp_path, monkeypatch):
+    import pinak.config as cfg_mod
+
+    cfg_file = tmp_path / "config.json"
+    bak_file = tmp_path / "config.json.bak"
+
+    # Primary is corrupted
+    cfg_file.write_text("CORRUPTED-NOT-JSON{{{{", encoding="utf-8")
+    # Backup is valid with customized setting
+    bak_file.write_text('{"quality": "720p", "retry_count": 5}', encoding="utf-8")
+
+    monkeypatch.setattr(cfg_mod, "CONFIG_FILE", str(cfg_file))
+    monkeypatch.setattr(cfg_mod, "config", cfg_mod.PinakSettings().model_dump())
+
+    loaded = cfg_mod.init_config()
+    assert loaded["quality"] == "720p"
+    assert loaded["retry_count"] == 5
+    # Primary config file should also be restored from .bak
+    assert "720p" in cfg_file.read_text(encoding="utf-8")

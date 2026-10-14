@@ -122,3 +122,116 @@ def test_json_output_shape(monkeypatch, tmp_path):
     payload = json.loads(result.output)
     assert payload["success"] is True
     assert payload["platform"] == "TestTube"
+
+
+def test_ask_with_esc_fallback_to_input(monkeypatch):
+    from pinak.cli import ask_with_esc
+
+    class _BrokenPrompt:
+        message = "Prompt:"
+
+        def ask(self, **kwargs):
+            raise RuntimeError("Terminal not connected to TTY")
+
+    monkeypatch.setattr("builtins.input", lambda prompt: "fallback-value")
+    result = ask_with_esc(_BrokenPrompt())
+    assert result == "fallback-value"
+
+
+def test_cli_any_subcommand_routes(monkeypatch):
+    calls = {}
+
+    def fake_handle_download(url, **kwargs):
+        calls["url"] = url
+        calls.update(kwargs)
+        return {"success": True, "url": url, "files": []}
+
+    monkeypatch.setattr(run_mod, "handle_download", fake_handle_download)
+    result = runner.invoke(app, ["any", "https://example.com/v"])
+    assert result.exit_code == 0, result.output
+    assert calls["url"] == "https://example.com/v"
+    assert calls["is_any_command"] is True
+
+
+def test_cli_any_option_routes(monkeypatch):
+    calls = {}
+
+    def fake_handle_download(url, **kwargs):
+        calls["url"] = url
+        calls.update(kwargs)
+        return {"success": True, "url": url, "files": []}
+
+    monkeypatch.setattr(run_mod, "handle_download", fake_handle_download)
+    result = runner.invoke(app, ["https://example.com/v", "--any"])
+    assert result.exit_code == 0, result.output
+    assert calls["url"] == "https://example.com/v"
+    assert calls["is_any_command"] is True
+
+
+def test_cli_any_without_url():
+    result = runner.invoke(app, ["any"])
+    assert result.exit_code == 1
+    assert "url is required" in result.output.lower()
+
+
+def test_repl_any_commands_dispatch(monkeypatch):
+    import pinak.cli as cli_mod
+
+    calls = []
+
+    def fake_handle_download(url, **kwargs):
+        calls.append({"url": url, **kwargs})
+        return {"success": True, "url": url, "files": []}
+
+    monkeypatch.setattr(cli_mod, "handle_download", fake_handle_download)
+    monkeypatch.setitem(cli_mod.config, "username", "tester")
+    monkeypatch.setattr(cli_mod, "maybe_print_offline_notice", lambda *a, **k: True)
+
+    inputs = iter(["/any https://example.com/v1", "any https://example.com/v2", "/exit"])
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(inputs))
+
+    # Run repl_loop without prompt_toolkit session
+    monkeypatch.setattr(cli_mod, "PromptSession", None)
+    cli_mod.repl_loop()
+
+    assert len(calls) == 2
+    assert calls[0]["url"] == "https://example.com/v1"
+    assert calls[0]["is_any_command"] is True
+    assert calls[1]["url"] == "https://example.com/v2"
+    assert calls[1]["is_any_command"] is True
+
+
+def test_repl_bare_any_prompts(monkeypatch):
+    import pinak.cli as cli_mod
+
+    calls = []
+
+    def fake_handle_download(url, **kwargs):
+        calls.append({"url": url, **kwargs})
+        return {"success": True, "url": url, "files": []}
+
+    monkeypatch.setattr(cli_mod, "handle_download", fake_handle_download)
+    monkeypatch.setitem(cli_mod.config, "username", "tester")
+    monkeypatch.setattr(cli_mod, "maybe_print_offline_notice", lambda *a, **k: True)
+
+    inputs = iter(
+        [
+            "/any",
+            "https://example.com/prompted1",
+            "any",
+            "https://example.com/prompted2",
+            "/any",
+            "",
+            "/exit",
+        ]
+    )
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(inputs))
+
+    monkeypatch.setattr(cli_mod, "PromptSession", None)
+    cli_mod.repl_loop()
+
+    assert len(calls) == 2
+    assert calls[0]["url"] == "https://example.com/prompted1"
+    assert calls[0]["is_any_command"] is True
+    assert calls[1]["url"] == "https://example.com/prompted2"
+    assert calls[1]["is_any_command"] is True
