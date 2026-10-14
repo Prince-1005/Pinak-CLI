@@ -75,10 +75,9 @@ def _show_native_notification(title: str, message: str) -> bool:
     if (sys.platform.startswith("linux") or "bsd" in sys.platform) and shutil.which("notify-send"):
 
         def _show_linux() -> None:
+            cmd = ["notify-send", title, message]
             with contextlib.suppress(Exception):
-                subprocess.run(
-                    ["notify-send", title, message], capture_output=True, timeout=5.0
-                )  # nosec B603, B607
+                subprocess.run(cmd, capture_output=True, timeout=5.0)  # nosec B603, B607
 
         threading.Thread(target=_show_linux, daemon=True).start()
         return True

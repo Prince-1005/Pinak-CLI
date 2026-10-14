@@ -420,16 +420,16 @@ def is_url_supported_by_ytdlp(url: str) -> tuple[bool, str]:
         import yt_dlp
 
         class _QuietProbeLogger:
-            def debug(self, msg):
+            def debug(self, msg: str) -> None:
                 pass
 
-            def info(self, msg):
+            def info(self, msg: str) -> None:
                 pass
 
-            def warning(self, msg):
+            def warning(self, msg: str) -> None:
                 pass
 
-            def error(self, msg):
+            def error(self, msg: str) -> None:
                 pass
 
         ydl = yt_dlp.YoutubeDL(
