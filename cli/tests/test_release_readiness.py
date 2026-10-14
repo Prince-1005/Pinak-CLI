@@ -18,7 +18,10 @@ runner = CliRunner()
 
 
 def _no_toast(monkeypatch):
+    import shutil
+
     monkeypatch.setattr(notify_mod, "_toast", None)
+    monkeypatch.setattr(shutil, "which", lambda cmd: None)
 
 
 def _sync_threads(monkeypatch):
