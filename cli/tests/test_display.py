@@ -51,13 +51,15 @@ def test_open_output_folder_tmp(tmp_path, monkeypatch):
     monkeypatch.setitem(info_m.config, "output_dir", str(tmp_path / "dl"))
     opened = {}
     import os as _os
+    import subprocess as _sub
     import webbrowser as _wb
 
     monkeypatch.setattr(_os, "startfile", lambda p: opened.setdefault("path", p), raising=False)
+    monkeypatch.setattr(_sub, "run", lambda cmd, **k: opened.setdefault("cmd", cmd))
     monkeypatch.setattr(_wb, "open", lambda uri: opened.setdefault("uri", uri))
     info_m.open_output_folder()
     assert (tmp_path / "dl").exists()
-    assert opened  # opened via startfile (win) or browser (other OS)
+    assert opened  # opened via startfile (win), subprocess (linux xdg-open), or browser fallback
 
 
 def test_open_output_folder_macos_and_linux(tmp_path, monkeypatch):

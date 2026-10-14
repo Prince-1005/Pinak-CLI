@@ -33,8 +33,8 @@ def _show_native_notification(title: str, message: str) -> bool:
     import subprocess
     import sys
 
-    # Tier 1: Windows win11toast
-    if sys.platform.startswith("win") and _toast is not None:
+    # Tier 1: Windows win11toast (when available or mocked)
+    if _toast is not None:
 
         def _show_win() -> None:
             with (
