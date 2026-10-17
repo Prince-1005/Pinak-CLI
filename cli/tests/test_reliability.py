@@ -29,6 +29,7 @@ def test_verify_files_empty_input():
 def test_ensure_ffmpeg_prefers_existing(tmp_path, monkeypatch):
     binary = tmp_path / "ffmpeg.exe"
     binary.write_bytes(b"fake")
+    binary.chmod(0o755)
     monkeypatch.setattr(ff_mod, "get_ffmpeg_path", lambda: str(binary))
     assert ff_mod.ensure_ffmpeg() == str(binary)
 

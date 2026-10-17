@@ -88,6 +88,24 @@ def test_input_parser_mouse_sgr():
     assert ev.is_pressed is True
 
 
+def test_input_parser_without_file_descriptor(monkeypatch):
+    import io
+
+    monkeypatch.setattr("sys.platform", "linux")
+    monkeypatch.setattr("sys.stdin", io.StringIO())
+    parser = InputParser()
+    parser._buffer.extend(b"q")
+    assert parser.poll_events() == [KeyEvent("q")]
+
+
+def test_input_parser_closed_descriptor(monkeypatch):
+    from unittest.mock import Mock
+
+    monkeypatch.setattr("sys.platform", "linux")
+    monkeypatch.setattr("sys.stdin", Mock(fileno=Mock(return_value=-1)))
+    assert InputParser().poll_events() == []
+
+
 def test_terminal_lifecycle_restore():
     ctx = TerminalSessionContext(enable_mouse=True)
     with patch("sys.stdout.write") as mock_write, patch("sys.stdout.flush"):

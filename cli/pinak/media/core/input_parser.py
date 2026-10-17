@@ -135,12 +135,15 @@ class InputParser:
         else:
             import select
 
-            r, _, _ = select.select([sys.stdin.fileno()], [], [], max(0.0, timeout_sec))
-            if r:
-                try:
-                    return os.read(sys.stdin.fileno(), 1024)
-                except OSError:
-                    return b""
+            try:
+                descriptor = sys.stdin.fileno()
+                r, _, _ = select.select([descriptor], [], [], max(0.0, timeout_sec))
+                if r:
+                    return os.read(descriptor, 1024)
+            except (OSError, ValueError):
+                # Redirected, closed and embedded input streams may lack a
+                # selectable descriptor. Buffered events remain usable.
+                return b""
             return b""
 
     def _parse_next_event(self, data: bytes) -> tuple[InputEvent | None, int]:

@@ -282,7 +282,9 @@ def test_probe_and_subproc_invalid_utf8_continuation_resilience(tmp_path: Path):
         assert "\ufffd" in res.stdout
 
 
-def test_video_player_repeat_modes_and_sequential_playback_stop_at_first(tmp_path: Path):
+def test_video_player_repeat_modes_and_sequential_playback_stop_at_first(
+    tmp_path: Path, monkeypatch
+):
     """Verifies that:
     1. Video player displays [r] Repeat in footer navigation bar.
     2. Video player allows cycling repeat modes ('r' key).
@@ -311,6 +313,23 @@ def test_video_player_repeat_modes_and_sequential_playback_stop_at_first(tmp_pat
     session.master_clock = MagicMock()
     session.transport.duration_sec = 10.0
     session.transport.is_playing = True
+
+    # Exercise real playlist transitions while keeping invalid fixture bytes
+    # away from host FFmpeg/audio drivers and their asynchronous error paths.
+    from dataclasses import replace
+
+    metadata = session._current_meta
+    monkeypatch.setattr(MediaProbe, "probe", lambda path: replace(metadata, file_path=path))
+
+    def initialize_components():
+        session.video_decoder = MagicMock()
+        session.video_decoder.read_frame.return_value = None
+        session.audio_backend = MagicMock()
+        session.master_clock = MagicMock()
+        session.master_clock.get_time.return_value = 0.0
+        session.transport.duration_sec = 10.0
+
+    monkeypatch.setattr(session, "_init_media_components", initialize_components)
 
     # 1. Repeat mode starts at 'none' (OFF), and footer shows [r] Repeat
     assert session.playlist_manager.repeat_mode == "none"

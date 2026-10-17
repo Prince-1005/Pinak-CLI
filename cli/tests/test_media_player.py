@@ -212,7 +212,8 @@ def test_kitty_renderer_vertical_spacing():
     assert res.endswith("\n" * 19)
 
 
-def test_launch_standalone_media_window(monkeypatch):
+@pytest.mark.parametrize("platform", ["win32", "linux"])
+def test_launch_standalone_media_window(monkeypatch, platform):
     """Verifies that launch_standalone_media_window correctly constructs OS console commands."""
     import subprocess
     from unittest.mock import MagicMock
@@ -222,9 +223,16 @@ def test_launch_standalone_media_window(monkeypatch):
     mock_popen = MagicMock()
     mock_popen.return_value.wait.return_value = 0
     monkeypatch.setattr(subprocess, "Popen", mock_popen)
+    monkeypatch.setattr("sys.platform", platform)
+    monkeypatch.setattr("pinak.utils.trusted_which", lambda name: "/usr/bin/xterm")
     success = launch_standalone_media_window(["test.mp4"])
     assert success is True
     assert mock_popen.called
+    command = mock_popen.call_args.args[0]
+    if platform == "linux":
+        assert command[:2] == ["/usr/bin/xterm", "-e"]
+    else:
+        assert mock_popen.call_args.kwargs["creationflags"]
 
 
 def test_timeline_scrubber_duration_alignment():

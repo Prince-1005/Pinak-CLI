@@ -112,6 +112,7 @@ def test_script_dir_falls_back_to_cli_dir(monkeypatch):
 def test_ffmpeg_resolution_order(tmp_path, monkeypatch):
     custom = tmp_path / "custom-ffmpeg"
     custom.write_bytes(b"x")
+    custom.chmod(0o755)
     monkeypatch.setattr(utils, "_configured_binary_override", lambda key: str(custom))
     assert utils.get_ffmpeg_path() == str(custom)
 

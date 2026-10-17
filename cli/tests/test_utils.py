@@ -119,6 +119,7 @@ def test_resolve_binary_from_candidate_dirs(monkeypatch, tmp_path):
     custom_bin_dir.mkdir()
     fake_ffmpeg = custom_bin_dir / "ffmpeg.exe"
     fake_ffmpeg.write_text("binary", encoding="utf-8")
+    fake_ffmpeg.chmod(0o755)
 
     monkeypatch.setattr(utils.shutil, "which", lambda name: None)
     monkeypatch.setattr(utils, "script_dir", lambda: str(tmp_path / "empty"))

@@ -24,6 +24,7 @@ Release notes are maintained manually; automatic release creation is disabled.
 - Open the `w` native video window at an aspect-correct size based on the usable display, preserve the chosen window size when the decoder changes resolution, and scale frames to fill the window without distortion.
 - Start video GPU windows at half the fitted dimensions while preserving the video ratio and existing picture/audio window sizes.
 - Use statically recognized Windows guards for platform APIs and isolate background update workers in configuration tests across CI platforms.
+- Keep POSIX media input polling usable with redirected/closed stdin and make executable, terminal-launch and playlist fixtures portable.
 
 ## [1.4.1] - 2026-10-17
 
