@@ -129,7 +129,7 @@ def test_display_mode_coordinator():
     assert part2.is_mini is False
 
 
-def test_coordinator_spacebar_pause_and_freeze_frame(tmp_path: Path):
+def test_coordinator_spacebar_pause_and_freeze_frame(tmp_path: Path, monkeypatch):
     """Verifies that pressing Space toggles pause, freezes master clock, and caches video frame."""
     from unittest.mock import MagicMock
 
@@ -141,6 +141,7 @@ def test_coordinator_spacebar_pause_and_freeze_frame(tmp_path: Path):
     fake_file.write_bytes(b"dummy_data")
 
     session = MediaSession([fake_file], enable_consent_prompt=False)
+    monkeypatch.setattr(session.master_clock, "get_time", lambda: 0.0)
     session.video_decoder = MagicMock()
     fake_vf = DecodedVideoFrame(pts=0.0, rgb_data=b"\x00" * (16 * 16 * 3), width=16, height=16)
     session.video_decoder.read_frame.return_value = fake_vf
@@ -736,11 +737,12 @@ def test_coordinator_music_visualizer_pause_freeze(tmp_path: Path):
     assert out_paused2 == out_paused3
 
 
-def test_coordinator_video_completion_sequence_and_stop_at_first_video(tmp_path: Path):
+def test_coordinator_video_completion_sequence_and_stop_at_first_video(tmp_path: Path, monkeypatch):
     """Verifies that in Repeat OFF, videos continue in sequence, and after all videos finish, TUI leads to first video and stops."""
+    from dataclasses import replace
     from unittest.mock import MagicMock
 
-    from pinak.media.decoders.probe import MediaMetadata
+    from pinak.media.decoders.probe import MediaMetadata, MediaProbe
     from pinak.media.player.coordinator import MediaSession
 
     vid1 = tmp_path / "vid1.mp4"
@@ -764,6 +766,18 @@ def test_coordinator_video_completion_sequence_and_stop_at_first_video(tmp_path:
     session.playlist_manager.current_idx = 0
     assert session.playlist_manager.has_next() is True
 
+    metadata = session._current_meta
+    monkeypatch.setattr(MediaProbe, "probe", lambda path: replace(metadata, file_path=path))
+
+    def initialize_components():
+        session.video_decoder = MagicMock()
+        session.video_decoder.read_frame.return_value = None
+        session.audio_backend = MagicMock()
+        session.master_clock = MagicMock()
+        session.master_clock.get_time.return_value = 0.0
+
+    monkeypatch.setattr(session, "_init_media_components", initialize_components)
+
     # 1. Simulate completion of vid1: master_pts >= dur
     session.master_clock.get_time = MagicMock(return_value=10.5)
     session._render_media_tui(80, 24, dt=0.016)
@@ -782,7 +796,7 @@ def test_coordinator_video_completion_sequence_and_stop_at_first_video(tmp_path:
     # After playing all videos, TUI leads to first video (index 0) and stops!
     assert session.playlist_manager.current_idx == 0
     assert session.transport.is_playing is False
-    assert getattr(session.audio_backend, "is_paused", True) is True
+    session.audio_backend.pause.assert_called_once()
 
     # User can start playback by clicking space
     session._handle_action_key("space", 80, 24)

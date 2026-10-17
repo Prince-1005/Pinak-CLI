@@ -4,6 +4,8 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from pinak.media.core.input_parser import KeyEvent
 from pinak.media.decoders.probe import MediaMetadata
 from pinak.media.diagnostics.capacity_scorer import CapacityScorer
@@ -114,6 +116,25 @@ def test_critical_modal_lists_all_reasons() -> None:
     assert "Low battery (5%)" in message
     assert "Low RAM" in message
     assert "High temperature (90°C)" in message
+
+
+@pytest.mark.parametrize("failed_operation", ["write", "flush"])
+def test_critical_state_cannot_bypass_consent_when_output_fails(failed_operation) -> None:
+    critical = replace(_telemetry(), is_on_battery=True, battery_pct=7)
+    with (
+        patch(
+            "pinak.media.diagnostics.preflight_modal.DeviceDiagnosticsProbe.inspect",
+            return_value=critical,
+        ),
+        patch("pinak.media.diagnostics.preflight_modal.sys.stdin") as stdin,
+        patch("pinak.media.diagnostics.preflight_modal.sys.stdout") as stdout,
+        patch("pinak.media.diagnostics.preflight_modal.TerminalSessionContext"),
+        patch("pinak.media.diagnostics.preflight_modal.InputParser") as parser,
+    ):
+        stdin.isatty.return_value = True
+        getattr(stdout, failed_operation).side_effect = OSError("Terminal output unavailable")
+        assert PreflightConsentModal.prompt_user(_media()) is False
+        parser.assert_not_called()
 
 
 def test_native_window_uses_screen_area_and_aspect_ratio() -> None:

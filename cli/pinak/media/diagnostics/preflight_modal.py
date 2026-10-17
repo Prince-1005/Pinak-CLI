@@ -147,7 +147,7 @@ class PreflightConsentModal:
                 sys.stdout.write(modal_text)
                 sys.stdout.flush()
             except OSError:
-                return True
+                return False
 
             parser = InputParser()
             while True:

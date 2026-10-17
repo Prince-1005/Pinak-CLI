@@ -51,8 +51,8 @@ repository `Prince-1005/Pinak-CLI` and workflow `publish.yml`.
 
 ## Verification
 
-Local verification on 17 October 2026 passed **464 tests on Python 3.10 and
-3.14**, with **76.52% coverage** on 3.14. Ruff, Black, Mypy, Bandit, Actionlint,
+Local verification on 17 October 2026 passed **466 tests on Python 3.10 and
+3.14**, with **76.29% coverage** on 3.14. Ruff, Black, Mypy, Bandit, Actionlint,
 the actual repository-root pre-commit Mypy hook, release-identity failure cases,
 and secret-detector canary checks passed. The clean wheel check passed entry
 points, playback imports, dependency consistency and advisory auditing with no
@@ -73,6 +73,9 @@ POSIX input polling now tolerates redirected or closed stdin without losing
 buffered events. Regression fixtures use executable permission bits for fake
 tools, mock terminal discovery, and keep playlist tests independent of real
 audio/decoder workers.
+Critical-device playback also stops if the warning cannot be written or flushed
+to the terminal; both failures have regressions proving consent cannot be bypassed.
+Pause/frame and playlist tests use controlled clocks and component lifecycles.
 
 The release check commands are:
 
