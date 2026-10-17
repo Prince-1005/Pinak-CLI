@@ -816,7 +816,9 @@ def test_coordinator_ctrl_m_mute_toggle(tmp_path: Path):
 
 def test_input_parser_ctrl_m_detection():
     """Verifies that InputParser detects Ctrl+M across CSI u sequences and Windows console reads."""
-    from unittest.mock import patch
+    import ctypes
+    from types import SimpleNamespace
+    from unittest.mock import Mock, patch
 
     from pinak.media.core.input_parser import InputParser
 
@@ -829,14 +831,23 @@ def test_input_parser_ctrl_m_detection():
     assert ev.ctrl is True
 
     # 2. Windows Enter with Control held down (GetAsyncKeyState returns high bit set)
-    with patch("ctypes.windll.user32.GetAsyncKeyState", return_value=-32767):
+    key_state = Mock(return_value=-32767)
+    windows_api = SimpleNamespace(user32=SimpleNamespace(GetAsyncKeyState=key_state))
+    with (
+        patch("pinak.media.core.input_parser.sys.platform", "win32"),
+        patch.object(ctypes, "windll", windows_api, create=True),
+    ):
         ev, consumed = parser._parse_next_event(b"\r")
         assert ev is not None
         assert ev.key == "m"
         assert ev.ctrl is True
 
     # 3. Normal Enter without Control held down
-    with patch("ctypes.windll.user32.GetAsyncKeyState", return_value=0):
+    key_state.return_value = 0
+    with (
+        patch("pinak.media.core.input_parser.sys.platform", "win32"),
+        patch.object(ctypes, "windll", windows_api, create=True),
+    ):
         ev, consumed = parser._parse_next_event(b"\r")
         assert ev is not None
         assert ev.key == "enter"

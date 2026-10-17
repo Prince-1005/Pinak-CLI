@@ -52,13 +52,21 @@ repository `Prince-1005/Pinak-CLI` and workflow `publish.yml`.
 ## Verification
 
 Local verification on 17 October 2026 passed **461 tests on Python 3.10 and
-3.14**, with **76.43% coverage** on 3.14. Ruff, Black, Mypy, Bandit, Actionlint,
+3.14**, with **76.59% coverage** on 3.14. Ruff, Black, Mypy, Bandit, Actionlint,
 the actual repository-root pre-commit Mypy hook, release-identity failure cases,
 and secret-detector canary checks passed. The clean wheel check passed entry
 points, playback imports, dependency consistency and advisory auditing with no
 known vulnerabilities. The rebuilt wheel matches all application source modules.
 Docker's local Linux engine was unavailable; its build and entry-point checks
 are enforced by the new Linux CI installation job.
+
+The first GitHub run also exposed POSIX type-check failures in Windows API
+branches, a background updater racing with isolated configuration tests, and
+vulnerable setuptools supplied by older Python bootstrap environments. Platform
+guards now pass explicit Linux/macOS/Windows type checks; REPL tests suppress the
+uncontrolled update worker. Development/build environments require setuptools
+83 or later, and clean-wheel/container bootstraps upgrade pip and setuptools
+before auditing the installed environment.
 
 The release check commands are:
 

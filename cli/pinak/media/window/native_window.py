@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
+import sys
 from typing import TYPE_CHECKING, Any
 
 from PIL import Image
@@ -70,7 +71,7 @@ class NativeVideoWindow:
     @staticmethod
     def _available_screen_size() -> tuple[int, int]:
         """Get display work area once; use a safe fallback on headless systems."""
-        if os.name == "nt":
+        if sys.platform == "win32":
             try:
                 import ctypes
 

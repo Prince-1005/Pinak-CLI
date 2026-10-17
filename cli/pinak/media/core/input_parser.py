@@ -81,7 +81,7 @@ class InputParser:
 
     def _read_nonblocking(self, timeout_sec: float) -> bytes:
         """Platform-specific non-blocking read."""
-        if os.name == "nt":
+        if sys.platform == "win32":
             import msvcrt
 
             collected = bytearray()
@@ -218,7 +218,7 @@ class InputParser:
         if b == 0x20:
             return KeyEvent(key="space"), 1
         if b in (0x0D, 0x0A):
-            if os.name == "nt":
+            if sys.platform == "win32":
                 try:
                     import ctypes
 

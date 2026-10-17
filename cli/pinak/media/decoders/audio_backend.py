@@ -10,6 +10,7 @@ import logging
 import math
 import os
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -22,10 +23,13 @@ import numpy as np
 from ...ffmpeg_setup import ensure_ffmpeg
 from ...utils import trusted_which
 
-try:
-    import winsound
-except ImportError:
-    winsound = None  # type: ignore[assignment]
+if sys.platform == "win32":
+    try:
+        import winsound
+    except ImportError:
+        winsound = None  # type: ignore[assignment]
+else:
+    winsound = None
 
 logger = logging.getLogger("pinak.media.audio_backend")
 _pending_temp_files: set[str] = set()

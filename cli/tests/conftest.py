@@ -41,6 +41,14 @@ def _silence_desktop_toasts(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _prevent_background_update_requests(monkeypatch):
+    """REPL tests must not leave real network workers racing with patched config paths."""
+    import pinak.updater as updater_mod
+
+    monkeypatch.setattr(updater_mod, "start_background_update_check", lambda: None)
+
+
+@pytest.fixture(autouse=True)
 def _finish_audio_workers(monkeypatch):
     """Always stop output workers before pytest closes temporary files/capture."""
     from pinak.media.decoders.audio_backend import AudioPlayerBackend

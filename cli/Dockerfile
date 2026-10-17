@@ -16,7 +16,7 @@ COPY pinak ./pinak
 COPY pinak_cli.py ./
 COPY tools ./tools
 
-RUN pip install --upgrade pip \
+RUN pip install --upgrade "pip>=26.2.1" "setuptools>=83.0.0" \
     && pip install --require-hashes -r requirements-runtime-lock.txt \
     && pip install --no-deps .
 

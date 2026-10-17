@@ -16,12 +16,14 @@ Release notes are maintained manually; automatic release creation is disabled.
 - Validate release tags/manual version inputs and all version files before building or uploading.
 - Verify Linux playback imports and clean wheel/container installations in CI; exclude local audit outputs from Docker contexts.
 - Align contributor hooks with repository paths and locked tools, and refresh portable installation/media documentation links.
+- Require patched setuptools for builds/development and upgrade clean-install bootstrap tools before dependency auditing.
 
 ### Fixed
 - Ask for playback consent only when measured battery is at or below 15%, available RAM falls below the media's working budget, or a temperature sensor reports at least 85°C. List every critical reason in the prompt; stop unattended playback when confirmation is required.
 - Read device health through the declared `psutil` dependency. Missing temperature sensors no longer trigger repeated warnings, and a momentary CPU load does not block playback.
 - Open the `w` native video window at an aspect-correct size based on the usable display, preserve the chosen window size when the decoder changes resolution, and scale frames to fill the window without distortion.
 - Start video GPU windows at half the fitted dimensions while preserving the video ratio and existing picture/audio window sizes.
+- Use statically recognized Windows guards for platform APIs and isolate background update workers in configuration tests across CI platforms.
 
 ## [1.4.1] - 2026-10-17
 

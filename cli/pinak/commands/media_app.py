@@ -22,7 +22,7 @@ def run_media_app(args: list[str] | None = None) -> None:
             sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
     # Maximize console window on Windows for highest available resolution
-    if os.name == "nt" and sys.stdin.isatty():
+    if sys.platform == "win32" and sys.stdin.isatty():
         try:
             import ctypes
 

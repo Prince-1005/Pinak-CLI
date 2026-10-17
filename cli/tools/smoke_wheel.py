@@ -30,6 +30,15 @@ def main() -> None:
         }
         env["PYTHONNOUSERSITE"] = "1"
         env["PYTHONUTF8"] = "1"
+        # Older Python ensurepip bundles can seed vulnerable bootstrap tools.
+        # Upgrade them rather than excluding their advisories from the audit.
+        subprocess.run(
+            [str(python), "-m", "pip", "install", "--upgrade", "pip>=26.2.1", "setuptools>=83.0.0"],
+            cwd=root,
+            env=env,
+            check=True,
+            timeout=300,
+        )
         subprocess.run(
             [str(python), "-m", "pip", "install", str(wheels[0])],
             cwd=root,
