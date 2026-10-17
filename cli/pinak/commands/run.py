@@ -6,15 +6,18 @@ All functions return plain values / exit codes so they are unit-testable.
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
+import sys
 from typing import Any
 
 from rich.console import Console
 from rich.table import Table
 
 from .. import updater
-from ..config import config, save_config
+from ..config import config
 from ..doctor import run_doctor
 from ..downloader import handle_download
 from ..notify import print_update_notice
@@ -107,7 +110,7 @@ def result_to_jsonable(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def run_single(
+def _run_single(
     url: str | None,
     output: str | None,
     force: bool,
@@ -122,7 +125,6 @@ def run_single(
     """Execute single-command mode. Returns the process exit code."""
     if output:
         config["output_dir"] = output
-        save_config()
 
     if doctor:
         return 0 if run_doctor(verbose=verbose) else 1
@@ -133,7 +135,7 @@ def run_single(
         console.print("[yellow]Tip: add --dry-run to preview without downloading.[/]")
         return 1
 
-    if not url.startswith("http"):
+    if not url.startswith(("http://", "https://")):
         console.print(
             f"[red][!] Error: Invalid URL {url!r}. URL must start with http:// or https://[/red]"
         )
@@ -156,16 +158,53 @@ def run_single(
         render_plan(build_plan(url, extract_audio, norm_quality, output), as_json=as_json)
         return 0
 
-    result = handle_download(
-        url,
-        extract_audio=extract_audio,
-        force=force,
-        quality=norm_quality,
-        interactive=False,
-        is_any_command=is_any,
-    )
+    with contextlib.redirect_stdout(sys.stderr) if as_json else contextlib.nullcontext():
+        result = handle_download(
+            url,
+            extract_audio=extract_audio,
+            force=force,
+            quality=norm_quality,
+            interactive=False,
+            is_any_command=is_any,
+        )
     if as_json:
         print(json.dumps(result_to_jsonable(result), indent=2))
     else:
         maybe_print_update_notice()
     return 0 if result.get("success") else 1
+
+
+def run_single(
+    url: str | None,
+    output: str | None,
+    force: bool,
+    audio: bool,
+    quality: str | None,
+    doctor: bool,
+    verbose: bool,
+    dry_run: bool,
+    as_json: bool,
+    is_any: bool = False,
+) -> int:
+    """Keep invocation overrides temporary and machine output exclusively JSON."""
+    previous = config.copy()
+    captured = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(captured) if as_json else contextlib.nullcontext():
+            code = _run_single(
+                url, output, force, audio, quality, doctor, verbose, dry_run, as_json, is_any
+            )
+        if as_json:
+            try:
+                payload = json.loads(captured.getvalue())
+            except json.JSONDecodeError:
+                payload = {
+                    "success": code == 0,
+                    "url": url,
+                    "errors": [captured.getvalue().strip()],
+                }
+            print(json.dumps(payload, indent=2))
+        return code
+    finally:
+        config.clear()
+        config.update(previous)

@@ -26,8 +26,12 @@ def test_download_image_entry_end_to_end(tmp_path, monkeypatch):
         def __exit__(self, *a):
             return False
 
-        def read(self):
-            return src.read_bytes()
+        def read(self, size=-1):
+            import io
+
+            if not hasattr(self, "_reader"):
+                self._reader = io.BytesIO(src.read_bytes())
+            return self._reader.read(size)
 
     monkeypatch.setattr(ig_mod, "urlopen", lambda *a, **k: _Resp())
 
@@ -124,7 +128,7 @@ def test_is_executable_variants(tmp_path, monkeypatch):
     binary.write_bytes(b"x")
     binary.chmod(0o755)
     assert ff_mod._is_executable(str(binary)) is True
-    monkeypatch.setattr(ff_mod.shutil, "which", lambda name: "/usr/bin/ffmpeg")
+    monkeypatch.setattr(ff_mod, "trusted_which", lambda name: str(binary))
     assert ff_mod._is_executable("ffmpeg") is True
 
 
@@ -145,7 +149,7 @@ def test_try_static_ffmpeg_success_with_fake_package(tmp_path, monkeypatch):
     fake_mod = types.ModuleType("static_ffmpeg")
     fake_mod.add_paths = lambda: True  # noqa: E731
     monkeypatch.setitem(sys.modules, "static_ffmpeg", fake_mod)
-    monkeypatch.setattr(ff_mod.shutil, "which", lambda name: str(fake_bin))
+    monkeypatch.setattr(ff_mod, "trusted_which", lambda name: str(fake_bin))
     assert ff_mod._try_static_ffmpeg() is True
 
 
@@ -160,7 +164,7 @@ def test_ensure_ffmpeg_uses_fetched_binary(tmp_path, monkeypatch):
     fake_mod.add_paths = lambda: True  # noqa: E731
     monkeypatch.setitem(sys.modules, "static_ffmpeg", fake_mod)
     monkeypatch.setattr(ff_mod, "get_ffmpeg_path", lambda: str(fake_bin))
-    monkeypatch.setattr(ff_mod.shutil, "which", lambda name: str(fake_bin))
+    monkeypatch.setattr(ff_mod, "trusted_which", lambda name: str(fake_bin))
     assert ff_mod.ensure_ffmpeg() == str(fake_bin)
 
 
@@ -188,7 +192,7 @@ def test_ensure_ffprobe_fetch_path(tmp_path, monkeypatch):
     fake_mod.add_paths = lambda: True  # noqa: E731
     monkeypatch.setitem(sys.modules, "static_ffmpeg", fake_mod)
     monkeypatch.setattr(ff_mod, "get_ffprobe_path", lambda: "/nonexistent/ffprobe")
-    monkeypatch.setattr(ff_mod.shutil, "which", lambda name: None)
+    monkeypatch.setattr(ff_mod, "trusted_which", lambda name: None)
     # Nothing fetchable -> falls back to the unresolved path, never raises.
     assert ff_mod.ensure_ffprobe() == "/nonexistent/ffprobe"
 

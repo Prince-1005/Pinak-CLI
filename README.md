@@ -12,6 +12,11 @@
 > Pinak is an open-source educational project and terminal interface wrapper around [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) and [`FFmpeg`](https://ffmpeg.org/), designed for learning CLI architecture and personal media archiving.  
 > ⚠️ **Notice:** Downloading content may violate a platform's Terms of Service. Only download media that you own, that is freely licensed, or that you have explicit permission to keep. Respect copyright laws and **be excellent to creators!**
 
+Current source release: **1.4.2**. See the [release notes](cli/CHANGELOG.md),
+[operating guide](cli/OPERATIONS.md), and [release readiness record](RELEASE_READINESS.md)
+for current behavior and verification. GitHub releases are created manually;
+automatic release creation is disabled.
+
 ## Overview
 
 Pinak is a cross-platform Python CLI tool and educational wrapper around `yt-dlp` that makes personal media archiving simple and reliable. It supports direct URL downloads, Instagram posts/reels/stories/highlights, quality and format selection, audio-video merging via FFmpeg, download history, and built-in diagnostics.
@@ -73,15 +78,39 @@ Pinak is a cross-platform Python CLI tool and educational wrapper around `yt-dlp
 ### Installation (from source)
 
 ```bash
-# Navigate to CLI directory
-cd "D:\pinak\cli"
+git clone https://github.com/Prince-1005/Pinak-CLI.git
+cd Pinak-CLI
+python -m venv .venv
 
-# Install in editable mode (recommended for development)
-pip install -e .
-
-# Or regular install
-pip install .
+# Activate the environment before the following commands:
+# Windows PowerShell: .\.venv\Scripts\Activate.ps1
+# macOS/Linux:        . .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install ./cli
 ```
+
+Use the Python 3.10+ interpreter installed on your system (`python3` if needed).
+For the latest published package, use `pipx install pinak-cli`; source and PyPI
+versions can differ before a release. Check the result with `pinak --version`.
+
+For development, from the repository root in the activated environment:
+
+```bash
+python -m pip install --require-hashes -r cli/requirements-lock.txt
+python -m pip install --no-deps -e ./cli
+pre-commit install --config cli/.pre-commit-config.yaml
+```
+
+For local playback on Debian/Ubuntu, install system audio and GUI prerequisites:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ffmpeg libportaudio2 python3-tk
+```
+
+Tkinter must match the Python interpreter you use. See the
+[playback installation guide](cli/OPERATIONS.md#playback-prerequisites) for Windows,
+macOS, optional OpenCV, and headless environments.
 
 ### Verify Installation
 
@@ -129,6 +158,10 @@ Inside the interactive shell:
 - `/audio <URL>` – Download and extract audio as MP3
 - `/video <URL>` – Download video
 - `/instagram <URL>` – Download Instagram media
+- `/media <path>` – Open local media or the file picker
+- `/play <path>` – Play local audio/video
+- `/view <path>` – View local pictures
+- `/ctl <command>` – Control the active player through authenticated local IPC
 - `/update` – Update yt-dlp and Pinak CLI
 - `/ffmpeg` – Download static FFmpeg build automatically
 - `/help` – Show all available slash commands
@@ -137,25 +170,32 @@ Inside the interactive shell:
 ## Project Structure
 
 ```
-D:\pinak Z\
+Pinak-CLI/
 ├── README.md                          # Root README (this file)
-├── PINAK_EXCELLENCE_DOCUMENTATION.md  # Comprehensive technical guide
+├── PINAK_DOCUMENTATION.md             # Historical design reference
+├── RELEASE_READINESS.md               # Release fixes and verification
+├── CHANGELOG.md                       # Link to cli/CHANGELOG.md
 ├── .gitignore                         # Git exclusions
 ├── .github/                           # CI/CD workflows
-│   └── workflows/ci.yml               # Multi-OS automated test & security pipeline
+│   └── workflows/                     # CI, manual publishing, release policy
 └── cli/                               # CLI application
     ├── CLI_README.md                  # CLI-specific documentation
+    ├── OPERATIONS.md                  # Installation, playback and recovery
+    ├── CHANGELOG.md                   # Maintained release history
     ├── pyproject.toml                 # Packaging & dependencies
     ├── pinak_cli.py                   # Entry wrapper script
     ├── Dockerfile                     # Container image definition
     ├── .dockerignore                  # Docker build ignore rules
     ├── requirements-lock.txt          # Pinned lockfile for dependencies
-    ├── tests/                         # Pytest test suite (170+ tests)
+    ├── requirements-runtime-lock.txt  # Runtime-only dependency lock
+    ├── tools/                         # Clean-install and release-version checks
+    ├── tests/                         # Unit, integration and regression tests
     └── pinak/                         # Core Python package
         ├── __init__.py                # Package init & version
         ├── __main__.py                # Module entry point
         ├── cli.py                     # Typer CLI & interactive REPL shell
         ├── commands/                  # REPL command handlers & UI panels
+        ├── media/                     # Decoders, TUI/native output, IPC and controls
         ├── downloader.py              # Download engine (yt-dlp wrapper)
         ├── config.py                  # Pydantic Settings configuration
         ├── history.py                 # SQLite download history & tracking
@@ -182,7 +222,7 @@ pinak [URL] [OPTIONS]
 | `--force` | | Force download even if URL exists in history | `False` |
 | `--doctor` | | Run environment and dependency checks | `False` |
 | `--dry-run` | | Simulate extraction without downloading | `False` |
-| `--json` | | Output JSON metadata (pairs with `--dry-run`) | `False` |
+| `--json` | | One JSON result on stdout; progress on stderr | `False` |
 | `--verbose` | `-v` | Enable verbose debug output | `False` |
 | `--log-file` | | Save detailed logs to specified file | None |
 | `--version` | `-V` | Show version and exit | |
@@ -206,62 +246,51 @@ pinak --doctor
 
 ## Configuration
 
-Pinak uses a JSON config file stored in your user data directory. Use `pinak config --show` to view current settings.
-
-**Common settings:**
-- `output_dir` – Default download location
-- `default_quality` – Preferred quality (`best`, `worst`, etc.)
-- `default_format` – Preferred format (`mp4`, `mp3`)
-- `merge_audio` – Auto-merge streams (`true`/`false`)
-- `max_retries` – Retry attempts on failure
-- `timeout` – Network timeout in seconds
-- `history_enabled` – Track download history
-
-See [Excellence Documentation](PINAK_EXCELLENCE_DOCUMENTATION.md#11-configuration) for full schema and details.
+Use `/config` inside the REPL and `pinak --config-path` for the configuration
+file location. Preferences include `output_dir`, `quality`, `audio_quality`,
+`video_format`, `audio_format`, `retry_count`, `connect_timeout`, `read_timeout`,
+`duplicate_action`, `history_enabled`, `ffmpeg_path` and `ffprobe_path`.
+Explicit `PINAK_<SETTING>` environment variables override saved values for the
+process; one-shot CLI options remain temporary. See the
+[current operating guide](cli/OPERATIONS.md#preferences-and-local-storage).
 
 ## Data & File Locations
 
-| Item | Windows | Linux | macOS |
-|---|---|---|---|
-| **Config** | `C:\Users\<User>\AppData\Local\pinak\pinak\config.json` | `~/.config/pinak/config.json` | `~/Library/Application Support/pinak/config.json` |
-| **History** | Same data dir as above (`history.json`) | Same as above | Same as above |
-| **Downloads** | `D:\pinak Z\downloads\` (default) or custom | `~/Downloads/Pinak/` or custom | `~/Downloads/Pinak/` or custom |
-| **Logs** | User temp/data dir (if enabled) | `~/.local/share/pinak/` or temp | Temp dir |
+Config and SQLite history use platformdirs' `pinak-cli` user config/data
+directories. The REPL command history is `~/.pinak_cli_history`. Default downloads
+go to `downloads` relative to the current directory. `--log-file` selects an
+explicit log path. IPC credentials live in the current user's application cache.
+Run `pinak --config-path` to locate configuration on the current platform.
 
 ## Technology Stack
 
-| Category | Technology | Purpose |
-|---|---|---|
-| **Language** | Python 3.10+ | Core implementation |
-| **CLI Framework** | [Typer](https://typer.tiangolo.com/) | Command-line interface & argument parsing |
-| **Download Engine** | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | Media extraction/download |
-| **Media Processing** | [FFmpeg](https://ffmpeg.org/) | Merging, conversion, processing |
-| **Terminal UI** | [Rich](https://github.com/Textualize/rich), [tqdm](https://github.com/tqdm/tqdm) | Beautiful output & progress |
-| **HTTP** | [requests](https://docs.python-requests.org/) | Network requests |
-| **Config/Validation** | [Pydantic](https://docs.pydantic.dev/) | Data validation |
-| **Cross-Platform Paths** | [appdirs](https://github.com/ActiveState/appdirs) | User dirs |
-| **Versioning** | [packaging](https://packaging.python.org/) | Version comparison |
-| **Packaging** | [setuptools](https://setuptools.pypa.io/) | Build/distribution |
+Python 3.10+, Typer, yt-dlp, FFmpeg, Rich, prompt-toolkit, Pydantic Settings,
+platformdirs, Pillow, Mutagen, NumPy, SoundDevice and filelock. Optional OpenCV
+provides a native window with Tkinter fallback. Media playback accepts local
+files: `/media <path>` in the REPL or `pinak media <path>` from the CLI.
 
 ## Documentation
 
-- **[PINAK_EXCELLENCE_DOCUMENTATION.md](PINAK_EXCELLENCE_DOCUMENTATION.md)** – Complete technical guide: architecture, features, config, testing, roadmap, troubleshooting.
+- **[cli/OPERATIONS.md](cli/OPERATIONS.md)** – Current installation, settings, media controls, recovery and release guidance.
+- **[PINAK_DOCUMENTATION.md](PINAK_DOCUMENTATION.md)** – Historical 1.3 architecture/design notes; settings and claims may be obsolete.
+- **[RELEASE_READINESS.md](RELEASE_READINESS.md)** – Current release checks and resolution of the final audit findings.
 - **[cli/CLI_README.md](cli/CLI_README.md)** – CLI-specific documentation.
 
 ## Roadmap
 
-- [x] Add comprehensive pytest test suite (170+ tests covering unit, e2e, security)
+- [x] Automated unit, integration, media and security regression tests
 - [x] Integrate ruff, black, mypy, pre-commit
 - [x] GitHub Actions CI/CD pipeline (cross-platform matrix + security audit)
 - [x] Cross-platform FFmpeg auto-detection & static downloader
 - [x] Docker support
-- [ ] Resume support for partial downloads
+- [x] Resume support for partial downloads
 - [ ] MkDocs documentation site
-- [ ] Batch download queue
+- [x] REPL batch-file downloads
 
 ## Contributing
 
-Contributions are welcome! Please read our [Excellence Documentation](PINAK_EXCELLENCE_DOCUMENTATION.md#19-contributing) for guidelines on:
+Contributions are welcome! Use the current [operating guide](cli/OPERATIONS.md) and
+the development setup above for:
 - Development setup
 - Code style & standards
 - Testing requirements

@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+import tempfile
 import urllib.request
 
 import yt_dlp
@@ -14,7 +15,7 @@ from rich.table import Table
 from .config import CONFIG_FILE, PinakSettings, config
 from .ffmpeg_setup import ensure_ffmpeg, ensure_ffprobe
 from .subproc import run_cmd
-from .utils import BOLD, RESET
+from .utils import BOLD, RESET, trusted_which
 
 console = Console()
 
@@ -39,7 +40,7 @@ def _check_ffmpeg_executable(path: str) -> tuple[bool, str]:
     if os.path.exists(path):
         binary = path
     else:
-        binary = shutil.which(os.path.basename(path)) or shutil.which(path) or ""
+        binary = (trusted_which(path) or "") if not os.path.dirname(path) else ""
         if not binary:
             return False, f"{path} (not found)"
     proc = run_cmd([binary, "-version"], timeout=10.0)
@@ -105,10 +106,10 @@ def run_doctor(verbose: bool = False) -> bool:
     output_dir = str(config.get("output_dir", "downloads"))
     try:
         os.makedirs(output_dir, exist_ok=True)
-        test_file = os.path.join(output_dir, ".pinak_write_test")
-        with open(test_file, "w", encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=output_dir, prefix=".pinak-write-test-", delete=True
+        ) as f:
             f.write("ok")
-        os.remove(test_file)
         # Disk space check (>= 500 MB free recommended).
         free_mb = shutil.disk_usage(os.path.abspath(output_dir)).free / (1024 * 1024)
         space_ok = free_mb >= 500
@@ -117,7 +118,7 @@ def run_doctor(verbose: bool = False) -> bool:
             (
                 "Output folder writable",
                 space_detail,
-                True,
+                space_ok,
                 (
                     ""
                     if space_ok
@@ -197,6 +198,58 @@ def run_doctor(verbose: bool = False) -> bool:
             "" if internet_ok else "Check network/VPN/firewall, then retry.",
         )
     )
+
+    # Media subsystem diagnostics (SILENT-03)
+    try:
+        from .media.decoders.audio_backend import AudioPlayerBackend
+
+        audio_drv = AudioPlayerBackend(os.devnull).driver_name
+        audio_detail = f"available driver: {audio_drv} (device opens during playback)"
+        audio_ok = audio_drv != "mock"
+    except Exception as exc:
+        audio_detail = f"fallback only ({exc})"
+        audio_ok = False
+    checks.append(
+        (
+            "Media: Audio Driver",
+            audio_detail,
+            audio_ok,
+            "" if audio_ok else "Install ffplay or a supported audio output backend.",
+        )
+    )
+
+    try:
+        from .media.window.native_window import NativeVideoWindow
+
+        win_backend = NativeVideoWindow().backend_name
+        if win_backend == "cv2":
+            win_detail = "OpenCV (cv2 hardware accelerated)"
+        elif win_backend == "tkinter":
+            win_detail = "Tkinter GUI window fallback"
+        else:
+            win_detail = "none (TUI rendering only)"
+    except Exception as exc:
+        win_detail = f"TUI only ({exc})"
+    checks.append(("Media: Video Window", win_detail, True, ""))
+
+    try:
+        from .media.core.terminal_caps import TerminalProber
+
+        caps = TerminalProber.probe(skip_active_interrogation=True)
+        if caps.has_kitty:
+            gfx_mode = "Kitty Graphics Protocol (APC)"
+        elif caps.has_sixel:
+            gfx_mode = "DEC Sixel Graphics"
+        elif caps.has_iterm2:
+            gfx_mode = "iTerm2 Inline Images"
+        elif caps.has_truecolor:
+            gfx_mode = "24-bit TrueColor ANSI (Half-Block/Quadrant)"
+        else:
+            gfx_mode = "Standard ANSI (Half-Block/ASCII fallback)"
+        gfx_detail = f"{gfx_mode} ({caps.cols}x{caps.rows})"
+    except Exception as exc:
+        gfx_detail = f"Standard ANSI ({exc})"
+    checks.append(("Media: Terminal Graphics", gfx_detail, True, ""))
 
     table = Table(title="Pinak Doctor Diagnostics", style="blue")
     table.add_column("Check", style="cyan")

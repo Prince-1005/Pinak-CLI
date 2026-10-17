@@ -9,19 +9,19 @@ All helpers are best-effort and never raise.
 
 from __future__ import annotations
 
-import contextlib
-import io
 import threading
 
 from rich.console import Console
 from rich.panel import Panel
+
+from .text_safety import safe_rich
 
 try:  # Windows-only optional dependency.
     from win11toast import toast as _toast
 except ImportError:  # pragma: no cover - platform dependent
     _toast = None
 
-console = Console()
+console = Console(stderr=True)
 
 
 def _show_native_notification(title: str, message: str) -> bool:
@@ -33,56 +33,47 @@ def _show_native_notification(title: str, message: str) -> bool:
     import subprocess
     import sys
 
-    # Tier 1: Windows win11toast (when available or mocked)
-    if _toast is not None:
+    def fallback() -> None:
+        console.print(
+            Panel(f"[bold]{safe_rich(title)}[/]\n{safe_rich(message)}", border_style="cyan")
+        )
 
-        def _show_win() -> None:
-            with (
-                contextlib.suppress(BaseException),
-                contextlib.redirect_stdout(io.StringIO()),
-                contextlib.redirect_stderr(io.StringIO()),
-            ):
-                _toast(
-                    title,
-                    message,
-                    duration="short",
-                    on_click=lambda *a, **k: None,
-                    on_dismissed=lambda *a, **k: None,
-                    on_failed=lambda *a, **k: None,
-                )
+    def deliver(cmd: list[str]) -> None:
+        try:
+            result = subprocess.run(
+                cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10.0, check=False
+            )
+            if result.returncode != 0:
+                fallback()
+        except (OSError, subprocess.TimeoutExpired):
+            fallback()
 
-        threading.Thread(target=_show_win, daemon=True).start()
-        return True
-
-    # Tier 2: macOS osascript
-    if sys.platform == "darwin" and shutil.which("osascript"):
-
-        def _show_mac() -> None:
-            with contextlib.suppress(Exception):
-                safe_title = title.replace('"', '\\"')
-                safe_msg = message.replace('"', '\\"')
-                cmd = [
-                    "osascript",
-                    "-e",
-                    f'display notification "{safe_msg}" with title "{safe_title}"',
-                ]
-                subprocess.run(cmd, capture_output=True, timeout=5.0)  # nosec B603
-
-        threading.Thread(target=_show_mac, daemon=True).start()
-        return True
-
-    # Tier 3: Linux notify-send
-    if (sys.platform.startswith("linux") or "bsd" in sys.platform) and shutil.which("notify-send"):
-
-        def _show_linux() -> None:
-            cmd = ["notify-send", title, message]
-            with contextlib.suppress(Exception):
-                subprocess.run(cmd, capture_output=True, timeout=5.0)  # nosec B603, B607
-
-        threading.Thread(target=_show_linux, daemon=True).start()
-        return True
-
-    return False
+    cmd: list[str]
+    if _toast is not None and sys.platform.startswith("win"):
+        # Third-party stdout and COM lifetime stay isolated from the CLI process.
+        code = (
+            "import sys; from win11toast import toast; "
+            "toast(sys.argv[1],sys.argv[2],duration='short',"
+            "on_click=lambda *a,**k:None,on_dismissed=lambda *a,**k:None,"
+            "on_failed=lambda *a,**k:None)"
+        )
+        cmd = [sys.executable, "-c", code, title, message]
+    elif sys.platform == "darwin" and shutil.which("osascript"):
+        # Text is argv data, never AppleScript source.
+        script = (
+            "on run argv\n"
+            "display notification (item 2 of argv) with title (item 1 of argv)\n"
+            "end run"
+        )
+        cmd = ["osascript", "-e", script, title, message]
+    elif (sys.platform.startswith("linux") or "bsd" in sys.platform) and shutil.which(
+        "notify-send"
+    ):
+        cmd = ["notify-send", "--", title, message]
+    else:
+        return False
+    threading.Thread(target=deliver, args=(cmd,), daemon=True).start()
+    return True
 
 
 def notify(title: str, message: str) -> None:
@@ -94,7 +85,9 @@ def notify(title: str, message: str) -> None:
         shown = False
 
     if not shown:
-        console.print(Panel(f"[bold]{title}[/]\n{message}", border_style="cyan"))
+        console.print(
+            Panel(f"[bold]{safe_rich(title)}[/]\n{safe_rich(message)}", border_style="cyan")
+        )
 
 
 def print_offline_notice() -> None:
@@ -117,7 +110,7 @@ def print_instagram_notice(detail: str = "") -> None:
         "[dim]Try again later, use a public post URL, or download via /video.[/]"
     )
     if detail:
-        text += f"\n[dim]Detail: {detail}[/]"
+        text += f"\n[dim]Detail: {safe_rich(detail)}[/]"
     console.print(Panel(text, title="📸 Instagram notice", border_style="yellow"))
     notify("Pinak — Instagram notice", "Instagram blocked or limited the request.")
 

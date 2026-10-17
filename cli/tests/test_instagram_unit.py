@@ -159,8 +159,12 @@ def test_download_binary_retry_success(tmp_path, monkeypatch):
         def __exit__(self, *a):
             return False
 
-        def read(self):
-            return b"data"
+        def read(self, size=-1):
+            import io
+
+            if not hasattr(self, "_reader"):
+                self._reader = io.BytesIO(b"data")
+            return self._reader.read(size)
 
     monkeypatch.setattr(ig_mod, "urlopen", lambda *a, **k: _Resp())
     ig_mod._download_binary_with_retry("http://x/img", target)
@@ -178,6 +182,14 @@ def test_download_binary_retry_exhausts(monkeypatch, tmp_path):
     monkeypatch.setattr(ig_mod.time, "sleep", lambda s: None)
     with pytest.raises(RuntimeError, match="failed after"):
         ig_mod._download_binary_with_retry("http://x/img", tmp_path / "img.bin")
+
+
+def test_download_binary_rejects_unsafe_url_scheme(tmp_path):
+    with pytest.raises(ValueError, match="Unsupported or unsafe URL scheme"):
+        ig_mod._download_binary_with_retry("file:///etc/passwd", tmp_path / "img.bin")
+
+    with pytest.raises(ValueError, match="Unsupported or unsafe URL scheme"):
+        ig_mod._download_binary_with_retry("ftp://example.com/img.jpg", tmp_path / "img.bin")
 
 
 def test_download_instagram_media_extract_failure(monkeypatch, tmp_path):

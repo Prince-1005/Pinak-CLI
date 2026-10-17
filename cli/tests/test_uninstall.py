@@ -55,6 +55,7 @@ def test_purge_user_data(tmp_path, monkeypatch):
     monkeypatch.setattr(uninst_mod, "config_dir", str(cfg_dir))
     monkeypatch.setattr(uninst_mod, "data_dir", str(data_dir))
     monkeypatch.setattr(uninst_mod, "legacy_db_file", str(legacy_db))
+    monkeypatch.setattr(uninst_mod, "command_history_file", str(tmp_path / "commands.txt"))
 
     removed = uninst_mod.purge_user_data(include_cache=False)
     assert str(cfg_dir) in removed
@@ -86,9 +87,20 @@ def test_execute_uninstallation_windows(monkeypatch):
         return MagicMock()
 
     monkeypatch.setattr(uninst_mod.subprocess, "Popen", mock_popen)
-    assert uninst_mod.execute_uninstallation(["uv", "tool", "uninstall", "pinak-cli"]) is True
+    # Test path with spaces
+    cmd_with_spaces = [
+        r"C:\Program Files\Python311\python.exe",
+        "-m",
+        "pip",
+        "uninstall",
+        "-y",
+        "pinak-cli",
+    ]
+    assert uninst_mod.execute_uninstallation(cmd_with_spaces) is True
     assert len(popen_called) == 1
     assert popen_called[0][0] == "powershell"
+    script = popen_called[0][3]
+    assert "& 'C:\\Program Files\\Python311\\python.exe'" in script
 
 
 def test_execute_uninstallation_failure(monkeypatch):

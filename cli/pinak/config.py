@@ -2,22 +2,29 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import os
 import shutil
+import tempfile
+import threading
 from typing import Any
 
 import platformdirs
+from filelock import FileLock
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .exceptions import ConfigError
+
+_config_lock = threading.RLock()
+_loaded_snapshots: dict[str, dict[str, Any]] = {}
+log = logging.getLogger("pinak.config")
 
 APP_NAME = "pinak-cli"
 APP_AUTHOR = "pinak"
 
 # Determine standard config directory
 config_dir = platformdirs.user_config_dir(APP_NAME, APP_AUTHOR)
-os.makedirs(config_dir, exist_ok=True)
 CONFIG_FILE = os.path.join(config_dir, "config.json")
 LOCAL_CONFIG = ".pinak_config.json"
 
@@ -118,8 +125,23 @@ class PinakSettings(BaseSettings):
         return (v or "").strip()
 
 
+class _StoredSettings(PinakSettings):
+    """Validate persisted preferences without importing invocation environment values."""
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: Any,
+        env_settings: Any,
+        dotenv_settings: Any,
+        file_secret_settings: Any,
+    ) -> tuple[Any, ...]:
+        return (init_settings,)
+
+
 # Legacy global dictionary for backward compatibility across modules
-config: dict[str, Any] = PinakSettings().model_dump()
+config: dict[str, Any] = PinakSettings.model_construct().model_dump()
 
 
 def _migrate_legacy_keys(data: dict[str, Any]) -> dict[str, Any]:
@@ -140,95 +162,161 @@ def _migrate_legacy_keys(data: dict[str, Any]) -> dict[str, Any]:
 
 def init_config() -> dict[str, Any]:
     global config
+    with _config_lock:
+        # Migrate legacy ~/.pinak_config.json if exists
+        legacy_home_config = os.path.expanduser("~/.pinak_config.json")
+        try:
+            os.makedirs(os.path.dirname(CONFIG_FILE) or ".", exist_ok=True)
+            with FileLock(CONFIG_FILE + ".lock", timeout=5):
+                if not os.path.exists(CONFIG_FILE):
+                    if os.path.exists(legacy_home_config):
+                        shutil.copy(legacy_home_config, CONFIG_FILE)
+                    elif os.path.exists(LOCAL_CONFIG):
+                        shutil.copy(LOCAL_CONFIG, CONFIG_FILE)
+        except (OSError, TimeoutError) as exc:
+            log.warning("Configuration storage unavailable: %s", exc)
 
-    # Migrate legacy ~/.pinak_config.json if exists
-    legacy_home_config = os.path.expanduser("~/.pinak_config.json")
-    if not os.path.exists(CONFIG_FILE):
-        if os.path.exists(legacy_home_config):
-            shutil.copy(legacy_home_config, CONFIG_FILE)
-        elif os.path.exists(LOCAL_CONFIG):
-            shutil.copy(LOCAL_CONFIG, CONFIG_FILE)
-
-    def _load_from_path(path: str) -> bool:
-        if not os.path.exists(path):
+        def _load_from_path(path: str) -> bool:
+            if not os.path.exists(path):
+                return False
+            with open(path, encoding="utf-8") as f:
+                raw = f.read().strip()
+            if not raw:
+                return False
+            data = json.loads(raw)
+            if isinstance(data, dict):
+                data = _migrate_legacy_keys(data)
+                # Environment overrides apply to the invocation; they are not saved
+                # unless explicitly changed by a preferences command.
+                data = {k: v for k, v in data.items() if "PINAK_" + k.upper() not in os.environ}
+                settings = PinakSettings(**data)
+                config.update(settings.model_dump())
+                return True
             return False
-        with open(path, encoding="utf-8") as f:
-            raw = f.read().strip()
-        if not raw:
-            return False
-        data = json.loads(raw)
-        if isinstance(data, dict):
-            data = _migrate_legacy_keys(data)
-            settings = PinakSettings(**data)
-            config.update(settings.model_dump())
-            return True
-        return False
 
-    loaded = False
-    try:
-        loaded = _load_from_path(CONFIG_FILE)
-    except Exception:
         loaded = False
+        try:
+            loaded = _load_from_path(CONFIG_FILE)
+        except Exception:
+            loaded = False
 
-    # Fallback to backup file if primary CONFIG_FILE was missing, empty, or corrupted
-    if not loaded:
-        bak_file = CONFIG_FILE + ".bak"
-        with contextlib.suppress(Exception):
-            if _load_from_path(bak_file):
-                with contextlib.suppress(Exception):
-                    shutil.copy2(bak_file, CONFIG_FILE)
+        # Fallback to backup file if primary CONFIG_FILE was missing, empty, or corrupted
+        if not loaded:
+            bak_file = CONFIG_FILE + ".bak"
+            with contextlib.suppress(Exception):
+                if _load_from_path(bak_file):
+                    loaded = True
+                    with FileLock(CONFIG_FILE + ".lock", timeout=5):
+                        try:
+                            primary_valid = _load_from_path(CONFIG_FILE)
+                        except (ValueError, OSError):
+                            primary_valid = False
+                        if not primary_valid:
+                            with tempfile.NamedTemporaryFile(
+                                dir=os.path.dirname(CONFIG_FILE) or ".", delete=False
+                            ) as recovery:
+                                recovery_path = recovery.name
+                            try:
+                                shutil.copy2(bak_file, recovery_path)
+                                os.replace(recovery_path, CONFIG_FILE)
+                            finally:
+                                if os.path.exists(recovery_path):
+                                    os.unlink(recovery_path)
 
-    return config
+        if not loaded:
+            try:
+                config.update(PinakSettings().model_dump())
+            except Exception as exc:
+                log.warning("Invalid environment settings; using safe defaults: %s", exc)
+        _loaded_snapshots[CONFIG_FILE] = config.copy()
+        return config
 
 
 def validate_settings(config_data: dict[str, Any]) -> PinakSettings:
     """Validate a settings dictionary against PinakSettings schema, raising ConfigError on failure."""
     try:
         clean = _migrate_legacy_keys(config_data)
-        return PinakSettings(**clean)
+        return _StoredSettings(**clean)
     except Exception as exc:
         raise ConfigError(f"Invalid configuration: {exc}") from exc
 
 
 def save_config(config_data: dict[str, Any] | None = None) -> bool:
     global config
-    if config_data is not None:
-        config.update(config_data)
+    with _config_lock:
+        if config_data is not None:
+            config.update(config_data)
 
-    temp_file = CONFIG_FILE + ".tmp"
-    bak_file = CONFIG_FILE + ".bak"
-    try:
-        valid_settings = validate_settings(config)
-        config.update(valid_settings.model_dump())
-        serialized = valid_settings.model_dump_json(indent=4)
+        temp_file = ""
+        bak_file = CONFIG_FILE + ".bak"
+        try:
+            parent_dir = os.path.dirname(CONFIG_FILE)
+            if parent_dir:
+                os.makedirs(parent_dir, exist_ok=True)
 
-        parent_dir = os.path.dirname(CONFIG_FILE)
-        if parent_dir:
-            os.makedirs(parent_dir, exist_ok=True)
-
-        with open(temp_file, "w", encoding="utf-8") as f:
-            f.write(serialized)
-            f.flush()
-            with contextlib.suppress(AttributeError, OSError):
-                os.fsync(f.fileno())
-
-        if os.path.exists(CONFIG_FILE):
-            with contextlib.suppress(Exception):
-                shutil.copy2(CONFIG_FILE, bak_file)
-
-        os.replace(temp_file, CONFIG_FILE)
-        return True
-    except ConfigError as ce:
-        print(f"\033[91m[X] Could not write {CONFIG_FILE}: {ce}\033[0m")
-        print(f"\033[93m[!] Tip: {ce.hint}\033[0m")
-        return False
-    except Exception as e:
-        print(f"\033[91m[X] Could not write {CONFIG_FILE}: {e}\033[0m")
-        print(
-            "\033[93m[!] Tip: check that values are valid (e.g. quality=best/720p, video_format=mp4). Run `pinak --doctor` for details.\033[0m"
-        )
-        return False
-    finally:
-        if os.path.exists(temp_file):
-            with contextlib.suppress(Exception):
-                os.remove(temp_file)
+            with FileLock(CONFIG_FILE + ".lock", timeout=5):
+                baseline = _loaded_snapshots.get(
+                    CONFIG_FILE, PinakSettings.model_construct().model_dump()
+                )
+                changes = {k: v for k, v in config.items() if baseline.get(k) != v}
+                if config_data:
+                    changes.update(config_data)
+                disk: dict[str, Any] = {}
+                if os.path.exists(CONFIG_FILE):
+                    try:
+                        with open(CONFIG_FILE, encoding="utf-8") as existing:
+                            raw = json.load(existing)
+                    except (ValueError, OSError):
+                        with open(bak_file, encoding="utf-8") as backup:
+                            raw = json.load(backup)
+                    if not isinstance(raw, dict):
+                        raise ConfigError("Configuration must be a JSON object")
+                    disk = _migrate_legacy_keys(raw)
+                valid_settings = validate_settings({**disk, **changes})
+                serialized = valid_settings.model_dump_json(indent=4)
+                with tempfile.NamedTemporaryFile(
+                    mode="w",
+                    encoding="utf-8",
+                    dir=parent_dir or ".",
+                    prefix=".pinak-config-",
+                    suffix=".tmp",
+                    delete=False,
+                ) as f:
+                    temp_file = f.name
+                    f.write(serialized)
+                    f.flush()
+                    os.fsync(f.fileno())
+                if os.path.exists(CONFIG_FILE):
+                    try:
+                        with open(CONFIG_FILE, encoding="utf-8") as primary:
+                            validate_settings(json.load(primary))
+                    except (ValueError, OSError, ConfigError):
+                        pass  # Retain the valid backup when repairing a damaged primary.
+                    else:
+                        shutil.copy2(CONFIG_FILE, bak_file)
+                os.replace(temp_file, CONFIG_FILE)
+                # Preserve invocation-only environment overrides in memory.
+                merged_runtime = PinakSettings(
+                    **{
+                        k: v
+                        for k, v in valid_settings.model_dump().items()
+                        if "PINAK_" + k.upper() not in os.environ or k in changes
+                    }
+                )
+                config.update(merged_runtime.model_dump())
+                _loaded_snapshots[CONFIG_FILE] = config.copy()
+            return True
+        except ConfigError as ce:
+            print(f"\033[91m[X] Could not write {CONFIG_FILE}: {ce}\033[0m")
+            print(f"\033[93m[!] Tip: {ce.hint}\033[0m")
+            return False
+        except Exception as e:
+            print(f"\033[91m[X] Could not write {CONFIG_FILE}: {e}\033[0m")
+            print(
+                "\033[93m[!] Tip: check that values are valid (e.g. quality=best/720p, video_format=mp4). Run `pinak --doctor` for details.\033[0m"
+            )
+            return False
+        finally:
+            if os.path.exists(temp_file):
+                with contextlib.suppress(Exception):
+                    os.remove(temp_file)

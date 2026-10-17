@@ -3,8 +3,12 @@
 from pinak import history as history_mod
 
 
-def test_record_and_query_history(isolated_history_db):
-    history_mod.record_download("https://example.com/v1", status="success", mode="media")
+def test_record_and_query_history(isolated_history_db, tmp_path):
+    media = tmp_path / "clip.mp4"
+    media.write_bytes(b"downloaded media")
+    history_mod.record_download(
+        "https://example.com/v1", status="success", mode="media", files=[str(media)]
+    )
     history_mod.record_download("https://example.com/v2", status="failed", mode="audio")
 
     all_rows = history_mod.get_history("")
@@ -12,6 +16,8 @@ def test_record_and_query_history(isolated_history_db):
 
     assert history_mod.url_downloaded_successfully("https://example.com/v1") is True
     assert history_mod.url_downloaded_successfully("https://example.com/v2") is False
+    media.unlink()
+    assert history_mod.url_downloaded_successfully("https://example.com/v1") is False
 
 
 def test_history_filters(isolated_history_db):

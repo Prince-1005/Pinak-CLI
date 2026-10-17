@@ -235,3 +235,61 @@ def test_repl_bare_any_prompts(monkeypatch):
     assert calls[0]["is_any_command"] is True
     assert calls[1]["url"] == "https://example.com/prompted2"
     assert calls[1]["is_any_command"] is True
+
+
+def test_cli_media_command_flags(monkeypatch):
+    """Verifies that extra arguments and flags like --window and --standalone are accepted and forwarded."""
+    import pinak.commands.media as media_mod
+
+    captured_args = []
+
+    def fake_handle_media(args, **kwargs):
+        captured_args.append(list(args))
+
+    monkeypatch.setattr(media_mod, "handle_media_command", fake_handle_media)
+    monkeypatch.setattr(media_mod, "handle_play_command", fake_handle_media)
+
+    result = runner.invoke(app, ["media", "sample.mp4", "--window"])
+    assert result.exit_code == 0
+    assert len(captured_args) == 1
+    assert "sample.mp4" in captured_args[0]
+    assert "--window" in captured_args[0]
+
+    captured_args.clear()
+    result = runner.invoke(app, ["play", "video.mkv", "--standalone", "--gui"])
+    assert result.exit_code == 0
+    assert len(captured_args) == 1
+    assert "video.mkv" in captured_args[0]
+    assert "--standalone" in captured_args[0]
+
+
+def test_cli_ctl_command(monkeypatch):
+    """Verifies that pinak ctl routes commands to MediaIPCClient (DEAD-04)."""
+    from unittest.mock import MagicMock
+
+    mock_client = MagicMock()
+    mock_client.send_command.return_value = {"error": "success", "data": 15.5}
+    mock_client.seek_relative.return_value = 42.0
+    mock_client.get_playback_time.return_value = 15.5
+
+    monkeypatch.setattr("pinak.commands.control.MediaIPCClient", lambda *a, **k: mock_client)
+
+    # 1. ctl pause
+    res = runner.invoke(app, ["ctl", "pause"])
+    assert res.exit_code == 0
+    mock_client.send_command.assert_called_with("set_property", "pause", True)
+
+    # 2. ctl seek +10
+    res = runner.invoke(app, ["ctl", "seek", "10"])
+    assert res.exit_code == 0
+    mock_client.send_command.assert_called_with("seek", 10.0, "relative")
+
+    # 3. ctl time
+    res = runner.invoke(app, ["ctl", "time"])
+    assert res.exit_code == 0
+    mock_client.send_command.assert_called_with("get_property", "playback-time")
+
+    # 4. ctl quit
+    res = runner.invoke(app, ["ctl", "quit"])
+    assert res.exit_code == 0
+    mock_client.send_command.assert_called_with("quit")

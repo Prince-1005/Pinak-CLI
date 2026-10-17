@@ -1,16 +1,21 @@
 # Bytecode and runtime caches
 __pycache__/
+**/__pycache__/
 *.py[cod]
+**/*.py[cod]
 *.pyo
 
 # Virtual environments
 .venv/
+.venv*/
 env/
 venv/
 
 # Testing and coverage artifacts
 .pytest_cache/
 .coverage
+.coverage.*
+.hypothesis/
 htmlcov/
 coverage.xml
 tests/
@@ -26,5 +31,12 @@ tests/
 # Package build artifacts and local outputs
 dist/
 build/
+release-dist/
 *.egg-info/
+.audit-*
+.env
+.env.*
+.pinak_config.json
+.pinak_history*
+.pinak_cli_history
 downloads/

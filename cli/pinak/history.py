@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import os
 import sqlite3
 import time
@@ -18,14 +19,16 @@ import uuid
 from typing import Any
 
 import platformdirs
+from filelock import FileLock
 
 from .utils import get_platform, human_duration, human_size
+
+logger = logging.getLogger("pinak.history")
 
 APP_NAME = "pinak-cli"
 APP_AUTHOR = "pinak"
 
 data_dir = platformdirs.user_data_dir(APP_NAME, APP_AUTHOR)
-os.makedirs(data_dir, exist_ok=True)
 DB_FILE = os.path.join(data_dir, "history.db")
 LOCAL_HISTORY = ".pinak_history.json"
 LEGACY_DB_FILE = os.path.expanduser("~/.pinak_history.db")
@@ -50,26 +53,26 @@ def get_current_session_id() -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Remote tracking stubs (intentionally retained as no-ops for backward compatibility)
+# Remote tracking stubs (deprecated: intentionally retained as no-ops for backward compatibility)
 # ---------------------------------------------------------------------------
 def push_session_start() -> None:
-    """No-op stub: remote backend tracking has been removed in this version."""
+    """[DEPRECATED] No-op stub: remote backend tracking has been removed."""
 
 
 def push_session_end(wait: bool = True) -> None:
-    """No-op stub: remote backend tracking has been removed in this version."""
+    """[DEPRECATED] No-op stub: remote backend tracking has been removed."""
 
 
 def push_command_event(command: str, url: str | None = None, platform: str = "unknown") -> None:
-    """No-op stub: remote backend tracking has been removed in this version."""
+    """[DEPRECATED] No-op stub: remote backend tracking has been removed."""
 
 
 def push_download_event(*args: Any, **kwargs: Any) -> None:
-    """No-op stub: remote backend tracking has been removed in this version."""
+    """[DEPRECATED] No-op stub: remote backend tracking has been removed."""
 
 
 def _push_activity(payload: dict[str, Any], wait: bool = False) -> None:
-    """No-op stub: remote backend tracking has been removed in this version."""
+    """[DEPRECATED] No-op stub: remote backend tracking has been removed."""
 
 
 # ---------------------------------------------------------------------------
@@ -97,14 +100,18 @@ def _create_schema(conn: sqlite3.Connection) -> None:
 
 
 def get_db_connection() -> sqlite3.Connection:
+    parent = os.path.dirname(DB_FILE)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+
     # Migrate legacy DB if it exists and new one doesn't
     if not os.path.exists(DB_FILE) and os.path.exists(LEGACY_DB_FILE):
         try:
             import shutil
 
             shutil.copy(LEGACY_DB_FILE, DB_FILE)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to copy legacy DB file: %s", exc)
 
     parent = os.path.dirname(DB_FILE)
     if parent:
@@ -116,30 +123,53 @@ def get_db_connection() -> sqlite3.Connection:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA schema_version")
         return conn
-    except (sqlite3.DatabaseError, OSError):
+    except (sqlite3.DatabaseError, OSError) as exc:
         if conn is not None:
             with contextlib.suppress(Exception):
                 conn.close()
-        # Self-healing: quarantine corrupt database and start clean
-        with contextlib.suppress(Exception):
-            corrupt_target = f"{DB_FILE}.corrupt.{int(time.time())}"
-            if os.path.exists(DB_FILE):
-                os.replace(DB_FILE, corrupt_target)
-
-        conn = sqlite3.connect(DB_FILE, timeout=5.0)
-        conn.row_factory = sqlite3.Row
-        with contextlib.suppress(Exception):
+        code = getattr(exc, "sqlite_errorcode", 0) & 0xFF
+        if code not in (11, 26) and str(exc).lower() not in (
+            "file is not a database",
+            "database disk image is malformed",
+        ):
+            raise
+        # Only confirmed corruption permits quarantine. Recheck after obtaining
+        # the cross-process recovery lock so another recovery is never replaced.
+        with FileLock(DB_FILE + ".recovery.lock", timeout=5):
+            with contextlib.closing(sqlite3.connect(DB_FILE, timeout=5.0)) as probe:
+                try:
+                    probe.execute("PRAGMA schema_version")
+                except sqlite3.DatabaseError as current:
+                    if (getattr(current, "sqlite_errorcode", 0) & 0xFF) not in (11, 26) and str(
+                        current
+                    ).lower() not in ("file is not a database", "database disk image is malformed"):
+                        raise
+                else:
+                    conn = sqlite3.connect(DB_FILE, timeout=5.0)
+                    conn.row_factory = sqlite3.Row
+                    return conn
+            corrupt_target = f"{DB_FILE}.corrupt.{uuid.uuid4().hex}"
+            os.replace(DB_FILE, corrupt_target)
+            logger.warning(
+                "Corrupt history preserved at %s; starting a new database", corrupt_target
+            )
+            conn = sqlite3.connect(DB_FILE, timeout=5.0)
+            conn.row_factory = sqlite3.Row
             _create_schema(conn)
-        return conn
+            return conn
 
 
 def init_db() -> None:
+    conn = None
     try:
         conn = get_db_connection()
         _create_schema(conn)
         conn.close()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Database initialization failed: %s", exc)
+    finally:
+        if conn is not None:
+            conn.close()
 
     # Run migration if legacy JSON history exists
     local_paths = [
@@ -148,7 +178,10 @@ def init_db() -> None:
     ]
     for p in local_paths:
         if os.path.exists(p):
-            migrate_json_to_sqlite(p)
+            try:
+                migrate_json_to_sqlite(p)
+            except Exception as exc:
+                logger.warning("Legacy history migration failed; original retained: %s", exc)
             break
 
 
@@ -159,48 +192,64 @@ def migrate_json_to_sqlite(json_path: str) -> None:
     except Exception:
         return
 
+    if not isinstance(data, dict) or not isinstance(data.get("downloads", []), list):
+        logger.warning("Legacy history has an invalid schema; original retained: %s", json_path)
+        return
     downloads = data.get("downloads", [])
+    if any(not isinstance(item, (dict, int, float)) for item in downloads):
+        logger.warning("Legacy history has invalid records; original retained: %s", json_path)
+        return
+    if any(
+        isinstance(item, dict)
+        and (
+            not isinstance(item.get("files", []), list)
+            or any(not isinstance(p, str) for p in item.get("files", []))
+            or not isinstance(item.get("time", 0), (int, float))
+        )
+        for item in downloads
+    ):
+        logger.warning("Legacy history has invalid record values; original retained: %s", json_path)
+        return
     if not downloads:
         with contextlib.suppress(OSError):
             os.rename(json_path, json_path + ".bak")
         return
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    with contextlib.closing(get_db_connection()) as conn, conn:
+        cursor = conn.cursor()
 
-    for item in downloads:
-        if isinstance(item, dict):
-            t_val = item.get("time", time.time())
-            url = item.get("url", "Unknown URL")
-            status = item.get("status", "success")
-            mode = item.get("mode", "media")
-            quality = item.get("quality", "best")
-            files = item.get("files", [])
+        for item in downloads:
+            if isinstance(item, dict):
+                t_val = item.get("time", time.time())
+                url = item.get("url", "Unknown URL")
+                status = item.get("status", "success")
+                mode = item.get("mode", "media")
+                quality = item.get("quality", "best")
+                files = item.get("files", [])
 
-            total_size = 0
-            for f in files:
-                if os.path.exists(f):
-                    total_size += os.path.getsize(f)
+                total_size = 0
+                for f in files:
+                    if os.path.exists(f):
+                        total_size += os.path.getsize(f)
 
-            files_str = json.dumps(files)
-            cursor.execute(
-                """
-            INSERT INTO downloads (time, url, status, mode, quality, files, duration, size)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-                (t_val, url, status, mode, quality, files_str, 0, total_size),
-            )
-        else:
-            cursor.execute(
-                """
-            INSERT INTO downloads (time, url, status, mode, quality, files, duration, size)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-                (float(item), "Legacy Entry", "success", "media", "best", "[]", 0, 0),
-            )
+                files_str = json.dumps(files)
+                cursor.execute(
+                    """
+                    INSERT INTO downloads (time, url, status, mode, quality, files, duration, size)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (t_val, url, status, mode, quality, files_str, 0, total_size),
+                )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO downloads (time, url, status, mode, quality, files, duration, size)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (float(item), "Legacy Entry", "success", "media", "best", "[]", 0, 0),
+                )
 
-    conn.commit()
-    conn.close()
+        conn.commit()
 
     try:
         os.rename(json_path, json_path + ".bak")
@@ -227,8 +276,8 @@ def record_download(
 
         if not _config.get("history_enabled", True):
             return
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Failed to query history_enabled config: %s", exc)
 
     # Calculate file sizes
     total_size = 0
@@ -240,6 +289,7 @@ def record_download(
     current_time = time.time()
 
     # --- Save to local SQLite ---
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -262,27 +312,38 @@ def record_download(
         )
         conn.commit()
         conn.close()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to insert record into download history: %s", exc)
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def url_downloaded_successfully(url: str) -> bool:
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT COUNT(*) FROM downloads WHERE url = ? AND status = 'success'", (url,)
-        )
-        count = cursor.fetchone()[0]
+        cursor.execute("SELECT files FROM downloads WHERE url = ? AND status = 'success'", (url,))
+        records = cursor.fetchall()
         conn.close()
-        return count > 0
+        for record in records:
+            with contextlib.suppress(ValueError, TypeError, OSError):
+                files = json.loads(record[0])
+                if files and all(os.path.isfile(p) and os.path.getsize(p) > 0 for p in files):
+                    return True
+        return False
     except Exception:
         return False
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def get_history(filter_text: str = "") -> list[dict[str, Any]]:
     filter_text = (filter_text or "").strip().lower()
 
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -308,8 +369,12 @@ def get_history(filter_text: str = "") -> list[dict[str, Any]]:
 
         rows = cursor.fetchall()
         conn.close()
-    except Exception:
+    except Exception as exc:
+        logger.warning("History read failed: %s", exc)
         return []
+    finally:
+        if conn is not None:
+            conn.close()
 
     results = []
     for r in rows:
@@ -334,32 +399,43 @@ def get_history(filter_text: str = "") -> list[dict[str, Any]]:
     return results
 
 
-def clear_all_history() -> None:
+def clear_all_history() -> bool:
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM downloads")
         conn.commit()
-        conn.close()
-    except Exception:
-        pass
+        return True
+    except Exception as exc:
+        logger.warning("Failed to clear download history: %s", exc)
+        return False
+    finally:
+        if conn is not None:
+            conn.close()
 
 
-def delete_history_by_ids(ids_to_delete: list[int]) -> None:
+def delete_history_by_ids(ids_to_delete: list[int]) -> bool:
     if not ids_to_delete:
-        return
+        return True
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         # Fully static SQL query using executemany — zero string interpolation or SQL injection risk.
         cursor.executemany("DELETE FROM downloads WHERE id = ?", [(i,) for i in ids_to_delete])
         conn.commit()
-        conn.close()
-    except Exception:
-        pass
+        return True
+    except Exception as exc:
+        logger.warning("Failed to delete history records by IDs: %s", exc)
+        return False
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def get_history_ids_desc() -> list[int]:
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -367,11 +443,16 @@ def get_history_ids_desc() -> list[int]:
         rows = cursor.fetchall()
         conn.close()
         return [r["id"] for r in rows]
-    except Exception:
+    except Exception as exc:
+        logger.warning("History read failed: %s", exc)
         return []
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def get_stats_data() -> dict[str, Any] | None:
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -395,8 +476,12 @@ def get_stats_data() -> dict[str, Any] | None:
         cursor.execute("SELECT url FROM downloads WHERE status = 'success'")
         urls = [r["url"] for r in cursor.fetchall()]
         conn.close()
-    except Exception:
+    except Exception as exc:
+        logger.warning("History statistics unavailable: %s", exc)
         return None
+    finally:
+        if conn is not None:
+            conn.close()
 
     platform_counts: dict[str, int] = {}
     for url in urls:

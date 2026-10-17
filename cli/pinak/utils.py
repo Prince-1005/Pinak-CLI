@@ -19,6 +19,20 @@ _ILLEGAL_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 _WHITESPACE_RUN = re.compile(r"\s+")
 
 
+def trusted_which(name: str) -> str | None:
+    """Resolve only absolute PATH entries, never Windows' implicit current directory."""
+    cwd = os.path.normcase(os.path.realpath(os.getcwd()))
+    for directory in os.get_exec_path():
+        if not directory or not os.path.isabs(directory):
+            continue
+        if os.path.normcase(os.path.realpath(directory)) == cwd:
+            continue
+        found = shutil.which(os.path.join(directory, name))
+        if found and os.path.isfile(found) and os.access(found, os.X_OK):
+            return found
+    return None
+
+
 def sanitize_filename(name: str, max_length: int = 180) -> str:
     """Make a string safe to use as a file name on all major OSes."""
     cleaned = _ILLEGAL_FILENAME_CHARS.sub("_", (name or "untitled").strip())
@@ -37,16 +51,15 @@ def script_dir() -> str:
     Search order (first directory containing a bundled binary wins):
       1. The directory of *this* file's package parent (cli/)
       2. The directory of *this* file (cli/pinak/) — edge case
-      3. The current working directory
     Falls back gracefully to the cli/ directory guess.
     """
     pkg_dir = os.path.dirname(os.path.abspath(__file__))  # …/cli/pinak
     cli_dir = os.path.dirname(pkg_dir)  # …/cli
-    candidates = (cli_dir, pkg_dir, os.getcwd())
+    candidates = (cli_dir, pkg_dir)
     wanted = ("ffmpeg.exe", "ffmpeg", "ffprobe.exe", "ffprobe")
     for candidate in candidates:
         for binary in wanted:
-            if os.path.exists(os.path.join(candidate, binary)):
+            if os.path.isfile(os.path.join(candidate, binary)):
                 return candidate
     return cli_dir  # best guess even if binary not found there
 
@@ -110,29 +123,31 @@ def _resolve_binary(
     """
     if config_override:
         expanded = os.path.abspath(os.path.expanduser(config_override))
-        if os.path.exists(expanded):
+        if os.path.isfile(expanded) and os.access(expanded, os.X_OK):
             return expanded
     for name in names:
-        found = shutil.which(name)
+        found = trusted_which(name)
         if found:
             return found
     base = script_dir()
     for name in names:
         candidate = os.path.join(base, name)
-        if os.path.exists(candidate):
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
             return candidate
     for d in _get_platform_candidate_dirs():
         for name in names:
             candidate = os.path.join(d, name)
-            if os.path.exists(candidate):
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
                 return candidate
     # Try static-ffmpeg if installed
     _ensure_static_ffmpeg_paths()
     for name in names:
-        found = shutil.which(name)
+        found = trusted_which(name)
         if found:
             return found
-    return names[0]
+    # An unresolved bare executable could still be implicitly executed from CWD
+    # by Windows or an external dependency. Return a controlled missing path.
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "_unavailable", names[0])
 
 
 def _configured_binary_override(key: str) -> str | None:
@@ -175,9 +190,7 @@ def get_ffprobe_path() -> str:
 def ffmpeg_available() -> bool:
     """True if an ffmpeg binary can actually be executed."""
     path = get_ffmpeg_path()
-    if os.path.exists(path):
-        return True
-    return shutil.which(os.path.basename(path)) is not None
+    return os.path.isfile(path) and os.access(path, os.X_OK)
 
 
 def human_duration(seconds: Any) -> str:

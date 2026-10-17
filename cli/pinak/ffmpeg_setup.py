@@ -14,11 +14,10 @@ user-facing hints when no binary can be provided.
 from __future__ import annotations
 
 import os
-import shutil
 import sys
 
 from .logging_setup import get_logger
-from .utils import get_ffmpeg_path, get_ffprobe_path
+from .utils import get_ffmpeg_path, get_ffprobe_path, trusted_which
 
 log = get_logger("pinak.ffmpeg")
 
@@ -27,8 +26,10 @@ def _is_executable(path: str) -> bool:
     if not path:
         return False
     if os.path.exists(path):
-        return os.access(path, os.X_OK) or path.lower().endswith(".exe")
-    return shutil.which(path) is not None or shutil.which(os.path.basename(path)) is not None
+        return os.path.isfile(path) and os.access(path, os.X_OK)
+    if os.path.dirname(path):
+        return False
+    return trusted_which(path) is not None
 
 
 def _try_static_ffmpeg() -> bool:
@@ -48,7 +49,7 @@ def _try_static_ffmpeg() -> bool:
     except Exception as exc:
         log.debug("static-ffmpeg fetch failed: %r", exc)
         return False
-    available = _is_executable(shutil.which("ffmpeg") or "") or _is_executable(get_ffmpeg_path())
+    available = _is_executable(trusted_which("ffmpeg") or "") or _is_executable(get_ffmpeg_path())
     log.debug("static-ffmpeg fetch result: available=%s", available)
     return available
 
@@ -67,7 +68,7 @@ def ensure_ffmpeg() -> str:
         refreshed = get_ffmpeg_path()
         if _is_executable(refreshed):
             return refreshed
-        system = shutil.which("ffmpeg")
+        system = trusted_which("ffmpeg")
         if system:
             return system
     return path
@@ -82,7 +83,7 @@ def ensure_ffprobe() -> str:
         refreshed = get_ffprobe_path()
         if _is_executable(refreshed):
             return refreshed
-        system = shutil.which("ffprobe")
+        system = trusted_which("ffprobe")
         if system:
             return system
     return path

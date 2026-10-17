@@ -26,11 +26,12 @@ def _no_toast(monkeypatch):
 
 def _sync_threads(monkeypatch):
     class _SyncThread:
-        def __init__(self, target=None, daemon=None):
+        def __init__(self, target=None, daemon=None, args=()):
             self._target = target
+            self._args = args
 
         def start(self):
-            self._target()
+            self._target(*self._args)
 
     monkeypatch.setattr(notify_mod.threading, "Thread", _SyncThread)
 
@@ -38,16 +39,26 @@ def _sync_threads(monkeypatch):
 def test_notify_falls_back_to_panel(monkeypatch, capsys):
     _no_toast(monkeypatch)
     notify_mod.notify("Hello", "world")
-    out = capsys.readouterr().out
+    out = capsys.readouterr().err
     assert "Hello" in out and "world" in out
 
 
 def test_notify_uses_toast_when_available(monkeypatch):
-    calls = []
-    monkeypatch.setattr(notify_mod, "_toast", lambda *a, **k: calls.append(a))
+    import subprocess
+    import sys
+
     _sync_threads(monkeypatch)
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(notify_mod, "_toast", object())
+    calls = []
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda cmd, **kw: (calls.append((cmd, kw)), SimpleNamespace(returncode=0))[1],
+    )
     notify_mod.notify("T", "M")
-    assert calls and calls[0][:2] == ("T", "M")
+    assert calls[0][0][-2:] == ["T", "M"]
+    assert calls[0][1]["stdout"] == subprocess.DEVNULL
 
 
 def test_notify_uses_macos_osascript(monkeypatch):
@@ -63,7 +74,9 @@ def test_notify_uses_macos_osascript(monkeypatch):
     )
 
     runs = []
-    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: runs.append(cmd))
+    monkeypatch.setattr(
+        subprocess, "run", lambda cmd, **k: (runs.append(cmd), SimpleNamespace(returncode=0))[1]
+    )
     notify_mod.notify("Mac Title", "Mac Message")
     assert runs and runs[0][0] == "osascript"
     assert "display notification" in runs[0][2]
@@ -82,43 +95,46 @@ def test_notify_uses_linux_notifysend(monkeypatch):
     )
 
     runs = []
-    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: runs.append(cmd))
+    monkeypatch.setattr(
+        subprocess, "run", lambda cmd, **k: (runs.append(cmd), SimpleNamespace(returncode=0))[1]
+    )
     notify_mod.notify("Linux Title", "Linux Message")
-    assert runs and runs[0] == ["notify-send", "Linux Title", "Linux Message"]
+    assert runs and runs[0] == ["notify-send", "--", "Linux Title", "Linux Message"]
 
 
 def test_notify_silences_toast_callbacks_and_output(monkeypatch, capsys):
-    toast_kwargs = {}
+    import subprocess
+    import sys
 
-    def _mock_toast(*a, **kwargs):
-        toast_kwargs.update(kwargs)
-        print("ToastDismissalReason.TIMED_OUT")
-        if callable(kwargs.get("on_dismissed")):
-            kwargs["on_dismissed"]("reason")
-
-    monkeypatch.setattr(notify_mod, "_toast", _mock_toast)
     _sync_threads(monkeypatch)
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(notify_mod, "_toast", object())
+    before = (sys.stdout, sys.stderr)
+    calls = []
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda cmd, **kw: (calls.append((cmd, kw)), SimpleNamespace(returncode=0))[1],
+    )
     notify_mod.notify("Title", "Message")
-
-    out = capsys.readouterr().out
-    assert "ToastDismissalReason.TIMED_OUT" not in out
-    assert callable(toast_kwargs.get("on_dismissed"))
-    assert callable(toast_kwargs.get("on_click"))
-    assert callable(toast_kwargs.get("on_failed"))
+    assert (sys.stdout, sys.stderr) == before
+    assert calls[0][1]["stdout"] == subprocess.DEVNULL
+    assert calls[0][1]["stderr"] == subprocess.DEVNULL
+    assert capsys.readouterr().out == ""
 
 
 def test_offline_notice_panel(monkeypatch, capsys):
     _no_toast(monkeypatch)
     monkeypatch.setattr(notify_mod, "notify", lambda *a, **k: None)
     notify_mod.print_offline_notice()
-    assert "offline" in capsys.readouterr().out.lower()
+    assert "offline" in capsys.readouterr().err.lower()
 
 
 def test_instagram_notice_panel(monkeypatch, capsys):
     _no_toast(monkeypatch)
     monkeypatch.setattr(notify_mod, "notify", lambda *a, **k: None)
     notify_mod.print_instagram_notice("429 too many")
-    out = capsys.readouterr().out
+    out = capsys.readouterr().err
     assert "Instagram" in out and "429" in out
 
 
@@ -126,7 +142,7 @@ def test_update_notice_panel(monkeypatch, capsys):
     _no_toast(monkeypatch)
     monkeypatch.setattr(notify_mod, "notify", lambda *a, **k: None)
     notify_mod.print_update_notice("yt-dlp", "9999.0.0")
-    out = capsys.readouterr().out
+    out = capsys.readouterr().err
     assert "9999.0.0" in out and "/update" in out
 
 

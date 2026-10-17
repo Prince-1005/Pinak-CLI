@@ -13,6 +13,7 @@ from rich.table import Table
 
 from ..config import config
 from ..history import get_history, get_stats_data
+from ..text_safety import safe_rich, safe_text
 from ..utils import BOLD, GREEN, RED, RESET, YELLOW
 
 console = Console()
@@ -55,9 +56,15 @@ def open_output_folder() -> None:
                 pass
 
         if not opened:
-            webbrowser.open(Path(path).as_uri())
+            try:
+                opened = bool(webbrowser.open(Path(path).as_uri()))
+            except Exception:
+                opened = False
 
-        print(f"{GREEN}[+] Opened: {path}{RESET}")
+        if opened:
+            print(f"{GREEN}[+] Opened: {path}{RESET}")
+        else:
+            print(f"{YELLOW}[!] Could not automatically open folder: {path}{RESET}")
     except Exception as e:
         print(f"{RED}[X] Could not open folder: {e}{RESET}")
 
@@ -117,6 +124,8 @@ def print_help() -> None:
         ),
         ("/update", "Update yt-dlp and Pinak itself to the latest versions"),
         ("/ffmpeg", "Download a static FFmpeg build automatically"),
+        ("/media [path]", "Launch interactive TUI media player & browser (videos, music, photos)"),
+        ("/reset", "Reset terminal console mode, buffer, and cursor if frozen"),
         ("/uninstall", "Completely remove Pinak CLI and its data from your system"),
         ("/exit, exit, quit", "Exit the CLI safely"),
     ]
@@ -142,7 +151,7 @@ def show_config() -> None:
 
     from ..config import CONFIG_FILE
 
-    console.print(f"[dim]Config file: {os.path.abspath(CONFIG_FILE)}[/dim]")
+    console.print(f"[dim]Config file: {safe_rich(os.path.abspath(CONFIG_FILE))}[/dim]")
     console.print("[dim]Tip: run [bold]pinak --config-path[/] anywhere to print this path.[/dim]")
 
     table = Table(
@@ -172,7 +181,7 @@ def show_config() -> None:
 
     for key in sorted(config):
         label = setting_names.get(key, key.replace("_", " ").title())
-        val = str(config[key])
+        val = safe_rich(config[key])
         if val.lower() == "true":
             val_formatted = "[bold green]Enabled (True)[/bold green]"
         elif val.lower() == "false":
@@ -250,10 +259,10 @@ def show_history_rendered(filter_text: str = "") -> None:
             is_selected = absolute_idx == selected_val
 
             dt = datetime.datetime.fromtimestamp(d["time"]).strftime("%Y-%m-%d %H:%M:%S")
-            url = d.get("url", "Unknown URL")
-            status = d.get("status", "unknown")
-            mode = d.get("mode", "media")
-            quality = d.get("quality", "best")
+            url = safe_rich(d.get("url", "Unknown URL"))
+            status = safe_rich(d.get("status", "unknown"))
+            mode = safe_rich(d.get("mode", "media"))
+            quality = safe_rich(d.get("quality", "best"))
 
             status_text = (
                 "[green]SUCCESS[/]" if status == "success" else f"[red]{status.upper()}[/]"
@@ -347,10 +356,10 @@ def show_history_rendered(filter_text: str = "") -> None:
 
         for idx, d in enumerate(downloads):
             dt = datetime.datetime.fromtimestamp(d["time"]).strftime("%Y-%m-%d %H:%M:%S")
-            url = d.get("url", "Unknown URL")
-            status = d.get("status", "unknown")
-            mode = d.get("mode", "media")
-            quality = d.get("quality", "best")
+            url = safe_rich(d.get("url", "Unknown URL"))
+            status = safe_rich(d.get("status", "unknown"))
+            mode = safe_rich(d.get("mode", "media"))
+            quality = safe_rich(d.get("quality", "best"))
 
             status_text = (
                 "[green]SUCCESS[/]" if status == "success" else f"[red]{status.upper()}[/]"
@@ -371,7 +380,7 @@ def show_platforms(search_term: str = "") -> None:
         if search_term:
             platforms = [p for p in platforms if search_term.lower() in p.lower()]
             if not platforms:
-                print(f"{YELLOW}[!] No platforms found matching '{search_term}'.{RESET}")
+                print(f"{YELLOW}[!] No platforms found matching '{safe_text(search_term)}'.{RESET}")
                 return
             print(f"\n{BOLD}--- Matching Supported Platforms ({len(platforms)}) ---{RESET}")
         else:

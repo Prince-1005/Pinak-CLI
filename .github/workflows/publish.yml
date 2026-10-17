@@ -4,9 +4,37 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Exact package version to publish (for example 1.4.2)"
+        required: true
+        type: string
 
 jobs:
+  release-check:
+    name: validate requested release version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Check tag or manual version against all version files
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: python cli/tools/check_release.py
+
+  verify:
+    needs: release-check
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
   build-and-publish:
+    needs: verify
     name: build + publish pinak-cli
     runs-on: ubuntu-latest
     permissions:
@@ -25,11 +53,16 @@ jobs:
 
       - name: Build sdist + wheel
         run: |
-          python -m pip install --upgrade pip build
-          python -m build
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r requirements-lock.txt
+          python -m build --outdir release-dist
+          python -m twine check --strict release-dist/*
+
+      - name: Verify clean wheel installation
+        run: python tools/smoke_wheel.py release-dist
 
       - name: Publish to PyPI (trusted publishing)
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          # Note: gh-action-pypi-publish executes from repo root, so path is cli/dist/
-          packages-dir: cli/dist/
+          # Note: gh-action-pypi-publish executes from repo root, so path is cli/release-dist/
+          packages-dir: cli/release-dist/

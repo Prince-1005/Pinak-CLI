@@ -1,2 +1,4 @@
 # Gitleaks configuration for Pinak CLI
 # No allowlist overrides required — scan all files.
+[extend]
+useDefault = true

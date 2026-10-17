@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_call:
   push:
     branches: [main, master]
   pull_request:
@@ -14,8 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        python: ["3.10", "3.11", "3.12", "3.13"]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     defaults:
       run:
@@ -33,7 +34,8 @@ jobs:
       - name: Install package + dev tools
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install --require-hashes -r requirements-lock.txt
+          pip install --no-deps -e .
 
       - name: Ruff lint
         run: ruff check .
@@ -69,8 +71,8 @@ jobs:
       - name: Install audit tools
         run: |
           python -m pip install --upgrade pip
-          pip install bandit pip-audit
-          pip install -e ".[dev]"
+          pip install --require-hashes -r requirements-lock.txt
+          pip install --no-deps -e .
 
       - name: Bandit (static security, fail on MEDIUM+)
         # Remaining low findings are benign idioms (no-shell subprocess,
@@ -78,7 +80,7 @@ jobs:
         run: bandit -r pinak -x tests -q -ll
 
       - name: pip-audit (dependency CVEs)
-        run: pip-audit -r requirements-lock.txt
+        run: pip-audit --local --skip-editable
 
       - name: SBOM (CycloneDX)
         run: |
@@ -93,10 +95,64 @@ jobs:
   gitleaks:
     name: secret scanning
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install verified Gitleaks CLI
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --location \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            --output "$RUNNER_TEMP/gitleaks.tar.gz"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+
+      - name: Verify secret detection with a synthetic canary
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/gitleaks-canary"
+          python3 -c "from pathlib import Path; import os, secrets, string; token = 'ghp_' + ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(36)); Path(os.environ['RUNNER_TEMP'], 'gitleaks-canary', 'test.txt').write_text('token = ' + token)"
+          if "$RUNNER_TEMP/gitleaks" dir "$RUNNER_TEMP/gitleaks-canary" --config .gitleaks.toml --redact --no-banner; then
+            echo "::error::Secret detector missed its synthetic canary"
+            exit 1
+          else
+            status=$?
+            test "$status" -eq 1
+          fi
+
+      - name: Scan Git history on every caller event
+        shell: bash
+        run: '"$RUNNER_TEMP/gitleaks" git . --config .gitleaks.toml --redact --no-banner'
+
+  installation:
+    name: clean Linux package and container installation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install Linux playback prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libportaudio2 python3-tk
+      - name: Build and verify a clean installation
+        run: |
+          python -m pip install --require-hashes -r requirements-lock.txt
+          python -m build --outdir release-dist
+          python -m twine check --strict release-dist/*
+          python tools/smoke_wheel.py release-dist --check-playback-imports
+      - name: Verify container installation
+        run: |
+          docker build --tag pinak-install-check .
+          docker run --rm pinak-install-check --version
+          docker run --rm pinak-install-check --help

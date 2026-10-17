@@ -1,6 +1,8 @@
 import contextlib
 import datetime
 import os
+import tempfile
+from pathlib import Path
 
 import yt_dlp
 from rich.console import Console
@@ -31,24 +33,28 @@ from .instagram import download_instagram_media
 from .logging_setup import get_logger
 from .notify import notify, print_instagram_notice
 from .retry import backoff_delay, is_retryable, sleep_with_interrupt
+from .text_safety import safe_rich, safe_text
 from .utils import (
     GREEN,
     RED,
     RESET,
     YELLOW,
-    changed_files,
     ffmpeg_available,
     get_ffmpeg_path,
-    get_file_snapshot,
     get_platform,
     has_embedded_subtitle,
     has_embedded_thumbnail,
     human_duration,
     human_size,
-    is_online,
     is_url_supported_by_ytdlp,
     normalize_quality,
     video_format_for_quality,
+)
+from .utils import (
+    changed_files as changed_files,
+)
+from .utils import (
+    is_online as is_online,
 )
 
 console = Console()
@@ -93,7 +99,7 @@ def _resilience_opts() -> dict:
         "continuedl": True,
         "retries": retries,
         "fragment_retries": retries,
-        "skip_unavailable_fragments": True,
+        "skip_unavailable_fragments": False,
         "socket_timeout": _socket_timeout(),
         "nocheckcertificate": False,
         "extractor_args": {
@@ -134,16 +140,46 @@ def _classify_download_error(exc: Exception, url: str) -> Exception:
 
 
 def verify_files(files: list) -> tuple:
-    """Integrity check: keep only files that exist and are non-empty.
+    """Completion check: require nonempty final media files and reject sidecars.
 
-    Returns ``(valid, problems)``. Guards against silent partial/corrupt
-    downloads being recorded as successes.
+    Returns ``(valid, problems)``. Completion requires extractor/postprocessor
+    success too; this is not an exhaustive codec corruption detector.
     """
     valid: list = []
     problems: list = []
     for path in files or []:
         try:
-            if os.path.exists(path) and os.path.getsize(path) > 0:
+            suffix = Path(path).suffix.lower()
+            if (
+                os.path.isfile(path)
+                and os.path.getsize(path) > 0
+                and suffix
+                in {
+                    ".mp4",
+                    ".mkv",
+                    ".webm",
+                    ".flv",
+                    ".avi",
+                    ".mov",
+                    ".m4v",
+                    ".ts",
+                    ".mp3",
+                    ".m4a",
+                    ".wav",
+                    ".flac",
+                    ".opus",
+                    ".ogg",
+                    ".aac",
+                    ".wma",
+                    ".jpg",
+                    ".jpeg",
+                    ".png",
+                    ".webp",
+                    ".gif",
+                    ".bmp",
+                    ".tiff",
+                }
+            ):
                 valid.append(path)
             else:
                 problems.append(path)
@@ -168,29 +204,34 @@ class YTDLLogger:
 
 def yt_dlp_progress_hook(d):
     global rich_progress, rich_task
-    if rich_progress and rich_task is not None:
-        if d["status"] == "downloading":
-            total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
-            downloaded = d.get("downloaded_bytes", 0)
+    prog = rich_progress
+    task = rich_task
+    if prog is not None and task is not None:
+        try:
+            if d.get("status") == "downloading":
+                total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+                downloaded = d.get("downloaded_bytes", 0)
 
-            filename = os.path.basename(d.get("filename", "Unknown"))
-            if total > 0:
-                rich_progress.update(
-                    rich_task,
-                    total=total,
-                    completed=downloaded,
-                    description=f"[cyan]Downloading: {filename[:20]}...",
-                )
-            else:
-                rich_progress.update(
-                    rich_task,
-                    total=None,
-                    completed=downloaded,
-                    description=f"[cyan]Downloading: {filename[:20]}...",
-                )
+                filename = safe_rich(os.path.basename(d.get("filename", "Unknown")))
+                if total > 0:
+                    prog.update(
+                        task,
+                        total=total,
+                        completed=downloaded,
+                        description=f"[cyan]Downloading: {filename[:20]}...",
+                    )
+                else:
+                    prog.update(
+                        task,
+                        total=None,
+                        completed=downloaded,
+                        description=f"[cyan]Downloading: {filename[:20]}...",
+                    )
 
-        elif d["status"] == "finished":
-            rich_progress.update(rich_task, description="[green]Finished stream, processing...")
+            elif d.get("status") == "finished":
+                prog.update(task, description="[green]Finished stream, processing...")
+        except Exception:
+            pass
 
 
 def print_download_summary(result):
@@ -259,7 +300,7 @@ def print_download_summary(result):
         for path in files:
             size = human_size(os.path.getsize(path)) if os.path.exists(path) else "unknown"
             thumb = "embedded" if has_embedded_thumbnail(path) else "no"
-            table.add_row("💾 Saved To:", f"[blue underline]{path}[/]")
+            table.add_row("💾 Saved To:", f"[blue underline]{safe_rich(path)}[/]")
             table.add_row("📏 File Size:", size)
             if path.lower().endswith((".mp3", ".m4a")):
                 table.add_row("🖼️ Thumbnail:", thumb)
@@ -320,7 +361,6 @@ def download_media_content(
     if auto_sort:
         actual_dir = os.path.dirname(actual_dir)
 
-    before_files = get_file_snapshot(actual_dir)
     chosen_quality = normalize_quality(quality or config.get("quality", "best")) or "best"
     audio_quality = str(config.get("audio_quality", "192"))
     suffix = f" {filename_suffix}" if filename_suffix else ""
@@ -328,7 +368,7 @@ def download_media_content(
 
     ydl_opts = {
         "outtmpl": f"{target_dir}/%(title)s{suffix}.%(ext)s",
-        "ignoreerrors": True,
+        "ignoreerrors": False,
         "quiet": True,
         "no_warnings": True,
         "logger": logger,
@@ -425,7 +465,9 @@ def download_media_content(
             ydl_opts["merge_output_format"] = vid_fmt
 
     mode = "AUDIO" if extract_audio else "MEDIA"
-    console.print(f"\n[*] Downloading [bold cyan]{mode}[/] from: [blue underline]{post_url}[/]")
+    console.print(
+        f"\n[*] Downloading [bold cyan]{mode}[/] from: [blue underline]{safe_rich(post_url)}[/]"
+    )
     console.print(
         "[yellow]💡 Tip: Press [bold]Ctrl+C[/bold] at any time to cancel/stop the download.[/]"
     )
@@ -463,12 +505,15 @@ def download_media_content(
                 temp_audio = base + f"_temp.{audio_fmt}"
 
                 if audio_fmt == "mp3" and os.path.exists(final_audio) and os.path.exists(thumb_jpg):
-                    os.replace(final_audio, temp_audio)
+                    with tempfile.NamedTemporaryFile(
+                        dir=os.path.dirname(final_audio) or ".", suffix=".mp3", delete=False
+                    ) as staged:
+                        temp_audio = staged.name
                     ffmpeg_cmd = [
                         ffmpeg_path,
                         "-y",
                         "-i",
-                        temp_audio,
+                        final_audio,
                         "-i",
                         thumb_jpg,
                         "-map",
@@ -485,66 +530,71 @@ def download_media_content(
                         "comment=Cover (front)",
                         "-disposition:v:0",
                         "attached_pic",
-                        final_audio,
+                        temp_audio,
                     ]
                     from .subproc import run_cmd
 
-                    run_cmd(ffmpeg_cmd, timeout=120.0)
-                    if os.path.exists(final_audio):
-                        os.remove(temp_audio)
-                        os.remove(thumb_jpg)
-                    else:
+                    try:
+                        remux = run_cmd(ffmpeg_cmd, timeout=120.0)
+                        if remux.returncode != 0 or os.path.getsize(temp_audio) == 0:
+                            raise RuntimeError("Cover remux failed; original audio retained")
                         os.replace(temp_audio, final_audio)
+                        os.remove(thumb_jpg)
+                    except Exception as exc:
+                        get_logger("pinak.downloader").warning("%s", exc)
+                    finally:
+                        with contextlib.suppress(OSError):
+                            os.remove(temp_audio)
 
-        after_files = get_file_snapshot(actual_dir)
-        new_files = changed_files(before_files, after_files)
+        # Use extractor/postprocessor-reported paths, never a whole-directory
+        # diff that can mistake another job's files or thumbnails for success.
+        candidates = []
+        visited = set()
 
-        if not new_files and info:
-            candidates: list[str] = []
-            if "_filename" in info and isinstance(info["_filename"], str):
-                candidates.append(info["_filename"])
+        def collect(entry):
+            if not isinstance(entry, dict) or id(entry) in visited:
+                return
+            visited.add(id(entry))
+            for key in ("filepath", "_filename"):
+                value = entry.get(key)
+                if isinstance(value, str):
+                    candidates.append(value)
             with contextlib.suppress(Exception):
-                candidates.append(ydl.prepare_filename(info))
-            for req in info.get("requested_downloads", []):
-                if isinstance(req, dict):
-                    if req.get("filepath") and isinstance(req["filepath"], str):
-                        candidates.append(req["filepath"])
-                    if req.get("_filename") and isinstance(req["_filename"], str):
-                        candidates.append(req["_filename"])
-            for entry in info.get("entries", []):
-                if isinstance(entry, dict):
-                    if entry.get("_filename") and isinstance(entry["_filename"], str):
-                        candidates.append(entry["_filename"])
-                    with contextlib.suppress(Exception):
-                        candidates.append(ydl.prepare_filename(entry))
-                    for req in entry.get("requested_downloads", []):
-                        if isinstance(req, dict):
-                            if req.get("filepath") and isinstance(req["filepath"], str):
-                                candidates.append(req["filepath"])
-                            if req.get("_filename") and isinstance(req["_filename"], str):
-                                candidates.append(req["_filename"])
+                candidates.append(ydl.prepare_filename(entry))
+            for key in ("entries", "requested_downloads"):
+                for child in entry.get(key) or []:
+                    collect(child)
 
-            expanded: list[str] = []
-            target_ext = (
-                config.get("audio_format", "mp3")
-                if extract_audio
-                else config.get("video_format", "mp4")
-            )
-            for c in candidates:
-                expanded.append(c)
-                base = os.path.splitext(c)[0]
-                if target_ext:
-                    expanded.append(f"{base}.{target_ext}")
-
-            for c in expanded:
+        collect(info)
+        new_files = []
+        root = Path(actual_dir).resolve()
+        expected_ext = (
+            config.get("audio_format", "mp3")
+            if extract_audio
+            else config.get("video_format", "mp4")
+        )
+        audio_extensions = {".mp3", ".m4a", ".flac", ".wav", ".opus", ".ogg", ".aac"}
+        for candidate in candidates:
+            if not isinstance(candidate, str):
+                continue
+            path = Path(candidate)
+            possible = [path, path.with_suffix("." + expected_ext)]
+            if not path.is_absolute():
+                possible.extend([root / path, (root / path).with_suffix("." + expected_ext)])
+            for item in possible:
+                resolved = item.resolve()
+                try:
+                    resolved.relative_to(root)
+                except ValueError:
+                    continue
+                if extract_audio and resolved.suffix.lower() not in audio_extensions:
+                    continue
                 if (
-                    c
-                    and os.path.exists(c)
-                    and os.path.getsize(c) > 0
-                    and not c.endswith((".part", ".ytdl"))
-                    and c not in new_files
+                    resolved.is_file()
+                    and resolved.stat().st_size > 0
+                    and str(resolved) not in new_files
                 ):
-                    new_files.append(c)
+                    new_files.append(str(resolved))
         # Integrity check: drop missing/empty files so corrupt partials
         # are never recorded as successes.
         valid_files, bad_files = verify_files(new_files)
@@ -554,7 +604,7 @@ def download_media_content(
             get_logger("pinak.downloader").warning("%s (url=%s)", msg, post_url)
             console.print(f"[yellow][!] Warning: {msg}[/]")
         new_files = valid_files
-        success = bool(info or new_files)
+        success = bool(new_files) and not logger.errors
         if bad_files and not success:
             logger.errors.append("All downloaded files failed integrity verification.")
 
@@ -568,6 +618,7 @@ def download_media_content(
 
         return {
             "success": success,
+            "partial": bool(new_files) and not success,
             "url": post_url,
             "audio": extract_audio,
             "quality": "audio" if extract_audio else chosen_quality,
@@ -596,8 +647,8 @@ def download_media_content(
     except Exception as e:
         friendly = _classify_download_error(e, post_url)
         hint = getattr(friendly, "hint", str(e))
-        console.print(f"[bold red][X][/] Error: {e}")
-        console.print(f"[yellow]Tip: {hint}[/]")
+        console.print(f"[bold red][X][/] Error: {safe_rich(e)}")
+        console.print(f"[yellow]Tip: {safe_rich(hint)}[/]")
         if isinstance(friendly, InstagramError):
             with contextlib.suppress(Exception):
                 print_instagram_notice(str(e))
@@ -613,13 +664,17 @@ def download_media_content(
             "trim_range": trim_range,
         }
 
+    finally:
+        rich_progress = None
+        rich_task = None
+
 
 # Backward compatibility alias
 download_instagram_content = download_media_content
 
 
 def parse_download_text(text):
-    raw = text.strip()
+    raw = safe_text(text).strip()
     force = False
     extract_audio = False
     quality = None
@@ -706,20 +761,7 @@ def handle_download(
 ):
     global is_downloading
     log = get_logger("pinak.downloader")
-    if not is_online(timeout=_connect_timeout()):
-        err = NetworkError("No internet connection detected.")
-        print(f"{RED}[!] Error: {err}{RESET}")
-        print(f"{YELLOW}Tip: {err.hint}{RESET}")
-        log.debug("Offline — aborting download for %s", url)
-        return {
-            "success": False,
-            "url": url,
-            "files": [],
-            "audio": extract_audio,
-            "quality": quality or config.get("quality", "best"),
-        }
-
-    if not url.startswith("http"):
+    if not url.startswith(("http://", "https://")):
         err = InvalidURLError(f"Invalid URL: {url!r}")
         print(f"{RED}[!] Error: {err}{RESET}")
         print(f"{YELLOW}Tip: {err.hint}{RESET}")
@@ -791,7 +833,7 @@ def handle_download(
 
     # Rate limits have been removed as per user request.
 
-    duplicate_action = handle_duplicate(url, interactive=interactive)
+    duplicate_action = "download" if force else handle_duplicate(url, interactive=interactive)
     if duplicate_action == "skip":
         print(f"{YELLOW}[!] Skipped duplicate URL.{RESET}")
         return {
@@ -852,12 +894,17 @@ def handle_download(
         try:
             if detected_platform == "Instagram":
                 try:
-                    result = download_instagram_media(
+                    # The generic engine owns trim selection; preserve that contract
+                    # for Instagram instead of silently downloading the full file.
+                    engine = download_media_content if trim_range else download_instagram_media
+                    extra = {"trim_range": trim_range} if trim_range else {}
+                    result = engine(
                         url,
                         output_dir,
                         extract_audio=extract_audio,
                         quality=quality,
                         filename_suffix=filename_suffix,
+                        **extra,
                     )
                 except Exception as ig_err:
                     log.warning(

@@ -41,7 +41,7 @@ class FakeYoutubeDL:
         }
 
     def prepare_filename(self, info):
-        return "fake_title.mp4"
+        return os.path.join(self.opts["outtmpl"].split("%")[0], "fake_title.mp4")
 
 
 def _patch_env(monkeypatch, tmp_path):

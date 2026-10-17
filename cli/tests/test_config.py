@@ -116,3 +116,44 @@ def test_init_config_recovers_from_backup_when_primary_corrupted(tmp_path, monke
     assert loaded["retry_count"] == 5
     # Primary config file should also be restored from .bak
     assert "720p" in cfg_file.read_text(encoding="utf-8")
+
+
+def test_concurrent_save_and_init_config(tmp_path, monkeypatch):
+    """Verifies that concurrent save_config and init_config calls across threads run safely without corruption (RACE-03)."""
+    import threading
+
+    import pinak.config as cfg_mod
+
+    cfg_file = tmp_path / "config.json"
+    monkeypatch.setattr(cfg_mod, "CONFIG_FILE", str(cfg_file))
+    monkeypatch.setattr(cfg_mod, "config", cfg_mod.PinakSettings().model_dump())
+
+    errors = []
+
+    def writer(thread_id: int):
+        try:
+            for i in range(10):
+                cfg_mod.save_config({"last_update_check": float(thread_id * 100 + i)})
+        except Exception as e:
+            errors.append(e)
+
+    def reader():
+        try:
+            for _ in range(10):
+                cfg_mod.init_config()
+        except Exception as e:
+            errors.append(e)
+
+    threads = [
+        threading.Thread(target=writer, args=(1,)),
+        threading.Thread(target=writer, args=(2,)),
+        threading.Thread(target=reader),
+    ]
+
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors
+    assert cfg_file.exists()

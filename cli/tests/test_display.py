@@ -88,6 +88,26 @@ def test_open_output_folder_macos_and_linux(tmp_path, monkeypatch):
     assert runs and runs[-1][0] == "xdg-open"
 
 
+def test_open_output_folder_failure_notice(tmp_path, monkeypatch, capsys):
+    """Verifies that open_output_folder warns user on failure instead of false positive success (SILENT-02)."""
+    import os as _os
+    import shutil
+    import webbrowser as _wb
+
+    import pinak.commands.info as info_m
+
+    monkeypatch.setitem(info_m.config, "output_dir", str(tmp_path / "dl_fail"))
+    if hasattr(_os, "startfile"):
+        monkeypatch.delattr(_os, "startfile")
+    monkeypatch.setattr(shutil, "which", lambda cmd: None)
+    monkeypatch.setattr(_wb, "open", lambda uri: False)
+
+    info_m.open_output_folder()
+    out = capsys.readouterr().out
+    assert "[!] Could not automatically open folder" in out
+    assert "[+] Opened:" not in out
+
+
 def test_show_history_fallback(monkeypatch, capsys, isolated_history_db):
     from pinak import history as history_mod
 

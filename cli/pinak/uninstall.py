@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 from rich.console import Console
 from rich.panel import Panel
@@ -18,6 +19,29 @@ from .logging_setup import get_logger
 log = get_logger("pinak.uninstall")
 console = Console()
 legacy_db_file = LEGACY_DB_FILE
+command_history_file = os.path.expanduser("~/.pinak_cli_history")
+
+
+def _purge_targets(include_cache: bool = True) -> list[str]:
+    targets = [config_dir, data_dir, legacy_db_file, command_history_file]
+    if include_cache:
+        import platformdirs
+
+        targets.append(platformdirs.user_cache_dir("pinak-cli", "pinak"))
+    safe = []
+    for target in targets:
+        if not target:
+            continue
+        path = Path(target).absolute()
+        resolved = path.resolve()
+        if resolved in (Path(resolved.anchor), Path.home().resolve(), Path.cwd().resolve()):
+            log.warning("Refusing unsafe purge target: %s", target)
+            continue
+        if path.is_symlink() or getattr(path, "is_junction", lambda: False)():
+            log.warning("Retaining linked data directory: %s", target)
+            continue
+        safe.append(str(resolved))
+    return list(dict.fromkeys(safe))
 
 
 def detect_uninstall_cmd() -> list[str]:
@@ -29,6 +53,8 @@ def detect_uninstall_cmd() -> list[str]:
                 ["uv", "tool", "list"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=5,
             )
             if res.returncode == 0 and "pinak-cli" in res.stdout:
@@ -43,6 +69,8 @@ def detect_uninstall_cmd() -> list[str]:
                 ["pipx", "list", "--short"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=5,
             )
             if res.returncode == 0 and "pinak-cli" in res.stdout:
@@ -61,34 +89,34 @@ def purge_user_data(include_cache: bool = True) -> list[str]:
     """
     removed: list[str] = []
     # Collect standard config and data directories
-    targets = [config_dir, data_dir]
-
-    if include_cache:
-        import platformdirs
-
-        cache_dir = platformdirs.user_cache_dir("pinak-cli", "pinak")
-        targets.append(cache_dir)
+    targets = _purge_targets(include_cache)
 
     for target in targets:
         if target and os.path.exists(target):
             try:
-                shutil.rmtree(target, ignore_errors=True)
-                removed.append(target)
+                if os.path.isdir(target):
+                    shutil.rmtree(target)
+                else:
+                    os.remove(target)
+                if not os.path.exists(target):
+                    removed.append(target)
             except Exception as exc:
-                log.debug("Failed to purge %s: %r", target, exc)
-
-    # Also clean legacy ~/.pinak_history.db if present
-    if legacy_db_file and os.path.exists(legacy_db_file):
-        try:
-            os.remove(legacy_db_file)
-            removed.append(legacy_db_file)
-        except Exception as exc:
-            log.debug("Failed to remove legacy db: %r", exc)
+                log.warning("Failed to purge %s: %r", target, exc)
 
     return removed
 
 
-def execute_uninstallation(cmd: list[str], detached: bool = True) -> bool:
+def _format_powershell_cmd(cmd: list[str]) -> str:
+    """Safely formats a command list for PowerShell invocation, handling spaces in paths."""
+    if not cmd:
+        return ""
+    quoted = ["'" + arg.replace("'", "''") + "'" for arg in cmd]
+    return f"& {quoted[0]} " + " ".join(quoted[1:])
+
+
+def execute_uninstallation(
+    cmd: list[str], detached: bool = True, *, purge_after: bool = False
+) -> bool:
     """Execute the package uninstallation command.
 
     On Windows, uses a detached process with a delay to avoid file lock conflicts.
@@ -99,7 +127,18 @@ def execute_uninstallation(cmd: list[str], detached: bool = True) -> bool:
     if sys.platform.startswith("win") and detached:
         # On Windows, running binaries/DLLs are locked while in use.
         # Launch a detached PowerShell process that pauses briefly to let pinak exit, then uninstalls.
-        powershell_script = f"Start-Sleep -Seconds 1; {cmd_str}"
+        # Using the PowerShell call operator (&) with quoted executable path prevents failures when
+        # Python paths contain spaces (e.g. 'C:\Program Files\Python311\python.exe').
+        ps_cmd = _format_powershell_cmd(cmd)
+        powershell_script = f"Start-Sleep -Seconds 1; {ps_cmd}"
+        if purge_after:
+            cleanup = []
+            for target in _purge_targets():
+                literal = "'" + target.replace("'", "''") + "'"
+                cleanup.append(
+                    f"if (Test-Path -LiteralPath {literal}) {{ Remove-Item -LiteralPath {literal} -Recurse -Force -ErrorAction Stop }}"
+                )
+            powershell_script += "; if ($LASTEXITCODE -eq 0) { " + "; ".join(cleanup) + " }"
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(
             subprocess, "DETACHED_PROCESS", 0
         )
@@ -114,8 +153,19 @@ def execute_uninstallation(cmd: list[str], detached: bool = True) -> bool:
             log.warning("Detached process launch failed (%r); falling back to direct run", exc)
 
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)  # nosec B603
-        return proc.returncode == 0
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=120,
+        )  # nosec B603
+        if proc.returncode != 0:
+            return False
+        if purge_after:
+            purge_user_data()
+        return True
     except Exception as exc:
         log.error("Failed to run uninstall command %r: %r", cmd, exc)
         return False
@@ -149,21 +199,23 @@ def run_uninstall(yes: bool = False, purge_data: bool = True) -> int:
             )
             return 0
 
-    if purge_data:
-        console.print("[yellow]🧹 Cleaning configuration settings and history database...[/yellow]")
-        purged = purge_user_data(include_cache=True)
-        if purged:
-            console.print("[green]✅ Configuration and history database removed![/green]")
-        else:
-            console.print("[dim]No configuration files needed removal.[/dim]")
-
     cmd = detect_uninstall_cmd()
     console.print(
         f"[yellow]📦 Triggering package removal ([bold]{' '.join(cmd)}[/bold])...[/yellow]"
     )
 
-    success = execute_uninstallation(cmd, detached=True)
+    success = execute_uninstallation(cmd, detached=True, purge_after=purge_data)
     if success:
+        if purge_data:
+            console.print(
+                "[dim]Configuration/history cleanup runs only after successful package removal. Downloaded media is retained.[/dim]"
+            )
+        from .config import config
+
+        if config.get("log_file"):
+            console.print(
+                "[dim]External log files are retained; remove them explicitly if desired.[/dim]"
+            )
         console.print(
             "\n[bold cyan]👋 Pinak has been scheduled for removal. Thank you for using Pinak! See you again! 🌸✨[/bold cyan]\n"
         )

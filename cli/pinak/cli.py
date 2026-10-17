@@ -21,7 +21,7 @@ from prompt_toolkit.keys import Keys
 from prompt_toolkit.styles import Style
 from rich.console import Console
 
-from . import updater
+from . import downloader, updater
 from .commands.info import (
     open_output_folder,
     print_help,
@@ -38,7 +38,7 @@ from .commands.panels import (
 )
 from .config import CONFIG_FILE, config, init_config, save_config
 from .doctor import run_doctor
-from .downloader import handle_download, is_downloading, parse_download_text
+from .downloader import handle_download, parse_download_text
 from .history import (
     clear_all_history,
     delete_history_by_ids,
@@ -141,7 +141,8 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
         "/update": "Update yt-dlp and Pinak itself to the latest versions",
         "/username": "Change and save your username",
         "/greeting": "Change and save your greeting statement",
-        "/uninstall": "Completely remove Pinak CLI and its data from your system",
+        "/media": "Launch interactive TUI media player & browser (videos, music, photos)",
+        "/reset": "Reset terminal console mode, buffer, and cursor if frozen",
         "/exit": "Exit the CLI safely",
     }
 
@@ -259,6 +260,35 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
 
             lower_cmd = cmd.lower()
 
+            from .media.lifecycle.session_coordinator import MediaSessionCoordinator
+
+            if MediaSessionCoordinator.is_media_active():
+                MediaSessionCoordinator.request_close_active_session(reason="new_command_received")
+                console.print(MediaSessionCoordinator.format_return_cli_banner())
+
+            if lower_cmd == "/media" or lower_cmd.startswith("/media "):
+                from .commands.media import handle_media_command
+
+                args = cmd[6:].strip().split() if len(cmd) > 6 else []
+                handle_media_command(args, standalone=False)
+                continue
+
+            # Forward legacy /play and /view directly to /media
+            if lower_cmd in ("/play", "/view") or lower_cmd.startswith(("/play ", "/view ")):
+                from .commands.media import handle_media_command
+
+                parts = cmd.split(maxsplit=1)
+                args = parts[1].strip().split() if len(parts) > 1 else []
+                handle_media_command(args, standalone=False)
+                continue
+
+            if lower_cmd in ("/reset", "reset"):
+                from .media.core.lifecycle import TerminalSessionContext
+
+                TerminalSessionContext.reset_terminal()
+                console.print("[green][+] Terminal state reset successfully.[/]")
+                continue
+
             # Fallback if somehow submitted (e.g. mouse double click in prompt_toolkit)
             if session is not None and lower_cmd in [
                 "/any",
@@ -338,7 +368,11 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
 
                 # 1. /delete_his all
                 if arg.lower() == "all":
-                    clear_all_history()
+                    if not clear_all_history():
+                        console.print(
+                            "[red][X] Could not clear history; see the storage warning.[/]"
+                        )
+                        continue
                     console.print(
                         "[green][+] Successfully cleared entire downloads history log.[/]"
                     )
@@ -371,7 +405,11 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                         console.print(f"[red][X] Error: No records found in range '{arg}'.[/]")
                         continue
 
-                    delete_history_by_ids(ids_to_delete)
+                    if not delete_history_by_ids(ids_to_delete):
+                        console.print(
+                            "[red][X] Could not delete history; see the storage warning.[/]"
+                        )
+                        continue
                     console.print(
                         f"[green][+] Successfully deleted log entries in range {start_sno} to {actual_end_sno} (Total: {len(ids_to_delete)}).[/]"
                     )
@@ -394,7 +432,11 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                         continue
 
                     id_to_delete = ids[sno - 1]
-                    delete_history_by_ids([id_to_delete])
+                    if not delete_history_by_ids([id_to_delete]):
+                        console.print(
+                            "[red][X] Could not delete history; see the storage warning.[/]"
+                        )
+                        continue
                     console.print(f"[green][+] Successfully deleted log entry #{sno}.[/]")
                     continue
 
@@ -671,6 +713,12 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                     )
                 continue
 
+            if lower_cmd == "/ctl" or lower_cmd.startswith("/ctl "):
+                from .commands.control import handle_control
+
+                handle_control(cmd[4:].strip().split())
+                continue
+
             if cmd.startswith("/"):
                 if not (
                     lower_cmd.startswith("/any ")
@@ -702,7 +750,20 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                     is_any_command=is_any,
                 )
             else:
-                if lower_cmd.startswith("any "):
+                if lower_cmd.startswith("media ") or lower_cmd == "media":
+                    from .commands.media import handle_media_command
+
+                    args = cmd[5:].strip().split() if len(cmd) > 5 else []
+                    handle_media_command(args, standalone=False)
+                    continue
+                elif lower_cmd.startswith(("play ", "view ")) or lower_cmd in ("play", "view"):
+                    from .commands.media import handle_media_command
+
+                    parts = cmd.split(maxsplit=1)
+                    args = parts[1].strip().split() if len(parts) > 1 else []
+                    handle_media_command(args, standalone=False)
+                    continue
+                elif lower_cmd.startswith("any "):
                     url, extract_audio, force, quality = parse_download_text(cmd)
                     handle_download(
                         url,
@@ -740,7 +801,7 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 continue
 
         except KeyboardInterrupt:
-            if is_downloading:
+            if downloader.is_downloading:
                 print(
                     f"\n{YELLOW}[!] Download in progress. Exiting now might corrupt files. Please wait...{RESET}"
                 )
@@ -801,8 +862,9 @@ def maybe_print_offline_notice() -> bool:
     return False
 
 
-@app.command()
+@app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 def main(
+    ctx: typer.Context,
     url: str | None = typer.Argument(None, help="The URL to download from"),
     extra_arg: str | None = typer.Argument(
         None, help="Optional secondary URL or command argument (e.g. pinak any <url>)"
@@ -860,17 +922,31 @@ def main(
     init_config()
     init_db()
     initialize_session()
-    # Persist CLI-level logging prefs so retries/errors also land in the file.
-    if log_file:
-        config["log_file"] = log_file
-        save_config()
     setup_logging(verbose=verbose, log_file=log_file or config.get("log_file") or None)
-    updater.start_background_update_check()
-    maybe_print_offline_notice()
 
     if url in ("any", "/any"):
         any_link = True
         url = extra_arg
+
+    if url in ("media", "/media", "play", "/play", "view", "/view"):
+        from .commands.media import handle_media_command, handle_play_command, handle_view_command
+
+        args = [extra_arg] if extra_arg else []
+        if ctx is not None and ctx.args:
+            args.extend(ctx.args)
+        if url in ("play", "/play"):
+            handle_play_command(args)
+        elif url in ("view", "/view"):
+            handle_view_command(args)
+        else:
+            handle_media_command(args)
+        raise typer.Exit(code=0)
+
+    if url in ("ctl", "/ctl", "ipc", "/ipc"):
+        from .commands.control import handle_control
+
+        arguments = ([extra_arg] if extra_arg else []) + (list(ctx.args) if ctx is not None else [])
+        raise typer.Exit(code=handle_control(arguments))
 
     has_args = bool(
         url
@@ -888,6 +964,11 @@ def main(
     # Testing tools like CliRunner don't mock sys.argv, so this is safer
     if has_args or (len(sys.argv) > 1 and "pytest" not in sys.argv[0]):
         from .commands.run import run_single
+
+        if (ctx is not None and ctx.args) or (extra_arg and not any_link):
+            raise typer.BadParameter(
+                "Unexpected arguments/options. Check option spelling with --help."
+            )
 
         raise typer.Exit(
             code=run_single(

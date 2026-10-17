@@ -87,8 +87,12 @@ def test_instagram_media_success_with_image_slide(tmp_path, monkeypatch):
         def __exit__(self, *a):
             return False
 
-        def read(self):
-            return src.read_bytes()
+        def read(self, size=-1):
+            import io
+
+            if not hasattr(self, "_reader"):
+                self._reader = io.BytesIO(src.read_bytes())
+            return self._reader.read(size)
 
     monkeypatch.setattr(ig_mod, "urlopen", lambda *a, **k: _Resp())
 

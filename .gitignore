@@ -1,34 +1,52 @@
-# --- Downloads (media files - never commit) ---
-downloads/
-cli/downloads/
+# Local downloaded media (user data, not repository source)
+/downloads/
+/cli/downloads/
 
-# --- Python bytecode / caches ---
+# Python bytecode and generated package metadata
 __pycache__/
 *.py[cod]
-*.class
-*.pyo
-
-# --- Package build artifacts ---
 *.egg-info/
-dist/
-build/
 *.egg
 
-# --- Local config ---
-.pinak_config.json
-.pinak_history.json
-.pinak_history.db
-.pinak_cli_history
-# --- Virtual environments ---
+# Rebuildable distributions and intermediate build directories
+dist/
+build/
+/cli/release-dist/
+
+# Local virtual environments, including the audit compatibility environment
 .venv/
+.venv-audit*/
 venv/
 env/
 ENV/
 
-# --- Local environment variables ---
+# Local Pinak preferences, history, and SQLite sidecars
+.pinak_config.json
+.pinak_history.json
+.pinak_history.db
+.pinak_history.db-*
+.pinak_cli_history
+
+# Local credentials and environment variables
 .env
 
-# --- OS / Editor ---
+# Test, coverage, type-check, lint, and property-test caches
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# Generated audit logs and wheel dependency snapshots
+.audit-*
+/unnecessary_files/
+
+phases
+
+# OS and editor files
 .DS_Store
 Thumbs.db
 *.swp
@@ -36,15 +54,7 @@ Thumbs.db
 .vscode/
 .idea/
 
-# --- Testing ---
-.coverage
-coverage.xml
-htmlcov/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-*.exe
-unnecessary_files/
-*.zip
-bin/
+AUDIT_REMEDIATION.md
+FINAL_PUSH_AND_INSTALL_AUDIT_2026-10-17.md
+PROJECT_AUDIT_2026-10-17.md
+SYSTEM_VULNERABILITY_AND_BUG_AUDIT.md

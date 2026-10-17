@@ -45,7 +45,9 @@ def test_migrate_json_to_sqlite(tmp_path, monkeypatch, isolated_history_db):
         encoding="utf-8",
     )
     history_mod.migrate_json_to_sqlite(str(legacy))
-    assert history_mod.url_downloaded_successfully("https://x.com/old") is True
+    assert history_mod.get_history()[0]["url"] == "https://x.com/old"
+    # Legacy status is preserved, but absent files must not suppress re-downloads.
+    assert history_mod.url_downloaded_successfully("https://x.com/old") is False
     assert os.path.exists(str(legacy) + ".bak")
 
 

@@ -1,6 +1,7 @@
 import contextlib
 import os
 import re
+import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -28,14 +29,21 @@ from .exceptions import (
 )
 from .logging_setup import get_logger
 from .retry import backoff_delay
+from .text_safety import safe_rich, safe_text
 from .utils import (
     GREEN,
     RED,
     RESET,
     YELLOW,
     changed_files,
+    ffmpeg_available,
     get_ffmpeg_path,
     get_file_snapshot,
+    normalize_quality,
+    video_format_for_quality,
+)
+from .utils import (
+    sanitize_filename as safe_filename,
 )
 
 console = Console()
@@ -81,7 +89,7 @@ def _yt_dlp_hook(d):
     if d["status"] == "downloading":
         total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
         downloaded = d.get("downloaded_bytes", 0)
-        fname = os.path.basename(d.get("filename", ""))[:24]
+        fname = safe_rich(os.path.basename(d.get("filename", "")))[:24]
         if total > 0:
             _progress.update(
                 _task_id,
@@ -140,10 +148,12 @@ def download_instagram_media(
                 "preferredquality": str(config.get("audio_quality", "192")),
             }
         ]
+    else:
+        ydl_opts["format"] = video_format_for_quality(
+            normalize_quality(quality) or "best", has_ffmpeg=ffmpeg_available()
+        )
 
-    before_files = get_file_snapshot(str(output_dir))
-
-    console.print(f"\n[*] Extracting Instagram metadata for: [blue underline]{url}[/]")
+    console.print(f"\n[*] Extracting Instagram metadata for: [blue underline]{safe_rich(url)}[/]")
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -152,7 +162,9 @@ def download_instagram_media(
                 raise RuntimeError("Could not retrieve post information. Make sure it is public.")
 
             metadata = extract_metadata(info)
-            _download_extracted_info(ydl, info, output_dir, filename_suffix, metadata, ydl_opts)
+            outcomes = _download_extracted_info(
+                ydl, info, output_dir, filename_suffix, metadata, ydl_opts
+            )
 
     except DownloadError as exc:
         friendly = _friendly_instagram_error(exc)
@@ -161,19 +173,19 @@ def download_instagram_media(
         logger.debug("Instagram download failed for %s: %r", url, exc)
         raise friendly from exc
 
-    after_files = get_file_snapshot(str(output_dir))
-    new_files = changed_files(before_files, after_files)
+    new_files = [f for outcome in outcomes for f in outcome.get("files", [])]
 
     from .downloader import verify_files  # late import to avoid cycle at module load
 
     valid_files, bad_files = verify_files(new_files)
-    errors: list = []
+    errors: list = [outcome["error"] for outcome in outcomes if outcome.get("error")]
     if bad_files:
         errors.append(f"Integrity check failed for {len(bad_files)} file(s): {bad_files}")
         console.print(f"{YELLOW}[!] Warning: {errors[-1]}{RESET}")
 
     return {
-        "success": len(valid_files) > 0,
+        "success": len(valid_files) > 0 and not errors,
+        "partial": bool(valid_files) and bool(errors),
         "url": url,
         "audio": extract_audio,
         "quality": ("audio" if extract_audio else (quality or config.get("quality", "best"))),
@@ -211,14 +223,19 @@ def _download_extracted_info(ydl, info, output_dir, filename_suffix, metadata, y
         total = len(entries)
         console.print(f"[*] Detected carousel post with {total} items.")
         if total > 1 and ydl_opts is not None:
-            _download_carousel_parallel(ydl_opts, entries, output_dir, filename_suffix, metadata)
+            return _download_carousel_parallel(
+                ydl_opts, entries, output_dir, filename_suffix, metadata
+            )
         else:
+            outcomes = []
             for index, entry in enumerate(entries, start=1):
                 console.print(f"\n[*] Processing slide {index}/{total}...")
-                _download_entry(ydl, entry, output_dir, index, filename_suffix, metadata)
-        return
+                outcomes.append(
+                    _download_entry(ydl, entry, output_dir, index, filename_suffix, metadata)
+                )
+            return outcomes
 
-    _download_entry(ydl, info, output_dir, 1, filename_suffix, metadata)
+    return [_download_entry(ydl, info, output_dir, 1, filename_suffix, metadata)]
 
 
 def _download_carousel_parallel(ydl_opts, entries, output_dir, filename_suffix, metadata):
@@ -240,7 +257,7 @@ def _download_carousel_parallel(ydl_opts, entries, output_dir, filename_suffix, 
         _say(f"\n[*] Processing slide {index}/{total}...", locked=True)
         try:
             with yt_dlp.YoutubeDL(dict(worker_opts)) as worker_ydl:
-                _download_entry(
+                return _download_entry(
                     worker_ydl,
                     entry,
                     output_dir,
@@ -254,9 +271,10 @@ def _download_carousel_parallel(ydl_opts, entries, output_dir, filename_suffix, 
         except Exception as exc:
             _say(f"{RED}[X] Error downloading slide {index}: {exc}{RESET}", locked=True)
             logger.debug("Parallel slide %d failed: %r", index, exc)
+            return {"files": [], "error": f"Slide {index}: {exc}"}
 
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="pinak-slide") as pool:
-        list(pool.map(_work, list(enumerate(entries, start=1))))
+        outcomes = list(pool.map(_work, list(enumerate(entries, start=1))))
 
     # Single metadata pass: per-entry snapshots would otherwise see (and
     # re-tag) sibling threads' files.
@@ -264,6 +282,7 @@ def _download_carousel_parallel(ydl_opts, entries, output_dir, filename_suffix, 
         f_path = Path(f)
         if f_path.suffix.lower() in (".mp4", ".mkv", ".webm", ".avi", ".m4v"):
             embed_metadata_in_video(f_path, metadata)
+    return outcomes
 
 
 # ---------------------------------------------------------------------------
@@ -325,7 +344,10 @@ def embed_metadata_in_video(file_path, metadata):
     """
     ffmpeg_path = get_ffmpeg_path()
     file_path = Path(file_path)
-    temp_path = file_path.with_name(f"temp_{file_path.name}")
+    with tempfile.NamedTemporaryFile(
+        dir=file_path.parent, suffix=file_path.suffix, delete=False
+    ) as staged:
+        temp_path = Path(staged.name)
 
     desc_val = metadata.get("description") or ""
     url_val = metadata.get("webpage_url") or ""
@@ -340,13 +362,19 @@ def embed_metadata_in_video(file_path, metadata):
         "-1",
         "-codec",
         "copy",
+        "-metadata",
+        f"title={metadata.get('title') or ''}",
+        "-metadata",
+        f"artist={metadata.get('uploader') or ''}",
+        "-metadata",
+        f"comment={comment_val}",
         str(temp_path),
     ]
     try:
         from .subproc import run_cmd
 
         run_cmd(cmd, timeout=120.0, check=True)
-        if temp_path.exists():
+        if temp_path.is_file() and temp_path.stat().st_size > 0:
             os.replace(temp_path, file_path)
 
             ext = file_path.suffix.lower()
@@ -437,16 +465,21 @@ def _download_entry(
             f"{RED}[X] Could not resolve entry at slide {index}.{RESET}",
             locked=use_lock,
         )
-        return
+        return {"files": [], "error": f"Could not resolve slide {index}"}
 
     if resolved.get("_type") == "playlist":
-        _download_extracted_info(ydl, resolved, output_dir, filename_suffix, metadata)
-        return
+        nested = _download_extracted_info(ydl, resolved, output_dir, filename_suffix, metadata)
+        return {
+            "files": [f for item in nested for f in item.get("files", [])],
+            "error": "; ".join(item["error"] for item in nested if item.get("error")),
+        }
 
-    post_id = resolved.get("id") or f"item_{index}"
+    post_id = safe_filename(str(resolved.get("id") or f"item_{index}"))
     before = get_file_snapshot(str(output_dir))
 
     is_video = _has_video_formats(resolved)
+    created_files = []
+    entry_error = ""
 
     if is_video:
         # FIX #2: wrap video download in a rich progress bar (sequential mode only)
@@ -485,10 +518,11 @@ def _download_entry(
                 locked=use_lock,
             )
         except Exception as e:
+            entry_error = f"Video slide {index}: {e}"
             _progress = None
             _task_id = None
             _say(
-                f"{RED}[X] Error downloading video slide {index}: {e}{RESET}",
+                f"{RED}[X] Error downloading video slide {index}: {safe_text(e)}{RESET}",
                 locked=use_lock,
             )
     else:
@@ -499,7 +533,7 @@ def _download_entry(
                 f"{RED}[X] No downloadable media found for slide {index}.{RESET}",
                 locked=use_lock,
             )
-            return
+            return {"files": [], "error": f"No image available for slide {index}"}
 
         filename = _image_filename(resolved, output_dir, index, filename_suffix)
         _say(
@@ -507,7 +541,9 @@ def _download_entry(
             locked=use_lock,
         )
 
-        temp_img_path = output_dir / f"temp_download_{index}_{post_id}.tmp"
+        with tempfile.NamedTemporaryFile(dir=output_dir, suffix=".tmp", delete=False) as download:
+            temp_img_path = Path(download.name)
+        staged_image = None
         try:
             # FIX #3: retry image download
             _download_binary_with_retry(thumbnail_url, temp_img_path, resolved.get("http_headers"))
@@ -515,16 +551,21 @@ def _download_entry(
             # FIX #8: convert + embed EXIF in a SINGLE save — no second open/save
             from PIL import Image as PILImage
 
-            img = PILImage.open(temp_img_path)
-            if img.mode not in ("RGB",):
-                img = img.convert("RGB")
-
-            exif = _build_image_exif(metadata)
-            # FIX #6: explicit quality=95 — never quality='keep' on converted images
-            save_kwargs = {"format": "JPEG", "quality": 95}
-            if exif is not None:
-                save_kwargs["exif"] = exif
-            img.save(filename, **save_kwargs)
+            with PILImage.open(temp_img_path) as raw:
+                if raw.width * raw.height > 32_000_000:
+                    raise ValueError("Image exceeds the decode budget")
+                with raw.convert("RGB") as img:
+                    exif = _build_image_exif(metadata)
+                    save_kwargs = {"format": "JPEG", "quality": 95}
+                    if exif is not None:
+                        save_kwargs["exif"] = exif
+                    with tempfile.NamedTemporaryFile(
+                        dir=output_dir, suffix=".jpg", delete=False
+                    ) as staging:
+                        staged_image = Path(staging.name)
+                    img.save(staged_image, **save_kwargs)
+            os.replace(staged_image, filename)
+            created_files = [str(filename)]
 
             with contextlib.suppress(OSError):
                 os.remove(temp_img_path)
@@ -534,25 +575,59 @@ def _download_entry(
                 locked=use_lock,
             )
         except Exception as e:
+            entry_error = f"Image slide {index}: {e}"
+            if staged_image:
+                with contextlib.suppress(OSError):
+                    staged_image.unlink()
             with contextlib.suppress(OSError):
                 os.remove(temp_img_path)
             _say(
-                f"{RED}[X] Error downloading image slide {index}: {e}{RESET}",
+                f"{RED}[X] Error downloading image slide {index}: {safe_text(e)}{RESET}",
                 locked=use_lock,
             )
+        finally:
+            temp_img_path.unlink(missing_ok=True)
+            if staged_image:
+                staged_image.unlink(missing_ok=True)
 
     if defer_embed:
-        return
+        new_files = changed_files(before, get_file_snapshot(str(output_dir)))
+        if is_video:
+            created_files = [
+                f
+                for f in new_files
+                if Path(f).stem == post_id or Path(f).stem.startswith(post_id + "_")
+            ]
+        from .downloader import verify_files
+
+        valid, _ = verify_files(created_files)
+        return {
+            "files": valid,
+            "error": entry_error or ("" if valid else f"Slide {index} produced no media"),
+        }
 
     # Snapshot diff — find newly created files
     after = get_file_snapshot(str(output_dir))
     new_files = changed_files(before, after)
+    if is_video:
+        created_files = [
+            f
+            for f in new_files
+            if Path(f).stem == post_id or Path(f).stem.startswith(post_id + "_")
+        ]
 
     # Embed metadata into video files (images are handled above inline)
-    for f in new_files:
+    for f in created_files:
         f_path = Path(f)
         if f_path.suffix.lower() in (".mp4", ".mkv", ".webm", ".avi", ".m4v"):
             embed_metadata_in_video(f_path, metadata)
+    from .downloader import verify_files
+
+    valid, _ = verify_files(created_files)
+    return {
+        "files": valid,
+        "error": entry_error or ("" if valid else f"Slide {index} produced no media"),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -723,11 +798,14 @@ def _image_filename(entry, output_dir, index, filename_suffix):
     Constructs a sanitized .jpg filename.
     Format: <index:02d>_<post_id>_<sanitized_title><suffix>.jpg
     """
-    post_id = entry.get("id") or f"item_{index}"
+    post_id = safe_filename(str(entry.get("id") or f"item_{index}"))
     title = sanitize_filename(
         entry.get("title") or entry.get("id") or f"item_{index}", restricted=True
     )
-    return output_dir / f"{index:02d}_{post_id}_{title}{filename_suffix}.jpg"
+    return (
+        output_dir
+        / f"{index:02d}_{post_id}_{title}{safe_filename(filename_suffix) if filename_suffix else ''}.jpg"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -759,6 +837,9 @@ def _download_binary_with_retry(url, output_file, headers=None):
         "Sec-Fetch-Mode": "no-cors",
         "Sec-Fetch-Site": "cross-site",
     }
+    if not (url.startswith("https://") or url.startswith("http://")):
+        raise ValueError(f"Unsupported or unsafe URL scheme: {url}")
+
     request_headers = {**default_headers, **(headers or {})}
     request = Request(url, headers=request_headers)
 
@@ -768,7 +849,18 @@ def _download_binary_with_retry(url, output_file, headers=None):
             # Media thumbnail URL resolved by yt-dlp; core downloader behavior.
             response = urlopen(request, timeout=timeout)  # nosec B310
             with response, open(output_file, "wb") as file_obj:
-                file_obj.write(response.read())
+                transferred = 0
+                deadline = time.monotonic() + timeout
+                while True:
+                    if time.monotonic() > deadline:
+                        raise TimeoutError("Image transfer exceeded its deadline")
+                    chunk = response.read(64 * 1024)
+                    if not chunk:
+                        break
+                    transferred += len(chunk)
+                    if transferred > 32 * 1024 * 1024:
+                        raise ValueError("Image transfer exceeds the 32 MiB limit")
+                    file_obj.write(chunk)
             return  # success
         except (URLError, OSError) as exc:
             last_exc = exc

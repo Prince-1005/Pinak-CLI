@@ -83,9 +83,10 @@ def test_run_single_validations():
     )
 
 
-def test_run_single_output_persisted(monkeypatch, tmp_path, capsys):
+def test_run_single_output_is_temporary(monkeypatch, tmp_path, capsys):
     saved = {}
-    monkeypatch.setattr(run_mod, "save_config", lambda: saved.setdefault("ok", True))
+    monkeypatch.setattr("pinak.config.save_config", lambda: saved.setdefault("ok", True))
+    previous_output = run_mod.config["output_dir"]
     monkeypatch.setattr(run_mod, "get_platform", lambda url: "TestTube")
     code = run_mod.run_single(
         "https://x.com/v",
@@ -99,7 +100,8 @@ def test_run_single_output_persisted(monkeypatch, tmp_path, capsys):
         False,
     )
     assert code == 0
-    assert saved.get("ok") is True
+    assert not saved
+    assert run_mod.config["output_dir"] == previous_output
     assert "Dry Run" in capsys.readouterr().out
 
 

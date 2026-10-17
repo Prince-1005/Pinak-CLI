@@ -7,6 +7,11 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Prevent Windows OS ValueError (max 32767 chars per env var) when mock.patch.dict restores os.environ
+for _k, _v in list(os.environ.items()):
+    if len(_v) > 30000:
+        os.environ.pop(_k, None)
+
 
 @pytest.fixture()
 def isolated_history_db(tmp_path, monkeypatch):
@@ -32,4 +37,22 @@ def _silence_desktop_toasts(monkeypatch):
     import pinak.notify as notify_mod
 
     if notify_mod._toast is not None:
-        monkeypatch.setattr(notify_mod, "_toast", lambda *a, **k: None)
+        monkeypatch.setattr(notify_mod, "_toast", None)
+
+
+@pytest.fixture(autouse=True)
+def _finish_audio_workers(monkeypatch):
+    """Always stop output workers before pytest closes temporary files/capture."""
+    from pinak.media.decoders.audio_backend import AudioPlayerBackend
+
+    original = AudioPlayerBackend.__init__
+    instances = []
+
+    def initialize(instance, *args, **kwargs):
+        original(instance, *args, **kwargs)
+        instances.append(instance)
+
+    monkeypatch.setattr(AudioPlayerBackend, "__init__", initialize)
+    yield
+    for instance in instances:
+        instance.stop()

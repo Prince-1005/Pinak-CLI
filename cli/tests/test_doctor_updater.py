@@ -61,6 +61,9 @@ def test_doctor_all_ok(monkeypatch, tmp_path, capsys):
     assert doctor_mod.run_doctor() is True
     out = capsys.readouterr().out
     assert "All checks passed" in out
+    assert "Media: Audio Driver" in out
+    assert "Media: Video Window" in out
+    assert "Media: Terminal Graphics" in out
 
 
 def test_doctor_reports_failures(monkeypatch, tmp_path, capsys):

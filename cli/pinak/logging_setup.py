@@ -16,6 +16,15 @@ _configured = False
 _file_handler_path: str | None = None
 
 
+class CurrentStderrHandler(logging.StreamHandler):
+    """Do not retain a redirected/closed stream across embedded CLI calls."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.stream = sys.stderr
+        if self.stream is not None and not self.stream.closed:
+            super().emit(record)
+
+
 def setup_logging(verbose: bool = False, log_file: str | None = None) -> logging.Logger:
     """Configure root logging. Returns the 'pinak' logger."""
     global _configured, _file_handler_path
@@ -27,7 +36,7 @@ def setup_logging(verbose: bool = False, log_file: str | None = None) -> logging
 
     if not _configured:
         if sys.stderr is not None:
-            handler = logging.StreamHandler(sys.stderr)
+            handler = CurrentStderrHandler()
             handler.setLevel(console_level)
             handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
             logger.addHandler(handler)

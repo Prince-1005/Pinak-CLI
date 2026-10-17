@@ -1,30 +1,16 @@
-name: Release Please
+name: Automatic release creation disabled
 
 on:
-  push:
-    branches: [main, master]
+  workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
-  actions: read
+  contents: read
 
 jobs:
-  release-please:
+  release-status:
     runs-on: ubuntu-latest
     steps:
-      - id: release-token
-        run: echo "has_token=${{ secrets.RELEASE_PLEASE_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
-      - if: steps.release-token.outputs.has_token != 'true'
-        run: echo "::notice::Skipping release-please because RELEASE_PLEASE_TOKEN is not configured."
-      - if: steps.release-token.outputs.has_token == 'true'
-        uses: actions/checkout@v4
-      - if: steps.release-token.outputs.has_token == 'true'
-        uses: googleapis/release-please-action@v4
-        id: release
-        with:
-          # Use a PAT/App token because GITHUB_TOKEN may be blocked from PR creation
-          # by repository settings ("Allow GitHub Actions to create and approve pull requests").
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
+      - name: Manual releases only
+        run: |
+          echo "::notice::Automatic release creation is disabled. Create GitHub releases manually."
+          echo "::notice::Publishing a release or manually running publish.yml invokes the verified PyPI publishing workflow."

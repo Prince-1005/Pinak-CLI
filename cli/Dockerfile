@@ -11,12 +11,14 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY pyproject.toml CLI_README.md ./
+COPY pyproject.toml CLI_README.md README.md OPERATIONS.md CHANGELOG.md LICENSE MANIFEST.in requirements-runtime-lock.txt requirements-lock.txt ./
 COPY pinak ./pinak
 COPY pinak_cli.py ./
+COPY tools ./tools
 
 RUN pip install --upgrade pip \
-    && pip install .
+    && pip install --require-hashes -r requirements-runtime-lock.txt \
+    && pip install --no-deps .
 
 # Default downloads volume.
 VOLUME ["/downloads"]
