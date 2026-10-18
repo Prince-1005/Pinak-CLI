@@ -19,7 +19,7 @@ After pipx installation, run `pipx ensurepath`, then reopen your terminal. If us
 
 ## Python or pip installation is blocked
 
-Use Python 3.10+. Use pipx or a virtual environment instead of overriding system Python protections. Match your shell/interpreter to the installation instructions.
+Pinak supports Python 3.10+, but the current pipx release needs Python 3.11+. If you only have Python 3.10, use a virtual environment or a compatible distribution-packaged pipx. On Debian/Ubuntu, install pipx with `apt` rather than overriding system Python protections. Match your shell/interpreter to the installation instructions.
 
 ## FFmpeg is missing
 

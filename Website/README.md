@@ -54,3 +54,5 @@ Build output and media caches are ignored. Commit source media that fit the file
 ## Maintenance and handover
 
 See [planning index](planning/README.md) for phase tasks and acceptance criteria. Build reports live in `.cache/media-report.json`. Current source version is read from `../cli/pyproject.toml`, and source release notes come from `../cli/CHANGELOG.md`; website documentation changes should accompany behavior changes in Pinak.
+
+For each website update: compare installation commands with the current CLI and the published package, review new gallery media and descriptions, run `npm run check`, `npm test`, and `npm run build`, then check the Website workflow and the live install page after deployment. Keep package releases and website deployments independent.

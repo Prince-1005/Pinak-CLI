@@ -27,6 +27,6 @@
 
 Lighthouse scores are measurements of a local build, not guarantees for every network/device. Automated WebKit on Windows is not a physical Safari/iPhone test. The sound test exercises a graceful unavailable-audio path when the browser runtime does not expose Web Audio. Physical audio devices and installation commands on macOS/Linux were not manually tested here.
 
-No public website was deployed and no Git commit/push was made. The new workflow is ready for the destination repository’s default branch. Enable **Settings → Pages → GitHub Actions**, push the website changes, and let the workflow validate/deploy. Optional custom-domain settings are documented in the website README.
+The initial verification above was completed before deployment. The Website workflow later deployed successfully from the repository's default branch, and Pages now uses **GitHub Actions** as its publishing source. Optional custom-domain settings are documented in the website README.
 
 Local reports and screenshots are generated/ignored, not required tracked assets. Reproduce Lighthouse with `node scripts/lighthouse.mjs` and visual/resource inspection with `node scripts/inspect.mjs` while a root-path production preview runs at `http://127.0.0.1:4322`.

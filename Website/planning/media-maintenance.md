@@ -8,6 +8,8 @@
 4. Preview using `npm run preview`, inspect the full-size gallery item, then commit and push source changes.
 5. The website workflow discovers the new file and deploys after checks pass.
 
+Before adding a capture, compare it with the existing gallery. A renamed copy of the same bytes creates a redundant gallery item. Keep the clearest capture, then describe what the visitor can actually see.
+
 Supported images: PNG/JPEG/WebP/AVIF/GIF. Videos: MP4/WebM/MOV/MKV/AVI. Audio: MP3/WAV/FLAC/OGG/M4A/AAC/Opus. Conversion depends on FFmpeg’s installed decoder support. Unsupported files are reported. Corrupt supported inputs fail the build with their filename.
 
 ## Optional metadata example
