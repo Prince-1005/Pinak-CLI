@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import os
+import shlex
 import threading
 from collections.abc import Sequence
 from datetime import datetime
@@ -24,8 +26,8 @@ class _Parser(argparse.ArgumentParser):
         raise ValueError(message)
 
 
-def _parser() -> argparse.ArgumentParser:
-    parser = _Parser(prog="pinak queue", description="Save downloads locally and resume later")
+def _parser(prog: str = "pinak queue") -> argparse.ArgumentParser:
+    parser = _Parser(prog=prog, description="Save downloads locally and resume later")
     commands = parser.add_subparsers(dest="action", required=True, parser_class=_Parser)
     add = commands.add_parser("add", help="Save a URL as a durable job")
     add.add_argument("url")
@@ -83,8 +85,8 @@ def _show_jobs(status: str | None = None) -> None:
     console.print(table)
 
 
-def main(argv: Sequence[str]) -> int:
-    parser = _parser()
+def main(argv: Sequence[str], *, prog: str = "pinak queue") -> int:
+    parser = _parser(prog)
     try:
         args = parser.parse_args(list(argv))
         if args.action == "add":
@@ -125,3 +127,24 @@ def main(argv: Sequence[str]) -> int:
     except (ValueError, OSError, RuntimeError) as exc:
         console.print(f"Queue error: {exc}")
         return 2
+
+
+def run_repl(raw: str) -> int:
+    """Route /queue arguments through the same parser as `pinak queue`."""
+    try:
+        args = shlex.split(raw, posix=os.name != "nt")
+        if os.name == "nt":
+            args = [
+                arg[1:-1] if len(arg) > 1 and arg[0] == arg[-1] and arg[0] in "\"'" else arg
+                for arg in args
+            ]
+    except ValueError as exc:
+        console.print(f"Queue error: {exc}")
+        return 2
+    if not args or args[0].lower() == "help":
+        args = ["--help"]
+    try:
+        return main(args, prog="/queue")
+    except SystemExit as exc:
+        # argparse uses SystemExit for help; returning keeps the REPL open.
+        return int(exc.code or 0)

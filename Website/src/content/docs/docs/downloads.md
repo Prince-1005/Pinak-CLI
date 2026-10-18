@@ -41,6 +41,8 @@ pinak queue retry --failed
 
 Each job keeps the options and preferences captured when it was added. Ctrl+C stops the current run and leaves the active job queued with partial files retained. Failed jobs need an explicit retry. The queue is local and foreground only; it does not keep downloading after the terminal closes.
 
+Inside the interactive shell, the same actions are available as `/queue add <URL>`, `/queue import <file>`, `/queue list`, `/queue run`, and `/queue retry --failed`. Enter `/queue help` for options. `/batch` is the shortcut that imports a file and runs those jobs immediately.
+
 ## Interrupted downloads
 
 Partial files are retained for continuation where supported. Re-run the same command to attempt resume. This does not guarantee that every source or stream can resume indefinitely.

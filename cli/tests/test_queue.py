@@ -343,6 +343,39 @@ def test_queue_cli_import_list_retry_and_run(isolated_history_db, tmp_path, monk
     assert queue_mod.list_jobs()[0].status == "queued"
 
 
+def test_repl_queue_routes_to_same_jobs_and_stays_open(isolated_history_db, tmp_path, monkeypatch):
+    import pinak.cli as cli
+    from pinak.commands import queue as queue_command
+
+    monkeypatch.setitem(cli.config, "username", "tester")
+    monkeypatch.setattr(cli, "PromptSession", None)
+    monkeypatch.setattr(cli, "maybe_print_offline_notice", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        queue_mod,
+        "run_download",
+        lambda request, on_event=None: DownloadResult("failed", request.url, (), ("offline",)),
+    )
+    commands = iter(
+        [
+            "/queue help",
+            "/queue add https://example.com/one --audio",
+            "/queue list --status queued",
+            "/queue run",
+            "/queue retry --failed",
+            "/exit",
+        ]
+    )
+    monkeypatch.setattr("builtins.input", lambda *args: next(commands))
+    cli.repl_loop()
+    job = queue_mod.list_jobs()[0]
+    assert job.request.extract_audio and job.status == "queued" and job.attempts == 1
+
+    batch = tmp_path / "files with spaces.txt"
+    batch.write_text("https://example.com/two\n")
+    assert queue_command.run_repl(f'import "{batch}"') == 0
+    assert len(queue_mod.list_jobs()) == 2
+
+
 def test_local_http_download_runs_through_queue(isolated_history_db, tmp_path, monkeypatch, capsys):
     import pinak.downloader as downloader
     import pinak.ffmpeg_setup as ffmpeg_setup

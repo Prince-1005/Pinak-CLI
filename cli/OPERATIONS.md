@@ -130,6 +130,11 @@ after a media file is completed but before its result is recorded can cause a
 repeat attempt; this is not an exactly-once system. No background service or
 remote download server is started.
 
+The interactive shell exposes the same queue through `/queue add <URL>`,
+`/queue import <file>`, `/queue list`, `/queue run`, and
+`/queue retry <id>` or `/queue retry --failed`. `/queue help` shows options.
+Unlike `/batch`, `/queue add` and `/queue import` only save jobs until a run starts.
+
 ## Preferences and local storage
 
 Run `pinak --config-path` for the actual config location and `/config` in the

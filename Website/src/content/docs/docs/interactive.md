@@ -12,6 +12,7 @@ Start with `pinak` and no arguments. Use `/help` for the installed version’s c
 - `/any <URL>`: route through yt-dlp-supported sources.
 - `/instagram <URL>`: Instagram extraction.
 - `/batch links.txt`: save and immediately run entries from a text file; unfinished jobs remain in the local queue.
+- `/queue add <URL>`, `/queue list`, `/queue run`, `/queue retry --failed`: manage the same durable jobs without leaving the shell. Use `/queue help` for all options.
 - `/trim 00:15-01:30 <URL>`: select an audio/video range.
 
 ## Preferences

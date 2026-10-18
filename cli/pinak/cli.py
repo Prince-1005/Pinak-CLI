@@ -168,6 +168,7 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
         "/open": "Open the current output folder",
         "/history": "View download history",
         "/batch": "Save and run URLs from a text file; unfinished jobs survive restart",
+        "/queue": "Manage saved jobs: add, import, list, run, retry",
         "/any": "Download content from any platform supported by yt-dlp",
         "/instagram": "Download post, reel, igtv from Instagram",
         "/video": "Download video from a URL",
@@ -765,6 +766,12 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                         console.print("Unfinished jobs remain queued for the next run.")
                 except (OSError, ValueError, RuntimeError) as exc:
                     console.print(f"[red]Batch error: {exc}[/]")
+                continue
+
+            if lower_cmd == "/queue" or lower_cmd.startswith("/queue "):
+                from .commands.queue import run_repl
+
+                run_repl(cmd[len("/queue") :].strip())
                 continue
 
             if lower_cmd == "/ctl" or lower_cmd.startswith("/ctl "):

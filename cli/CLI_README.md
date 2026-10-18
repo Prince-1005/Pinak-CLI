@@ -155,6 +155,7 @@ When running the interactive REPL shell (`pinak`), the following commands are av
 | `/view <path>` | View local pictures |
 | `/ctl <command>` | Control the active player through authenticated local IPC |
 | `/batch <file>` | Save and run URLs from a text file; unfinished jobs survive restart |
+| `/queue <action>` | Manage saved jobs with `add`, `import`, `list`, `run`, or `retry` |
 | `/history` | View a list of recent downloads from your history database |
 | `/config` | Print out the current config settings and environment |
 | `/setout <dir>` | Change the output downloads directory |
@@ -197,6 +198,10 @@ For saved downloads outside the interactive shell, use `pinak queue add <URL>`,
 `pinak queue retry --failed`. Jobs retain their settings and partial files
 across restarts; one local worker runs while the terminal stays open. See
 [OPERATIONS.md](OPERATIONS.md) for recovery and duplicate behavior.
+Inside the interactive shell, use the matching `/queue` commands, for example
+`/queue add <URL>`, `/queue list`, and `/queue run`. Enter `/queue help` for all
+options. `/batch <file>` is the shortcut that imports and immediately runs the
+file's jobs.
 
 - **Windows**: `%LOCALAPPDATA%\pinak\pinak-cli\config.json`
 - **macOS**: `~/Library/Application Support/pinak-cli/config.json`
