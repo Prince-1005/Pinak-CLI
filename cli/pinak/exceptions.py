@@ -40,6 +40,14 @@ class NetworkError(PinakError):
     )
 
 
+class RateLimitedError(NetworkError):
+    hint = (
+        "The platform is rate-limiting requests (HTTP 429). Stop retrying and wait before "
+        "trying again; the cooldown is controlled by the platform. To download without "
+        "subtitles, turn /subs off and retry after the cooldown."
+    )
+
+
 class FFmpegNotFoundError(PinakError):
     hint = (
         "FFmpeg not found. Install FFmpeg and ensure it is on PATH, "

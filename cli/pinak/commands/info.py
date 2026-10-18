@@ -13,6 +13,7 @@ from rich.table import Table
 
 from ..config import config
 from ..history import get_history, get_stats_data
+from ..subtitle_preferences import MAX_SUBTITLE_LANGUAGES
 from ..text_safety import safe_rich, safe_text
 from ..utils import BOLD, GREEN, RED, RESET, YELLOW
 
@@ -114,7 +115,11 @@ def print_help() -> None:
         ),
         ("/platform [search]", "List or search supported platforms"),
         ("/trim <start>-<end>", "Trim video/audio (e.g. /trim 01:15-02:30 <url>)"),
-        ("/subs", "Toggle automatic subtitle/lyric extraction"),
+        ("/subs [on|off]", "Enable/disable subtitle downloads (no argument toggles)"),
+        (
+            "/subs_lang [codes|list]",
+            f"Choose and save 1–{MAX_SUBTITLE_LANGUAGES} subtitle languages (e.g. en hi es)",
+        ),
         ("/sort", "Toggle auto-sorting into platform directories"),
         ("/username [name]", "Change and save your username"),
         ("/greeting [text]", "Change and save your greeting statement"),
@@ -173,6 +178,7 @@ def show_config() -> None:
         "video_format": "Video Format",
         "audio_format": "Audio Format",
         "embed_subs": "Embed Subtitles",
+        "subtitle_languages": f"Subtitle Languages (maximum {MAX_SUBTITLE_LANGUAGES})",
         "auto_sort": "Auto Sort Platform",
         "retry_count": "Retry Count",
         "connect_timeout": "Connect Timeout (s)",

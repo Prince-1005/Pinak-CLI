@@ -310,6 +310,48 @@ def test_coordinator_subtitle_cycling(tmp_path: Path):
     assert session.active_sub_idx == 0
 
 
+def test_background_subtitles_start_off_and_c_cycles_every_track(tmp_path, monkeypatch):
+    from unittest.mock import Mock
+
+    from pinak.media.player.coordinator import MediaSession
+    from pinak.media.subtitles.model import SubtitleTrack
+
+    session = MediaSession([tmp_path / "movie.mp4"], enable_consent_prompt=False)
+    tracks = [
+        SubtitleTrack(track_id=1, title="Hindi", language="hin"),
+        SubtitleTrack(track_id=2, title="English", language="eng"),
+        SubtitleTrack(track_id=3, title="Spanish", language="spa"),
+    ]
+    monkeypatch.setattr(session._subtitle_loader, "poll", Mock(side_effect=[tracks, None]))
+    session._subtitles_loading = True
+    session._poll_subtitles()
+    assert session.active_sub_idx == -1
+    for expected_idx in (0, 1, 2, -1, 0):
+        session._handle_action_key("c", 80, 24)
+        assert session.active_sub_idx == expected_idx
+    session._poll_subtitles()
+    assert session.active_sub_idx == 0  # subsequent ticks preserve the user's choice
+
+
+@pytest.mark.parametrize("presses,expected_idx", [(1, 0), (2, -1)])
+def test_c_while_subtitles_load_preserves_requested_visibility(
+    tmp_path, monkeypatch, presses, expected_idx
+):
+    from pinak.media.player.coordinator import MediaSession
+    from pinak.media.subtitles.model import SubtitleTrack
+
+    session = MediaSession([tmp_path / "movie.mp4"], enable_consent_prompt=False)
+    session._subtitles_loading = True
+    for _ in range(presses):
+        session._handle_action_key("c", 80, 24)
+    monkeypatch.setattr(
+        session._subtitle_loader, "poll", lambda: [SubtitleTrack(track_id=1, title="English")]
+    )
+    session._poll_subtitles()
+    assert session.active_sub_idx == expected_idx
+    assert not session._subtitles_loading
+
+
 def test_coordinator_action_keys_and_window(tmp_path: Path, monkeypatch):
     """Verifies action keys: c (subtitles), w (window), space (play/pause), seek, volume."""
     from unittest.mock import MagicMock

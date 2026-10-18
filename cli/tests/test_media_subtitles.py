@@ -94,6 +94,7 @@ def test_subtitle_parser_file_and_sibling_discovery(tmp_path: Path):
     assert len(tracks) == 2
     assert any("en" in t.title.lower() for t in tracks)
     assert any("es" in t.title.lower() for t in tracks)
+    assert {t.language for t in tracks} == {"en", "es"}
 
 
 def test_subtitle_renderer_frame_overlay():
@@ -151,3 +152,94 @@ def test_extract_embedded_subtitles_continue_on_failure(monkeypatch, tmp_path):
     # Ensure stream 0 was attempted, failed, and stream 1 was evaluated
     assert "0:s:0" in calls
     assert "0:s:1" in calls
+
+
+def test_embedded_tracks_use_language_metadata(monkeypatch, tmp_path):
+    import json
+    import subprocess
+
+    media = tmp_path / "video.mp4"
+    media.write_bytes(b"dummy")
+    monkeypatch.setattr("pinak.media.subtitles.parser.shutil.which", lambda cmd: "ffmpeg")
+
+    def run(cmd, **kwargs):
+        if "-show_entries" in cmd:
+            metadata = {"streams": [{"tags": {"language": "hin"}}, {"tags": {"language": "eng"}}]}
+            return subprocess.CompletedProcess(cmd, 0, stdout=json.dumps(metadata).encode())
+        if int(cmd[cmd.index("-map") + 1].rsplit(":", 1)[1]) >= 2:
+            return subprocess.CompletedProcess(cmd, 1, stdout=b"")
+        return subprocess.CompletedProcess(
+            cmd, 0, stdout=b"1\n00:00:00,000 --> 00:00:02,000\nCaption\n"
+        )
+
+    monkeypatch.setattr("pinak.media.subtitles.parser.subprocess.run", run)
+    tracks = SubtitleParser.extract_embedded_subtitles(media)
+    assert [track.label for track in tracks] == ["Hindi", "English"]
+    assert [track.language for track in tracks] == ["hin", "eng"]
+
+
+def test_real_multilanguage_container_and_player_cycle(tmp_path, monkeypatch):
+    import subprocess
+
+    import pytest
+
+    from pinak.media.player.coordinator import MediaSession
+    from pinak.utils import get_ffmpeg_path, get_ffprobe_path
+
+    ffmpeg, ffprobe = get_ffmpeg_path(), get_ffprobe_path()
+    if not Path(ffmpeg).is_file() or not Path(ffprobe).is_file():
+        pytest.skip("Local FFmpeg and FFprobe are required for the container smoke test")
+    inputs = []
+    languages = ["en", "hi", "es"]
+    container_codes = ["eng", "hin", "spa"]
+    for code in languages:
+        path = tmp_path / f"source-{code}.srt"
+        path.write_text(f"1\n00:00:00,000 --> 00:00:01,000\nCaption {code}\n", encoding="utf-8")
+        inputs.extend(["-i", str(path)])
+    media = tmp_path / "three-languages.mkv"
+    stream_options = ["-map", "0:v:0"]
+    for idx, code in enumerate(container_codes):
+        stream_options.extend(["-map", f"{idx + 1}:0", f"-metadata:s:s:{idx}", f"language={code}"])
+    subprocess.run(
+        [
+            ffmpeg,
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=s=160x90:r=10:d=1",
+            *inputs,
+            *stream_options,
+            "-c:v",
+            "mpeg4",
+            "-c:s",
+            "srt",
+            str(media),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=20,
+    )
+    monkeypatch.setattr("pinak.media.subtitles.parser.ensure_ffmpeg", lambda: ffmpeg)
+    monkeypatch.setattr("pinak.media.subtitles.parser.get_ffprobe_path", lambda: ffprobe)
+    tracks = SubtitleParser.extract_embedded_subtitles(media)
+    assert [track.label for track in tracks] == [
+        "English",
+        "Hindi",
+        "Spanish",
+    ]
+    session = MediaSession([media], enable_consent_prompt=False)
+    monkeypatch.setattr(session._subtitle_loader, "poll", lambda: tracks)
+    session._poll_subtitles()
+    assert session.active_sub_idx == -1
+    for code in languages:
+        session._handle_action_key("c", 80, 24)
+        assert (
+            session.subtitle_tracks[session.active_sub_idx].get_active_text(0.5)
+            == f"Caption {code}"
+        )
+    session._handle_action_key("c", 80, 24)
+    assert session.active_sub_idx == -1
+    session._handle_action_key("c", 80, 24)
+    assert session.active_sub_idx == 0

@@ -2,15 +2,126 @@
 
 from io import StringIO
 
+import pytest
 from rich.console import Console
 
 import pinak.downloader as dl_mod
-from pinak.exceptions import DownloadFailedError, NetworkError
+from pinak.exceptions import DownloadFailedError, NetworkError, RateLimitedError
 
 
 def test_classify_network_errors():
     err = dl_mod._classify_download_error(TimeoutError("timed out"), "https://x.com/v")
     assert isinstance(err, NetworkError)
+
+
+def test_classify_rate_limit_separately_from_connection_failure():
+    err = dl_mod._classify_download_error(
+        RuntimeError("HTTP Error 429: Too Many Requests"), "https://youtu.be/example"
+    )
+    assert isinstance(err, RateLimitedError)
+    assert "cooldown" in err.hint
+    assert "internet connection" not in err.hint
+
+
+@pytest.mark.parametrize(
+    ("manual", "automatic", "preferred", "expected"),
+    [
+        (["hi", "en"], ["ab-ar", "en", "fr"], ["en"], ["en"]),
+        ([], ["ab-ar", "en", "fr"], ["en", "hi"], ["en"]),
+        (["en-US", "hi"], [], ["en-US", "hi"], ["en-US", "hi"]),
+        (["hi"], [], ["en"], []),
+        (["hi", "es", "en"], ["en", "fr"], ["hi", "en", "es"], ["hi", "en", "es"]),
+        (
+            ["en", "hi", "es", "fr", "de", "it", "ja", "ko"],
+            ["en", "hi", "es", "fr", "de", "it", "ja", "ko", "ab-ar"],
+            ["hi", "en", "es"],
+            ["hi", "en", "es"],
+        ),
+        ([], [], ["en"], []),
+    ],
+)
+def test_subtitles_download_only_available_preferred_languages(
+    monkeypatch, tmp_path, manual, automatic, preferred, expected
+):
+    real_ydl = dl_mod.yt_dlp.YoutubeDL
+    selected = []
+    target_file = tmp_path / "sample.mp4"
+    monkeypatch.setitem(dl_mod.config, "embed_subs", True)
+    monkeypatch.setitem(dl_mod.config, "subtitle_languages", preferred)
+    monkeypatch.setitem(dl_mod.config, "auto_sort", False)
+    monkeypatch.setattr(dl_mod, "ffmpeg_available", lambda: True)
+    monkeypatch.setattr(dl_mod, "get_ffmpeg_path", lambda: "ffmpeg")
+
+    class SubtitleYDL:
+        def __init__(self, opts):
+            self.opts = opts
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def extract_info(self, url, download=True):
+            # Exercise the actual dependency's selection without network I/O.
+            track = [{"ext": "vtt", "url": "https://example.com/captions.vtt"}]
+            # Keep dependency startup warnings out of the mocked download's
+            # error collector; only subtitle selection runs in this instance.
+            with real_ydl({**self.opts, "logger": dl_mod.YTDLLogger()}) as ydl:
+                subtitles = ydl.process_subtitles(
+                    "example", dict.fromkeys(manual, track), dict.fromkeys(automatic, track)
+                )
+            selected.extend(subtitles or {})
+            target_file.write_bytes(b"media")
+            return {"id": "example", "title": "sample", "filepath": str(target_file)}
+
+        def prepare_filename(self, info):
+            return str(target_file)
+
+    monkeypatch.setattr(dl_mod.yt_dlp, "YoutubeDL", SubtitleYDL)
+    result = dl_mod.download_media_content("https://youtu.be/example", str(tmp_path))
+    assert selected == expected
+    assert result["success"] is True, result["errors"]
+
+
+def test_subtitle_429_stops_outer_retries(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(dl_mod, "is_online", lambda *a, **k: True)
+    monkeypatch.setattr(dl_mod, "get_platform", lambda url: "Youtube")
+    monkeypatch.setattr(dl_mod, "url_downloaded_successfully", lambda url: False)
+    monkeypatch.setattr(dl_mod, "get_ffmpeg_path", lambda: "ffmpeg")
+    monkeypatch.setattr(dl_mod, "ffmpeg_available", lambda: True)
+    monkeypatch.setattr(dl_mod, "record_download", lambda *a, **k: None)
+    monkeypatch.setitem(dl_mod.config, "embed_subs", True)
+    monkeypatch.setitem(dl_mod.config, "output_dir", str(tmp_path))
+    monkeypatch.setitem(dl_mod.config, "retry_count", 3)
+
+    def unexpected_retry(*args):
+        pytest.fail("A rate-limited download must not immediately retry")
+
+    monkeypatch.setattr(dl_mod, "sleep_with_interrupt", unexpected_retry)
+
+    class RateLimitedYDL:
+        def __init__(self, opts):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def extract_info(self, url, download=True):
+            calls.append(url)
+            raise RuntimeError(
+                "Unable to download video subtitles for 'en': HTTP Error 429: Too Many Requests"
+            )
+
+    monkeypatch.setattr(dl_mod.yt_dlp, "YoutubeDL", RateLimitedYDL)
+    result = dl_mod.handle_download("https://youtu.be/example", interactive=False)
+    assert result["success"] is False
+    assert result["rate_limited"] is True
+    assert len(calls) == 1
 
 
 def test_classify_instagram_errors():

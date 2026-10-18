@@ -108,6 +108,8 @@ class MediaSession:
         # mpv-grade extensions: OSC, Subtitles, IPC, and Native Window
         self.osc = OnScreenController()
         self.subtitle_tracks: list[SubtitleTrack] = []
+        self._subtitles_loading = False
+        self._subtitle_enable_pending = False
         self.active_sub_idx: int = -1
         self.native_window: NativeVideoWindow | None = None
         self._pending_window_keys: list[str] = []
@@ -293,6 +295,8 @@ class MediaSession:
             # Optional subtitle I/O must not delay the first frame/audio block.
             self.subtitle_tracks = []
             self.active_sub_idx = -1
+            self._subtitles_loading = True
+            self._subtitle_enable_pending = False
             self._subtitle_loader.load(cur_file)
 
             # 2. Synchronously start audio backend and master clock at 0.0
@@ -330,6 +334,8 @@ class MediaSession:
         self.turntable = None
         self.subtitle_tracks = []
         self.active_sub_idx = -1
+        self._subtitles_loading = False
+        self._subtitle_enable_pending = False
         self._last_video_img = None
         self._cached_audio_thumb = None
         self._buffered_video_frame = None
@@ -353,12 +359,24 @@ class MediaSession:
     def cycle_subtitles(self) -> str:
         """Cycles through available subtitle tracks (-1 for Off, then 0, 1, ...)."""
         if not self.subtitle_tracks:
+            if self._subtitles_loading:
+                self._subtitle_enable_pending = not self._subtitle_enable_pending
+                return "Loading subtitles" if self._subtitle_enable_pending else "Off"
             return "No Subtitles"
         total = len(self.subtitle_tracks)
         self.active_sub_idx = (self.active_sub_idx + 2) % (total + 1) - 1
         if self.active_sub_idx == -1:
             return "Off"
         return self.subtitle_tracks[self.active_sub_idx].label
+
+    def _poll_subtitles(self) -> None:
+        """Publish background tracks without enabling subtitles until requested."""
+        tracks = self._subtitle_loader.poll()
+        if tracks is not None:
+            self.subtitle_tracks = tracks
+            self.active_sub_idx = 0 if tracks and self._subtitle_enable_pending else -1
+            self._subtitles_loading = False
+            self._subtitle_enable_pending = False
 
     def toggle_native_window(self) -> bool:
         """Opens or closes the OS-native GPU video output window."""
@@ -485,10 +503,7 @@ class MediaSession:
 
     def _on_tick(self, dt: float, events: list[KeyEvent | MouseEvent]) -> str | None:
         """Main frame tick callback."""
-        tracks = self._subtitle_loader.poll()
-        if tracks is not None:
-            self.subtitle_tracks = tracks
-            self.active_sub_idx = 0 if tracks else -1
+        self._poll_subtitles()
         for _ in range(16):
             try:
                 generation, raw, ready, result = self._ipc_requests.get_nowait()

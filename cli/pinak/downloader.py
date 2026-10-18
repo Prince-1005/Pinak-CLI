@@ -26,13 +26,15 @@ from .exceptions import (
     InvalidURLError,
     NetworkError,
     OutputDirError,
+    RateLimitedError,
     UnsupportedLinkTypeError,
 )
 from .history import record_download, url_downloaded_successfully
 from .instagram import download_instagram_media
 from .logging_setup import get_logger
 from .notify import notify, print_instagram_notice
-from .retry import backoff_delay, is_retryable, sleep_with_interrupt
+from .retry import backoff_delay, is_rate_limited, is_retryable, sleep_with_interrupt
+from .subtitle_preferences import normalize_subtitle_languages
 from .text_safety import safe_rich, safe_text
 from .utils import (
     GREEN,
@@ -134,6 +136,8 @@ def _classify_download_error(exc: Exception, url: str) -> Exception:
                 hint=InstagramPrivateContentError.hint,
             )
         return InstagramError(str(exc))
+    if is_rate_limited(exc):
+        return RateLimitedError(str(exc))
     if is_retryable(exc) or "urlopen" in text or "network" in text:
         return NetworkError(str(exc))
     return DownloadFailedError(str(exc) or f"Failed to download {url}")
@@ -406,7 +410,11 @@ def download_media_content(
     if config.get("embed_subs", False) and not extract_audio and has_ffmpeg:
         ydl_opts["writesubtitles"] = True
         ydl_opts["writeautomaticsub"] = True
-        ydl_opts["subtitleslangs"] = ["en", "all"]
+        # Exact codes bound requests to the configured language limit. Missing languages
+        # are skipped by yt-dlp; never fetch unrelated automatic translations.
+        ydl_opts["subtitleslangs"] = normalize_subtitle_languages(
+            config.get("subtitle_languages", ["en"])
+        )
         ydl_opts["postprocessors"].append(
             {
                 "key": "FFmpegSubtitlesConvertor",
@@ -663,6 +671,7 @@ def download_media_content(
             "files": [],
             "errors": logger.errors + [str(e)],
             "trim_range": trim_range,
+            "rate_limited": is_rate_limited(e),
         }
 
     finally:
@@ -960,7 +969,7 @@ def handle_download(
             }
             break
         is_downloading = False
-        if result.get("success") or result.get("canceled"):
+        if result.get("success") or result.get("canceled") or result.get("rate_limited"):
             break
 
     # Calculate actual duration of trimmed range

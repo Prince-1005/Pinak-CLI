@@ -15,6 +15,7 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .exceptions import ConfigError
+from .subtitle_preferences import MAX_SUBTITLE_LANGUAGES, normalize_subtitle_languages
 
 _config_lock = threading.RLock()
 _loaded_snapshots: dict[str, dict[str, Any]] = {}
@@ -58,6 +59,10 @@ class PinakSettings(BaseSettings):
     history_enabled: bool = Field(default=True, description="Track downloads in local history DB")
     log_file: str = Field(default="", description="Optional file path for debug logs")
     embed_subs: bool = Field(default=False, description="Whether to embed subtitles")
+    subtitle_languages: list[str] = Field(
+        default_factory=lambda: ["en"],
+        description=f"Subtitle language codes (1 to {MAX_SUBTITLE_LANGUAGES})",
+    )
     auto_sort: bool = Field(default=False, description="Auto sort into platform folders")
 
     duplicate_action: str = Field(default="ask", description="Action to take for duplicate URLs")
@@ -79,6 +84,11 @@ class PinakSettings(BaseSettings):
         if v not in VALID_VIDEO_FORMATS:
             raise ValueError(f"video_format must be one of {sorted(VALID_VIDEO_FORMATS)}")
         return v
+
+    @field_validator("subtitle_languages", mode="before")
+    @classmethod
+    def _validate_subtitle_languages(cls, value: Any) -> list[str]:
+        return normalize_subtitle_languages(value)
 
     @field_validator("audio_format")
     @classmethod

@@ -8,11 +8,18 @@ instead of failing immediately.
 from __future__ import annotations
 
 import random
+import re
 import time
 from collections.abc import Callable
 from typing import TypeVar
 
 T = TypeVar("T")
+
+
+def is_rate_limited(exc: BaseException) -> bool:
+    """Recognize throttling separately from short-lived connection failures."""
+    return bool(re.search(r"\b429\b|too many requests|rate[- ]limit", str(exc).lower()))
+
 
 # Exceptions that are generally worth retrying.
 RETRYABLE_MARKERS: tuple[str, ...] = (

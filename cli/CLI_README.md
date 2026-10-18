@@ -168,6 +168,28 @@ When running the interactive REPL shell (`pinak`), the following commands are av
 
 ## ⚙️ Configuration File
 
+### Subtitle languages and playback
+
+Use `/subs_lang` for the language picker, or `/subs_lang list` to see language
+codes. Save one to three languages with, for example, `/subs_lang hi en es`.
+Preferences are stored locally in the same `config.json` as the system settings
+and appear in `/config`. The default language is English (`en`).
+
+Use `/subs on` to enable subtitle downloads and `/subs off` to disable them;
+`/subs` without an argument toggles the setting. Downloads request only the
+selected language codes, prefer creator-provided captions over automatic
+captions for the same code, and skip languages the video does not offer.
+Regional codes are explicit choices (for example, `en-US` or `pt-BR`).
+Missing subtitles do not prevent downloading the video. Subtitle conversion
+and embedding require FFmpeg. HTTP 429 stops immediate retries and reports
+the platform's rate limit.
+
+In the TUI video player, subtitles begin off. Press `c` to show the first
+available track, press it again to advance through tracks, and press it after
+the last track to turn subtitles off. Another `c` starts the cycle again.
+The player reads embedded subtitles and matching `.srt`/`.vtt` sidecar files;
+it does not fetch new languages during playback.
+
 Pinak CLI saves user-specific configuration (like download directory, quality, retry counts) in a standard configuration folder (via `platformdirs`).
 
 - **Windows**: `%LOCALAPPDATA%\pinak\pinak-cli\config.json`

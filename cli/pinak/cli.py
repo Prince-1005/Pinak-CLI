@@ -48,6 +48,11 @@ from .history import (
 )
 from .logging_setup import setup_logging
 from .notify import print_offline_notice
+from .subtitle_preferences import (
+    MAX_SUBTITLE_LANGUAGES,
+    SUBTITLE_LANGUAGES,
+    normalize_subtitle_languages,
+)
 from .utils import BOLD, CYAN, GREEN, RED, RESET, YELLOW, normalize_quality
 
 console = Console()
@@ -97,6 +102,45 @@ def ask_with_esc(q):
             return None
 
 
+def configure_subtitle_languages(argument: str = "") -> None:
+    """Choose and persist bounded subtitle preferences, or list available codes."""
+    if argument.strip().lower() == "list":
+        console.print(f"[cyan]Choose 1–{MAX_SUBTITLE_LANGUAGES} subtitle languages:[/]")
+        for code, name in SUBTITLE_LANGUAGES.items():
+            console.print(f"  {code:8} {name}")
+        return
+    previous = config.get("subtitle_languages", ["en"])
+    if argument.strip():
+        selection = argument
+    else:
+        selection = ask_with_esc(
+            questionary.checkbox(
+                f"Subtitle languages (choose 1–{MAX_SUBTITLE_LANGUAGES}):",
+                choices=[
+                    questionary.Choice(f"{name} ({code})", value=code, checked=code in previous)
+                    for code, name in SUBTITLE_LANGUAGES.items()
+                ],
+                validate=lambda values: 1 <= len(values) <= MAX_SUBTITLE_LANGUAGES,
+                instruction="(Space selects, Enter saves, Esc cancels)",
+            )
+        )
+        if selection is None:
+            console.print("[yellow][*] Canceled.[/]")
+            return
+    try:
+        languages = normalize_subtitle_languages(selection)
+    except ValueError as exc:
+        console.print(f"[!] {exc}", style="red", markup=False)
+        return
+    if not save_config({"subtitle_languages": languages}):
+        config["subtitle_languages"] = previous
+        console.print("[red][!] Subtitle preferences could not be saved.[/]")
+        return
+    names = ", ".join(SUBTITLE_LANGUAGES[code] for code in languages)
+    console.print(f"[green][+] Subtitle languages saved: {names}.[/]")
+    console.print("[dim]Only available selected languages are downloaded when /subs is on.[/]")
+
+
 def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
     print_banner()
     username = config.get("username", "").strip()
@@ -135,6 +179,7 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
         "/platform": "List or search supported platforms",
         "/trim": "Trim video/audio (e.g. /trim 01:15-02:30 <url>)",
         "/subs": "Toggle automatic subtitle/lyric extraction",
+        "/subs_lang": f"Choose up to {MAX_SUBTITLE_LANGUAGES} subtitle languages; use list to see codes",
         "/sort": "Toggle auto-sorting into platform directories",
         "/delete_his": "Delete history: all, index (e.g. 3), or range (e.g. 2-4)",
         "/ffmpeg": "Download a static FFmpeg build automatically",
@@ -640,11 +685,21 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                             f"{RED}[!] Error: Invalid format. Supported: mp3, m4a, wav, flac, opus.{RESET}"
                         )
                     continue
-            if lower_cmd == "/subs":
-                config["embed_subs"] = not config.get("embed_subs", False)
+            if lower_cmd == "/subs_lang" or lower_cmd.startswith("/subs_lang "):
+                configure_subtitle_languages(cmd[len("/subs_lang") :].strip())
+                continue
+
+            if lower_cmd == "/subs" or lower_cmd.startswith("/subs "):
+                arg = lower_cmd[len("/subs") :].strip()
+                if arg not in ("", "on", "off"):
+                    console.print("[yellow]Usage: /subs [on|off]. Languages: /subs_lang[/]")
+                    continue
+                config["embed_subs"] = arg == "on" if arg else not config.get("embed_subs", False)
                 save_config()
                 state = "enabled" if config["embed_subs"] else "disabled"
                 console.print(f"[green][+] Subtitle extraction {state}.[/]")
+                languages = ", ".join(config.get("subtitle_languages", ["en"]))
+                console.print(f"[dim]Languages: {languages}. Change with /subs_lang.[/]")
                 continue
 
             if lower_cmd == "/sort":

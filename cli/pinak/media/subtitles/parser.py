@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import shutil
@@ -10,6 +11,12 @@ from collections.abc import Callable
 from pathlib import Path
 
 from ...ffmpeg_setup import ensure_ffmpeg
+from ...subtitle_preferences import (
+    MAX_SUBTITLE_LANGUAGES,
+    SUBTITLE_LANGUAGES,
+    subtitle_language_name,
+)
+from ...utils import get_ffprobe_path
 from .model import SubtitleCue, SubtitleTrack
 
 logger = logging.getLogger("pinak.media.subtitles")
@@ -112,10 +119,19 @@ class SubtitleParser:
         ext = path.suffix.lower()
         cues = cls.parse_vtt(content) if ext == ".vtt" else cls.parse_srt(content)
 
+        language_codes = {code.lower(): code for code in SUBTITLE_LANGUAGES}
+        language = next(
+            (
+                language_codes[token.lower()]
+                for token in reversed(re.split(r"[._]", path.stem))
+                if token.lower() in language_codes
+            ),
+            "und",
+        )
         return SubtitleTrack(
             track_id=track_id,
             title=path.stem,
-            language="en" if "en" in path.stem.lower() else "und",
+            language=language,
             cues=cues,
             is_external=True,
             file_path=path,
@@ -169,8 +185,33 @@ class SubtitleParser:
             return []
 
         tracks: list[SubtitleTrack] = []
-        # Attempt extracting stream 0:s:0, 0:s:1 up to 3 subtitle tracks
-        for s_idx in range(3):
+        # Match the download selection limit so every selected track is playable.
+        stream_tags = []
+        if is_cancelled is not None and is_cancelled():
+            return []
+        try:
+            probe = subprocess.run(
+                [
+                    get_ffprobe_path(),
+                    "-v",
+                    "quiet",
+                    "-select_streams",
+                    "s",
+                    "-show_entries",
+                    "stream_tags=language,title",
+                    "-of",
+                    "json",
+                    str(media),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                timeout=4.0,
+            )
+            if probe.returncode == 0:
+                stream_tags = json.loads(probe.stdout).get("streams", [])
+        except (OSError, ValueError, subprocess.SubprocessError):
+            pass  # Labels are optional; still extract tracks if probing fails.
+        for s_idx in range(MAX_SUBTITLE_LANGUAGES):
             if is_cancelled is not None and is_cancelled():
                 break
             cmd = [
@@ -193,10 +234,19 @@ class SubtitleParser:
                     srt_text = res.stdout.decode("utf-8", errors="replace")
                     cues = cls.parse_srt(srt_text)
                     if cues:
+                        tags = (
+                            stream_tags[s_idx].get("tags", {}) if s_idx < len(stream_tags) else {}
+                        )
+                        language = tags.get("language", "und")
+                        title = tags.get("title") or (
+                            subtitle_language_name(language)
+                            if language != "und"
+                            else f"Embedded #{s_idx + 1}"
+                        )
                         track = SubtitleTrack(
                             track_id=start_track_id + len(tracks),
-                            title=f"Embedded #{s_idx + 1}",
-                            language="und",
+                            title=title,
+                            language=language,
                             cues=cues,
                             is_external=False,
                             file_path=None,
