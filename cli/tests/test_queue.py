@@ -157,7 +157,14 @@ def test_run_continues_past_failure_then_retries(isolated_history_db, tmp_path, 
     summary = queue_mod.run_queue(on_event=lambda job, event: observed.append((job.id, event.kind)))
     assert (summary.failed, summary.succeeded) == (1, 1)
     assert [j.status for j in queue_mod.list_jobs()] == ["succeeded", "failed"]
-    assert observed == [(first, "message"), (second, "message")]
+    assert observed == [
+        (first, "started"),
+        (first, "message"),
+        (first, "finished"),
+        (second, "started"),
+        (second, "message"),
+        (second, "finished"),
+    ]
     assert queue_mod.retry_failed(first) == 1
     assert queue_mod.run_queue().succeeded == 1
     assert queue_mod.retry_failed(first) == 0
@@ -408,3 +415,97 @@ def test_local_http_download_runs_through_queue(isolated_history_db, tmp_path, m
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_queue_display_renders_transfer_and_processing(isolated_history_db, tmp_path, monkeypatch):
+    from io import StringIO
+
+    from rich.console import Console
+
+    from pinak.commands import queue as command
+
+    output = StringIO()
+    terminal = Console(file=output, width=60, color_system=None)
+    monkeypatch.setattr(command, "console", terminal)
+    queue_mod.add_job(_request(tmp_path))
+    job = queue_mod.list_jobs()[0]
+    display = command.QueueDisplay(1)
+    display.handle(job, DownloadEvent("started"))
+    display.handle(job, DownloadEvent("progress", "demo.mp4", 512, 1024))
+    terminal.print(display.render())
+    display.handle(job, DownloadEvent("processing"))
+    terminal.print(display.render())
+    display.handle(job, DownloadEvent("finished", "succeeded", files=("demo.mp4",)))
+    rendered = output.getvalue()
+    for expected in (
+        "PINAK DOWNLOAD QUEUE",
+        "demo.mp4",
+        "50%",
+        "512.0 B",
+        "ETA",
+        "Processing / merging",
+        "Succeeded",
+        "Saved 1 file",
+    ):
+        assert expected in rendered
+
+
+def test_queue_display_reports_worker_exception_and_interrupt(
+    isolated_history_db, tmp_path, monkeypatch, capsys
+):
+    from pinak.commands import queue as command
+
+    job_id, _ = queue_mod.add_job(_request(tmp_path))
+
+    def fail(request, on_event=None):
+        raise RuntimeError("source is offline")
+
+    monkeypatch.setattr(queue_mod, "run_download", fail)
+    assert command.main(["run"]) == 1
+    assert "source is offline" in capsys.readouterr().out
+    assert queue_mod.retry_failed(job_id) == 1
+
+    def interrupt(request, on_event=None):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(queue_mod, "run_download", interrupt)
+    assert command.main(["run"]) == 130
+    assert "Queue paused" in capsys.readouterr().out
+    assert queue_mod.list_jobs()[0].status == "queued"
+
+
+def test_clear_redraws_header_and_preserves_jobs_and_history(
+    isolated_history_db, tmp_path, monkeypatch, capsys
+):
+    from io import StringIO
+
+    from rich.console import Console
+
+    import pinak.cli as cli
+    from pinak.commands import panels
+
+    output = StringIO()
+    monkeypatch.setenv("TERM", "xterm-256color")
+    monkeypatch.setattr(
+        panels, "console", Console(file=output, width=80, force_terminal=True, legacy_windows=False)
+    )
+    monkeypatch.setitem(config, "username", "tester")
+    monkeypatch.setattr(cli, "PromptSession", None)
+    monkeypatch.setattr(cli.updater, "start_background_update_check", lambda: None)
+    monkeypatch.setattr(cli, "maybe_print_offline_notice", lambda *a, **kw: True)
+    history.record_download("https://example.com/history")
+    old_history = history.get_history()
+    job_id, _ = queue_mod.add_job(_request(tmp_path))
+    old_config = dict(config)
+    commands = iter(["/clear", "/batch missing.txt", "/queue list", "/exit"])
+    monkeypatch.setattr("builtins.input", lambda *a: next(commands))
+    cli.repl_loop()
+    rendered = output.getvalue()
+    assert "\x1b[2J" in rendered
+    after_clear = rendered.split("\x1b[2J", 1)[1]
+    assert "PINAK-CLI" in after_clear and "PINAK CONTROL PANEL" in after_clear
+    assert "Unknown command: /batch" in capsys.readouterr().out
+    assert queue_mod.list_jobs()[0].id == job_id
+    assert queue_mod.list_jobs()[0].status == "queued"
+    assert history.get_history() == old_history
+    assert config == old_config

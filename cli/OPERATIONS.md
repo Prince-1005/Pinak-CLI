@@ -116,8 +116,8 @@ change that job. An equivalent unfinished job returns its existing ID; use
 `--force` to intentionally add a separate download. The interactive `ask`
 duplicate preference becomes `skip` for a saved job, because a foreground queue
 run never stops to ask for input. `queue import` validates
-every non-comment line before saving any jobs. REPL `/batch links.txt` imports
-and immediately runs the jobs from that file.
+every non-comment line before saving any jobs. Import links with
+`/queue import links.txt` in the interactive shell, then use `/queue run`.
 
 One foreground worker runs queued jobs in order and continues after failed
 jobs. Closing the terminal stops processing. Ctrl+C returns the active job to
@@ -133,7 +133,13 @@ remote download server is started.
 The interactive shell exposes the same queue through `/queue add <URL>`,
 `/queue import <file>`, `/queue list`, `/queue run`, and
 `/queue retry <id>` or `/queue retry --failed`. `/queue help` shows options.
-Unlike `/batch`, `/queue add` and `/queue import` only save jobs until a run starts.
+`/queue add` and `/queue import` save jobs until a run starts. The live queue
+display shows overall job counts, the active file, bytes, speed, ETA, and processing
+status. Each finished job prints its result; failures include the reason.
+
+`/clear` (or `clear`) clears terminal output and redraws the Pinak ASCII logo and
+control panel with current settings. It preserves jobs, history, preferences, and
+downloaded files and does not repeat first-run initialization.
 
 ## Preferences and local storage
 

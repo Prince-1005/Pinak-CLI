@@ -161,13 +161,13 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
     print_welcome_screen()
     commands_meta = {
         "/help": "Show this help menu",
+        "/clear": "Clear the screen and redraw the Pinak logo and control panel",
         "/doctor": "Check dependencies and output folder",
         "/config": "Show saved preferences",
         "/stats": "Show download analytics and insights",
         "/setout": "Change and save the output directory",
         "/open": "Open the current output folder",
         "/history": "View download history",
-        "/batch": "Save and run URLs from a text file; unfinished jobs survive restart",
         "/queue": "Manage saved jobs: add, import, list, run, retry",
         "/any": "Download content from any platform supported by yt-dlp",
         "/instagram": "Download post, reel, igtv from Instagram",
@@ -218,7 +218,6 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 "/audio",
                 "/trim",
                 "/setout",
-                "/batch",
                 "/delete_his",
                 "/instagram",
             ]:
@@ -243,7 +242,6 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
             "/audio",
             "/trim",
             "/setout",
-            "/batch",
             "/delete_his",
             "/instagram",
         ]:
@@ -342,7 +340,6 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 "/audio",
                 "/trim",
                 "/setout",
-                "/batch",
                 "/delete_his",
                 "/instagram",
             ]:
@@ -745,27 +742,10 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 show_platforms(search_term)
                 continue
 
-            if lower_cmd.startswith("/batch "):
-                filename = cmd[7:].strip()
-                if not os.path.exists(filename):
-                    print(f"{RED}[!] Error: Batch file '{filename}' not found.{RESET}")
-                    continue
-                from .commands.queue import _display_job
-                from .queue import import_file, run_queue
+            if lower_cmd in ("/clear", "clear"):
+                from .commands.panels import clear_screen
 
-                try:
-                    imported = import_file(filename)
-                    ids = [job_id for job_id, _created in imported]
-                    console.print(f"Saved {len(imported)} batch entries in the local queue.")
-                    summary = run_queue(ids, on_event=_display_job)
-                    console.print(
-                        f"Batch: {summary.succeeded} succeeded, {summary.skipped} skipped, "
-                        f"{summary.failed} failed."
-                    )
-                    if summary.interrupted:
-                        console.print("Unfinished jobs remain queued for the next run.")
-                except (OSError, ValueError, RuntimeError) as exc:
-                    console.print(f"[red]Batch error: {exc}[/]")
+                clear_screen()
                 continue
 
             if lower_cmd == "/queue" or lower_cmd.startswith("/queue "):

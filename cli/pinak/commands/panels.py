@@ -108,3 +108,10 @@ def print_welcome_screen() -> None:
         )
     )
     console.print()
+
+
+def clear_screen() -> None:
+    """Clear terminal output and redraw the current session header."""
+    console.clear(home=True)
+    print_banner()
+    print_welcome_screen()

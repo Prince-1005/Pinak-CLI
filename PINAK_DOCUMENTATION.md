@@ -311,7 +311,9 @@ Running `pinak` without arguments launches an interactive shell with auto-comple
 - `/audio <URL>` – Download as MP3
 - `/video <URL>` – Download video
 - `/instagram <URL>` – Download Instagram content
-- `/batch <file>` – Download batch list of URLs
+- `/queue import <file>` then `/queue run` – Save and run a list of URLs
+- `/queue add <url>`, `/queue list`, `/queue retry --failed` – Manage saved download jobs
+- `/clear` – Clear terminal output and redraw the Pinak logo and control panel
 - `/update` – Update tools to latest versions
 - `/exit` – Exit interactive prompt
 
@@ -611,7 +613,7 @@ Check CLI output with `--verbose`. Future: add `--log-file` for persistent logs.
 ### Future Roadmap
 - [ ] Resume support for partial downloads
 - [ ] MkDocs documentation site
-- [ ] Download queue/batch progress enhancement
+- [x] Durable download queue with live progress
 - [ ] Plugin system for custom sources
 
 ### Quality Goals

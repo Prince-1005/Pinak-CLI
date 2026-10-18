@@ -11,7 +11,6 @@ Start with `pinak` and no arguments. Use `/help` for the installed version’s c
 - `/audio <URL>`: audio extraction.
 - `/any <URL>`: route through yt-dlp-supported sources.
 - `/instagram <URL>`: Instagram extraction.
-- `/batch links.txt`: save and immediately run entries from a text file; unfinished jobs remain in the local queue.
 - `/queue add <URL>`, `/queue list`, `/queue run`, `/queue retry --failed`: manage the same durable jobs without leaving the shell. Use `/queue help` for all options.
 - `/trim 00:15-01:30 <URL>`: select an audio/video range.
 
@@ -43,3 +42,7 @@ Start with `pinak` and no arguments. Use `/help` for the installed version’s c
 - `/ctl pause`: control the active player.
 
 `/reset` restores terminal state if it is left in an unexpected mode. `/exit` exits the shell. Paths with spaces should be supplied as the full command argument; consult the installed command behavior for your shell.
+
+## Clear the screen
+
+Use `/clear` (or `clear`) to clear previous terminal output and redraw the Pinak ASCII logo and control panel. Saved jobs, history, preferences, and downloaded files remain intact.

@@ -143,6 +143,8 @@ class DownloadEvent:
     message: str = ""
     downloaded: int | None = None
     total: int | None = None
+    files: tuple[str, ...] = ()
+    errors: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

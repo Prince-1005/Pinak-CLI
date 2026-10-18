@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
+import logging
 import os
 import sqlite3
 import time
@@ -271,6 +272,14 @@ def run_queue(
         raise RuntimeError("Another Pinak queue runner is active") from exc
     succeeded = skipped = failed = processed = 0
     interrupted = False
+
+    def publish(job: QueueJob, event: DownloadEvent) -> None:
+        if on_event:
+            try:
+                on_event(job, event)
+            except Exception:
+                logging.getLogger("pinak.queue").exception("Queue display listener failed")
+
     try:
         with contextlib.closing(_connect()) as conn:
             if selected is not None:
@@ -287,15 +296,22 @@ def run_queue(
                     break
                 processed += 1
                 try:
+                    publish(job, DownloadEvent("started"))
                     result = run_download(
                         job.request,
-                        on_event=partial(on_event, job) if on_event else None,
+                        on_event=partial(publish, job),
                     )
                 except KeyboardInterrupt:
                     result = DownloadResult("interrupted", job.request.url, (), ("Interrupted",))
                 except Exception as exc:
                     result = DownloadResult("failed", job.request.url, (), (str(exc),))
                 _finish(conn, job.id, result)
+                publish(
+                    job,
+                    DownloadEvent(
+                        "finished", result.status, files=result.files, errors=result.errors
+                    ),
+                )
                 if result.status == "interrupted":
                     interrupted = True
                     break

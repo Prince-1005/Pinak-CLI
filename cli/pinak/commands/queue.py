@@ -10,15 +10,18 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import NoReturn
 
-from rich.console import Console
+from rich.console import Console, Group
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 from rich.table import Table
+from rich.text import Text
 
 from ..engine import DownloadEvent, DownloadRequest
 from ..queue import QueueJob, add_job, import_file, list_jobs, retry_failed, run_queue
+from ..utils import human_size
 
 console = Console()
-_progress_lock = threading.Lock()
-_progress_buckets: dict[int, int] = {}
 
 
 class _Parser(argparse.ArgumentParser):
@@ -50,22 +53,130 @@ def _parser(prog: str = "pinak queue") -> argparse.ArgumentParser:
     return parser
 
 
-def _display_job(job: QueueJob, event: DownloadEvent) -> None:
-    if event.kind == "message" and event.message:
-        console.print(f"#{job.id} {event.message}", markup=False)
-    elif event.kind == "progress" and event.total and event.downloaded is not None:
-        bucket = min(100, max(0, int(event.downloaded * 100 / event.total))) // 20 * 20
-        with _progress_lock:
-            previous = _progress_buckets.get(job.id, -1)
-            if bucket > previous:
-                _progress_buckets[job.id] = bucket
-                console.print(f"Job #{job.id}: {bucket}%")
-    elif event.kind == "processing":
-        console.print(f"Job #{job.id}: processing media")
-    elif event.kind == "result":
-        console.print(f"Job #{job.id}: {event.message}")
-        with _progress_lock:
-            _progress_buckets.pop(job.id, None)
+class QueueDisplay:
+    """One live terminal surface shared by CLI and slash-command queue runs."""
+
+    def __init__(self, total: int) -> None:
+        self.lock = threading.RLock()
+        self.overall = Progress(
+            TextColumn("[cyan]Jobs[/]"),
+            BarColumn(),
+            TextColumn("{task.completed:.0f}/{task.total:.0f}"),
+            console=console,
+            auto_refresh=False,
+            expand=True,
+        )
+        self.overall_id = self.overall.add_task("Queue", total=total)
+        self.transfer = Progress(
+            SpinnerColumn(),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console,
+            auto_refresh=False,
+            expand=True,
+        )
+        self.transfer_id = self.transfer.add_task("Download", total=None)
+        self.job: QueueJob | None = None
+        self.filename = ""
+        self.status = "Checking saved jobs…"
+        self.started = 0
+        self.live = Live(self.render(), console=console, refresh_per_second=8, transient=True)
+
+    def __enter__(self) -> QueueDisplay:
+        self.live.start(refresh=True)
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        self.live.stop()
+
+    def render(self) -> Panel:
+        with self.lock:
+            parts: list = [self.overall]
+            if self.job:
+                request = self.job.request
+                mode = "Audio" if request.extract_audio else "Media"
+                parts.extend(
+                    [
+                        Text(
+                            f"Job #{self.job.id} · {mode} · {request.quality} · Attempt {self.job.attempts}",
+                            style="bold cyan",
+                        ),
+                        Text(request.url, overflow="fold"),
+                        Text(f"Save to: {request.output_dir}", style="dim", overflow="fold"),
+                        Text(self.filename or "Preparing download…", style="cyan", overflow="fold"),
+                        self.transfer,
+                    ]
+                )
+                task = self.transfer.tasks[self.transfer_id]
+                size = human_size(task.completed)
+                total = human_size(task.total) if task.total else "unknown size"
+                speed = f"{human_size(task.speed)}/s" if task.speed else "—"
+                eta = f"{int(task.time_remaining)}s" if task.time_remaining is not None else "—"
+                parts.append(Text(f"{size} / {total}  •  {speed}  •  ETA {eta}", style="dim"))
+            parts.extend(
+                [
+                    Text(self.status, overflow="fold"),
+                    Text("Ctrl+C stops this run; unfinished jobs stay saved.", style="dim"),
+                ]
+            )
+            return Panel(
+                Group(*parts), title="[bold cyan]PINAK DOWNLOAD QUEUE[/]", border_style="cyan"
+            )
+
+    def handle(self, job: QueueJob, event: DownloadEvent) -> None:
+        with self.lock:
+            if event.kind == "started":
+                self.job = job
+                self.started += 1
+                overall = self.overall.tasks[self.overall_id]
+                if self.started > (overall.total or 0):
+                    self.overall.update(self.overall_id, total=self.started)
+                self.filename = ""
+                self.status = "Preparing download…"
+                self.transfer.reset(self.transfer_id, total=None)
+            elif event.kind == "message" and event.message:
+                self.status = event.message
+            elif event.kind == "progress":
+                task = self.transfer.tasks[self.transfer_id]
+                if (event.message and event.message != self.filename) or (
+                    event.downloaded or 0
+                ) < task.completed:
+                    self.transfer.reset(self.transfer_id, total=event.total or None)
+                self.filename = event.message or self.filename
+                self.transfer.update(
+                    self.transfer_id, total=event.total or None, completed=event.downloaded or 0
+                )
+                self.status = "Downloading…"
+            elif event.kind == "processing":
+                self.status = "Processing / merging media…"
+            elif event.kind == "finished":
+                style = {
+                    "succeeded": "green",
+                    "skipped": "yellow",
+                    "failed": "red",
+                    "interrupted": "yellow",
+                }.get(event.message, "white")
+                label = (
+                    "Interrupted — saved for next run"
+                    if event.message == "interrupted"
+                    else event.message.capitalize()
+                )
+                console.print(Text(f"#{job.id}  {label}  ·  {job.request.url}", style=style))
+                if event.files:
+                    console.print(
+                        Text(
+                            f"    Saved {len(event.files)} file(s) to {job.request.output_dir}",
+                            style="dim",
+                        )
+                    )
+                for error in event.errors:
+                    console.print(
+                        Text(f"    {error}", style="red" if event.message == "failed" else "yellow")
+                    )
+                if event.message != "interrupted":
+                    self.overall.advance(self.overall_id)
+                self.status = label
+            self.live.update(self.render())
 
 
 def _show_jobs(status: str | None = None) -> None:
@@ -114,10 +225,23 @@ def main(argv: Sequence[str], *, prog: str = "pinak queue") -> int:
             if count == 0:
                 return 1
         elif args.action == "run":
-            summary = run_queue(on_event=_display_job, limit=args.limit)
+            total = sum(job.status in {"queued", "running"} for job in list_jobs())
+            if args.limit is not None:
+                total = min(total, args.limit)
+            with QueueDisplay(max(0, total)) as display:
+                summary = run_queue(on_event=display.handle, limit=args.limit)
             console.print(
-                f"Queue: {summary.succeeded} succeeded, {summary.skipped} skipped, "
-                f"{summary.failed} failed."
+                Panel(
+                    Text.assemble(
+                        (f"{summary.succeeded} succeeded", "green"),
+                        "  ·  ",
+                        (f"{summary.skipped} skipped", "yellow"),
+                        "  ·  ",
+                        (f"{summary.failed} failed", "red"),
+                    ),
+                    title="Queue paused" if summary.interrupted else "Queue complete",
+                    border_style="yellow" if summary.interrupted else "cyan",
+                )
             )
             if summary.interrupted:
                 console.print("Interrupted; the active job is queued for the next run.")

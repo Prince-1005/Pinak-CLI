@@ -19,15 +19,16 @@ pinak "<your-media-url>" --quality 1080p -o "<output-folder>"
 
 Available source formats determine what can be downloaded. One-shot options are temporary; use shell preferences to save defaults. `/sort` toggles sorting into platform folders.
 
-## Batch text files
+## Import text files
 
 Create a UTF-8 text file with one URL per line. Blank lines and lines beginning with `#` are ignored. Launch `pinak`, then:
 
 ```text
-/batch links.txt
+/queue import links.txt
+/queue run
 ```
 
-`/batch` saves the entries as local jobs and starts those jobs immediately. They run sequentially while Pinak is open. If you close Pinak, unfinished jobs remain in the queue for a later `pinak queue run`.
+Import saves the entries as local jobs; run starts the queue. Jobs run sequentially while Pinak is open. If you close Pinak, unfinished jobs remain in the queue for a later `/queue run`.
 
 You can also save jobs without starting them:
 
@@ -39,9 +40,11 @@ pinak queue run
 pinak queue retry --failed
 ```
 
+The live display shows overall job counts, the active file, transfer size, speed, ETA, and processing status. Finished jobs show their result and any failure reason.
+
 Each job keeps the options and preferences captured when it was added. Ctrl+C stops the current run and leaves the active job queued with partial files retained. Failed jobs need an explicit retry. The queue is local and foreground only; it does not keep downloading after the terminal closes.
 
-Inside the interactive shell, the same actions are available as `/queue add <URL>`, `/queue import <file>`, `/queue list`, `/queue run`, and `/queue retry --failed`. Enter `/queue help` for options. `/batch` is the shortcut that imports a file and runs those jobs immediately.
+Inside the interactive shell, the same actions are available as `/queue add <URL>`, `/queue import <file>`, `/queue list`, `/queue run`, and `/queue retry --failed`. Enter `/queue help` for options.
 
 ## Interrupted downloads
 

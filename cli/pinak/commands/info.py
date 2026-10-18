@@ -86,7 +86,8 @@ def print_help() -> None:
             "/history [filter]",
             "View history; filters: failed, audio, media, search <text>",
         ),
-        ("/batch <file>", "Download multiple URLs from a text file"),
+        ("/queue <action>", "Manage downloads: add, import, list, run, retry; /queue help"),
+        ("/clear", "Clear the screen; keep the Pinak logo and control panel"),
         (
             "/any <url>",
             "Download content from any platform supported by yt-dlp",
