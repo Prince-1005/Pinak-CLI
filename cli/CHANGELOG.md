@@ -7,6 +7,18 @@ Release notes are maintained manually; automatic release creation is disabled.
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-10-19
+
+### Added
+- Add `/subs_lang` with a language picker and explicit language codes; save one to three preferred subtitle languages alongside the local system configuration.
+- Add `/subs on` and `/subs off` while retaining the existing toggle command.
+
+### Fixed
+- Download only selected subtitle languages that a video provides, preferring creator-provided captions over automatic captions for the same language instead of requesting every translation.
+- Stop rapid download retries after HTTP 429 and explain the platform's rate limit without misleading connection advice or visible ANSI escape fragments.
+- Keep TUI subtitles off until requested; cycle `c` through available tracks, then Off, and preserve subtitle requests made during background loading.
+- Show embedded subtitle language labels when metadata is available and recognize language codes in external subtitle filenames.
+
 ## [1.4.3] - 2026-10-18
 
 ### Changed

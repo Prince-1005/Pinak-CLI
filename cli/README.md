@@ -1,4 +1,4 @@
-# Pinak CLI 1.4.3
+# Pinak CLI 1.4.4
 
 See [CLI_README.md](CLI_README.md) for usage and
 [OPERATIONS.md](OPERATIONS.md) for current configuration, playback, recovery,
