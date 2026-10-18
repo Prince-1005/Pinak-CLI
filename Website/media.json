@@ -1,0 +1,28 @@
+{
+  "Screenshot 2026-10-17 171235.png": {
+    "title": "One player. Two perspectives.",
+    "description": "Local video in the terminal alongside Pinak’s native playback window.",
+    "alt": "Pinak playing the same local video in a terminal renderer and a native window, with keyboard controls below.",
+    "tags": ["Playback", "Terminal", "Native window"], "featured": true, "order": 1
+  },
+  "Screenshot 2026-10-18 193224.png": {
+    "title": "Your pictures, in a different light.",
+    "description": "A portrait rendered in the terminal and opened in the native picture viewer.",
+    "alt": "A colorful portrait displayed in Pinak’s quadrant terminal renderer beside the native image window.",
+    "tags": ["Pictures", "Quadrant"], "featured": true, "order": 2
+  },
+  "Screenshot 2026-10-18 193257.png": {
+    "title": "A little more character.",
+    "description": "An alternative terminal presentation of the same local picture, with the full image alongside.",
+    "alt": "Pinak’s terminal picture presentation alongside the original colorful portrait in its native window.",
+    "tags": ["Pictures", "Terminal"], "featured": true, "order": 3
+  },
+  "John Wick - Rasputin.mp4": {
+    "title": "Video playback, in action", "description": "A desktop recording of Pinak playing local video in the terminal and native window.",
+    "tags": ["Playback demo", "Video", "Native window"], "order": 4
+  },
+  "Radhunandana-From -HanuMan.mp4": {
+    "title": "The soundtrack to your terminal", "description": "A desktop recording showing Pinak’s local music playback, artwork, and visualizer alongside a native window.",
+    "tags": ["Playback demo", "Audio", "Visualizer"], "order": 5
+  }
+}

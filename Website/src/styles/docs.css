@@ -1,0 +1,5 @@
+@import '@fontsource-variable/inter';
+@import '@fontsource/jetbrains-mono/400.css';
+:root{--sl-font:'Inter Variable',sans-serif;--sl-font-mono:'JetBrains Mono',monospace;--sl-color-accent-low:#123139;--sl-color-accent:#38b8c6;--sl-color-accent-high:#89e5ed;--sl-color-black:#0b1015;--sl-color-gray-6:#111920;--sl-color-gray-5:#293742}
+:root[data-theme=light]{--sl-color-accent-low:#d8f1f2;--sl-color-accent:#087482;--sl-color-accent-high:#075662;--sl-color-white:#14242b;--sl-color-gray-6:#edf1ef;--sl-color-gray-5:#c7d3d2}
+.site-title{letter-spacing:-.03em}.sl-markdown-content h1,.sl-markdown-content h2{letter-spacing:-.035em}.sl-markdown-content a{text-underline-offset:3px}

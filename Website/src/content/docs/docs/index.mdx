@@ -1,0 +1,44 @@
+---
+title: Your terminal, your media
+description: Start using Pinak for downloading and playing local media.
+---
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Pinak is a Python command-line media toolkit built around **yt-dlp** and **FFmpeg**. Download supported media, extract audio, inspect local history, and play local video, audio, and pictures.
+
+## Get started
+
+```sh
+pipx install pinak-cli
+pinak --version
+pinak --doctor
+```
+
+Python 3.10 or newer is required. [Start with platform-specific setup](./installation/), including pipx installation, if these commands are not available yet.
+
+## Make your first download
+
+Replace the placeholder with a supported HTTP(S) URL. Only download media you own or have permission to save.
+
+```sh
+pinak "<your-media-url>"
+pinak "<your-media-url>" --audio
+pinak "<your-media-url>" --quality 720p -o downloads
+```
+
+Run `pinak` alone for the interactive shell. Use `pinak media <local-path>` to open local media.
+
+## Choose your next step
+
+<CardGrid>
+  <LinkCard title="Commands & options" href="./commands/" description="Direct invocation, inspection, quality, and machine-readable results." />
+  <LinkCard title="Local playback" href="./playback/" description="Open your collection, navigate media, and show subtitles." />
+  <LinkCard title="Interactive shell" href="./interactive/" description="Batch downloads, preferences, history, and diagnostics." />
+  <LinkCard title="Troubleshooting" href="./troubleshooting/" description="Find actionable next steps when a source or device fails." />
+</CardGrid>
+
+## What local means
+
+The installed package runs on your device. Downloads connect to their sources and are saved to your output directory. Pinak does not use a shared cloud download backend. Settings and history are local; source availability and network access still matter.
+
+These guides follow the current source and operating guide. The PyPI release may differ from repository source; check `pinak --version`.

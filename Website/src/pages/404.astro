@@ -1,0 +1,5 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { url } from '../lib/site';
+---
+<Layout title="Page not found — Pinak" description="This Pinak page could not be found. Return home, install the package, or explore the documentation."><div class="wrap"><section class="page-intro" style="padding-bottom:130px"><span class="eyebrow">404 / OFF THE PLAYLIST</span><h1>Nothing playing<br/><span style="color:var(--accent)">at this address.</span></h1><p>The page may have moved. Let’s get you back to your terminal.</p><div class="guide-links"><a class="button" href={url('/')}>Back home →</a><a class="button button-ghost" href={url('/install/')}>Install Pinak</a><a class="button button-ghost" href={url('/docs/')}>Documentation</a></div></section></div></Layout>

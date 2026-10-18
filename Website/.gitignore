@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.astro/
+.cache/
+public/generated/
+src/generated/
+test-results/
+playwright-report/
+.originals/

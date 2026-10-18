@@ -1,0 +1,33 @@
+---
+import '@fontsource-variable/inter';
+import '@fontsource/jetbrains-mono/400.css';
+import '../styles/global.css';
+import Brand from '../components/Brand.astro';
+import { url, version, repository } from '../lib/site';
+interface Props { title?: string; description?: string; sound?: boolean }
+const { title = 'Pinak — Download. Play. Keep it local.', description = 'A local-first media toolkit for your terminal. Download with yt-dlp, play local media, and keep your collection on your own device.', sound = false } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <meta name="description" content={description}/><meta name="theme-color" content="#0b1015"/>
+    <title>{title}</title><link rel="canonical" href={canonical}/><link rel="icon" type="image/svg+xml" href={url('/favicon.svg')}/>
+    <meta property="og:title" content={title}/><meta property="og:description" content={description}/><meta property="og:type" content="website"/><meta property="og:url" content={canonical}/><meta property="og:image" content={new URL(url('/social.png'), Astro.site)}/><meta property="og:image:width" content="1200"/><meta property="og:image:height" content="630"/><meta name="twitter:card" content="summary_large_image"/>
+    <script is:inline>try { document.documentElement.dataset.theme = localStorage.getItem('pinak-theme') || 'dark'; } catch {}</script>
+  </head>
+  <body data-sound-enabled={sound ? 'true' : 'false'}>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header"><div class="header-inner"><Brand/><span class="header-separator">/</span><span class="header-label">THE LOCAL MEDIA TOOLKIT</span>
+      <button class="menu-toggle" aria-expanded="false" aria-controls="main-nav" type="button">Menu <span aria-hidden="true">☰</span></button>
+      <nav id="main-nav" aria-label="Main navigation"><a href={url('/#features')}>Features</a><a href={url('/showcase/')} aria-current={Astro.url.pathname.includes('/showcase') ? 'page' : undefined}>Showcase</a><a href={url('/docs/')}>Docs</a><a href={repository} class="github-link">GitHub <span aria-hidden="true">↗</span></a></nav>
+      <div class="header-tools"><button id="theme-toggle" class="icon-button" type="button" aria-label="Switch to light theme">◐</button><a class="button button-small" href={url('/install/')}>Get Pinak <span aria-hidden="true">↗</span></a></div>
+    </div></header>
+    <main id="main"><slot/></main>
+    <footer class="site-footer wrap"><div><Brand/><p>Less friction. More ownership.<br/>Your media, on your machine.</p><span class="eyebrow">SOURCE v{version} · MIT LICENSE</span></div><div class="footer-links"><div><span class="eyebrow">EXPLORE</span><a href={url('/install/')}>Installation</a><a href={url('/showcase/')}>Showcase</a><a href={url('/docs/')}>Documentation</a></div><div><span class="eyebrow">PROJECT</span><a href={repository}>Source code ↗</a><a href="https://pypi.org/project/pinak-cli/">PyPI package ↗</a><a href={url('/changelog/')}>Release notes</a><a href={url('/about/')}>About & license</a></div></div><div class="footer-bottom"><span>Built for personal media archiving. Download content you own or have permission to save.</span><a href={url('/about/#responsible-use')}>Responsible use ↗</a></div></footer>
+    {sound && <aside class="sound-panel" aria-label="Website sound controls"><button id="sound-toggle" type="button" aria-pressed="false"><span aria-hidden="true">♫</span> <span id="sound-label">Sound off</span></button><label for="ambient-volume">Ambient volume</label><input id="ambient-volume" type="range" min="0" max="100" value="20" aria-label="Ambient volume"/></aside>}
+    <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
+    <script>import '../scripts/site';</script>
+  </body>
+</html>

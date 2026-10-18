@@ -1,0 +1,14 @@
+---
+import type { MediaItem } from '../lib/media';
+import { url } from '../lib/site';
+interface Props { item: MediaItem; index?: number }
+const { item, index = 0 } = Astro.props;
+const typeLabel = { image: 'Screenshot', video: 'Video', audio: 'Audio' }[item.type];
+const duration = item.duration ? `${Math.floor(item.duration / 60)}:${String(Math.floor(item.duration % 60)).padStart(2, '0')}` : '';
+---
+<article class="media-card" data-media-card data-type={item.type} data-search={`${item.title} ${item.description} ${item.tags.join(' ')}`.toLowerCase()}>
+  <button type="button" class="media-open" data-media-id={item.id}>
+    <div class="media-thumbnail"><img src={url(item.poster)} alt={item.alt} loading="lazy" width={item.type === 'image' ? item.width : 960} height={item.type === 'image' ? item.height : 540} style={item.focalPoint ? `object-position:${item.focalPoint}` : undefined}/>{item.preview && <video class="media-preview" src={url(item.preview)} muted loop playsinline preload="none" aria-hidden="true" tabindex="-1"/>}<span class="media-badge">{typeLabel}{duration && ` / ${duration}`}</span><span class="media-action" aria-hidden="true">{item.type === 'image' ? '↗' : '▶'}</span></div>
+    <div class="media-caption"><span class="eyebrow">{String(index + 1).padStart(2, '0')} / {item.tags[0] || typeLabel}</span><h3>{item.title}</h3><p>{item.description || 'Explore this media from the Pinak collection.'}</p></div>
+  </button>
+</article>

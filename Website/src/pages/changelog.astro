@@ -1,0 +1,9 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { readFileSync } from 'node:fs';
+import { marked } from 'marked';
+import { version, repository } from '../lib/site';
+const markdown = readFileSync(new URL('../../../cli/CHANGELOG.md', import.meta.url), 'utf8');
+const rendered = await marked.parse(markdown);
+---
+<Layout title="Release notes — Pinak" description="Pinak source release notes, changes, and fixes."><div class="wrap"><section class="page-intro"><span class="eyebrow">CHANGELOG / CONTINUOUSLY REFINED</span><h1>Small improvements.<br/><span style="color:var(--accent)">Better sessions.</span></h1><p>Source version {version}. Notes below are built from the package changelog. For the published package, check <a class="text-link" href="https://pypi.org/project/pinak-cli/">PyPI ↗</a>.</p></section><article class="content-narrow changelog-body" style="margin-left:0" set:html={rendered}/><p class="content-narrow"><a class="text-link" href={`${repository}/releases`}>View GitHub releases ↗</a></p></div></Layout>

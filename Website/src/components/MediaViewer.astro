@@ -1,0 +1,10 @@
+---
+import type { MediaItem } from '../lib/media';
+import { url } from '../lib/site';
+interface Props { items: MediaItem[] }
+const { items } = Astro.props;
+const resolved = items.map(item => ({ ...item, src: url(item.src), poster: url(item.poster), captions: item.captions && url(item.captions), transcript: item.transcript && url(item.transcript) }));
+---
+<dialog id="media-viewer" aria-labelledby="viewer-title"><div class="viewer-toolbar"><span class="eyebrow">PINAK / SHOWCASE</span><button id="viewer-zoom" type="button" class="button button-ghost">Zoom image</button><button id="viewer-close" type="button" class="button button-ghost" aria-label="Close media viewer">Close ×</button></div><div id="viewer-content" class="viewer-content"></div><div class="viewer-description"><h2 id="viewer-title"></h2><p id="viewer-description"></p><a id="viewer-transcript" hidden>Read transcript ↗</a><p id="viewer-status" role="status"></p></div></dialog>
+<script type="application/json" id="media-manifest" set:html={JSON.stringify(resolved).replaceAll('<', '\\u003c')}/>
+<script>import '../scripts/gallery';</script>

@@ -1,0 +1,7 @@
+<script is:inline>
+  (() => {
+    let theme = 'dark';
+    try { theme = localStorage.getItem('pinak-theme') || 'dark'; } catch {}
+    document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+  })();
+</script>

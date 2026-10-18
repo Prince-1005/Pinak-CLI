@@ -1,0 +1,12 @@
+---
+import Layout from '../layouts/Layout.astro';
+import MediaCard from '../components/MediaCard.astro';
+import MediaViewer from '../components/MediaViewer.astro';
+import data from '../generated/media.json';
+import type { MediaItem } from '../lib/media';
+const items = data as MediaItem[];
+---
+<Layout title="Showcase — Pinak" description="Real Pinak interface captures, playback recordings, and a growing media showcase." sound>
+  <div class="wrap"><section class="page-intro"><span class="eyebrow">THE SHOWCASE / SEE FOR YOURSELF</span><h1>A toolkit with<br/><span style="color:var(--accent)">a different view.</span></h1><p>Real interface captures. Playback in motion. Open a screenshot to inspect the details, or press play on a demonstration.</p><p class="build-note">Recorded on a local desktop. Available presentation depends on your terminal and installed tools.</p></section>
+  <section aria-label="Media gallery" style="padding-bottom:80px"><div class="gallery-controls"><div class="filter-buttons" role="group" aria-label="Filter media"><button data-filter="all" aria-pressed="true" type="button">All media</button><button data-filter="image" aria-pressed="false" type="button">Screenshots</button><button data-filter="video" aria-pressed="false" type="button">Videos</button><button data-filter="audio" aria-pressed="false" type="button">Audio</button></div><label class="sr-only" for="gallery-search">Search media titles and tags</label><input id="gallery-search" class="gallery-search" type="search" placeholder="Search the showcase…"/></div><p id="gallery-count" class="gallery-summary" role="status">{items.length} items · All media</p><div class="media-grid" id="gallery-results">{items.map((item, index) => <MediaCard item={item} index={index}/>)}</div><p id="gallery-empty" class="empty-message" hidden>No matching media. Try another filter or search.</p><nav class="gallery-pagination" aria-label="Gallery pages"><button id="gallery-previous" class="button button-ghost" type="button" disabled>← Previous</button><span id="gallery-page">Page 1</span><button id="gallery-next" class="button button-ghost" type="button">Next →</button></nav><noscript><p class="callout">All media previews are shown. Enable JavaScript for filtering and the enlarged media viewer.</p>{items.map(item => <p><a href={`${import.meta.env.BASE_URL.replace(/\/$/, '')}${item.src}`}>{item.title} — open media</a></p>)}</noscript></section></div><MediaViewer items={items}/>
+</Layout>

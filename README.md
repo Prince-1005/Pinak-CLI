@@ -271,6 +271,7 @@ files: `/media <path>` in the REPL or `pinak media <path>` from the CLI.
 
 ## Documentation
 
+- **[Website/README.md](Website/README.md)** – Static informational website, automatic media showcase, local development and GitHub Pages deployment.
 - **[cli/OPERATIONS.md](cli/OPERATIONS.md)** – Current installation, settings, media controls, recovery and release guidance.
 - **[PINAK_DOCUMENTATION.md](PINAK_DOCUMENTATION.md)** – Historical 1.3 architecture/design notes; settings and claims may be obsolete.
 - **[RELEASE_READINESS.md](RELEASE_READINESS.md)** – Current release checks and resolution of the final audit findings.
