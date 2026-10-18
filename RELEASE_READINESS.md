@@ -1,6 +1,6 @@
 # Release readiness — Pinak 1.4.2
 
-This record describes the current release fixes. Historical design notes are in
+This record describes the 1.4.2 release fixes. Historical design notes are in
 [PINAK_DOCUMENTATION.md](PINAK_DOCUMENTATION.md); current user instructions are
 in [README.md](README.md) and [cli/OPERATIONS.md](cli/OPERATIONS.md).
 

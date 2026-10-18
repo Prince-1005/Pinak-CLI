@@ -78,12 +78,12 @@ class PlaylistManager:
             return True
         return self.current_idx + 1 < len(self.original_playlist)
 
-    def next_track(self) -> Path | None:
-        """Advances to the next track according to active repeat and shuffle settings."""
+    def next_track(self, *, wrap: bool = False, manual: bool = False) -> Path | None:
+        """Advance, optionally wrapping music playlists independently of repeat mode."""
         if not self.original_playlist:
             return None
 
-        if self.repeat_mode == "solo":
+        if self.repeat_mode == "solo" and not manual:
             return self.get_current()
 
         self.history_stack.append(self.current_idx)
@@ -92,7 +92,7 @@ class PlaylistManager:
         self.current_idx += 1
 
         if self.current_idx >= len(self.original_playlist):
-            if self.repeat_mode == "all":
+            if wrap or self.repeat_mode == "all":
                 self.current_idx = 0
             else:
                 self.current_idx = len(self.original_playlist) - 1
@@ -100,10 +100,15 @@ class PlaylistManager:
 
         return self.get_current()
 
-    def prev_track(self) -> Path | None:
-        """Returns to the previous track, honoring shuffle playback history and circular wrap."""
+    def prev_track(self, *, wrap: bool = False) -> Path | None:
+        """Return to the previous track, honoring shuffle history and optional wrap."""
         if not self.original_playlist:
             return None
+
+        if wrap and self.current_idx == 0:
+            self.current_idx = len(self.original_playlist) - 1
+            self.history_stack.clear()
+            return self.get_current()
 
         if self.history_stack:
             self.current_idx = self.history_stack.pop()

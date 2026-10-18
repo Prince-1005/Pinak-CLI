@@ -43,7 +43,6 @@ class PictureViewer:
             max(0, initial_index % len(self.image_paths)) if self.image_paths else 0
         )
         self.renderer: BaseRenderer = renderer or QuadrantRenderer()
-        self.scale_mode: str = "native_1to1"  # "native_1to1" (actual size) or "fit"
         self.is_native_window_open: bool = False
         self.zoom: float = 1.0
         self.pan_x: float = 0.0
@@ -70,15 +69,6 @@ class PictureViewer:
         self.pan_y = 0.0
         self.rotation_deg = 0
 
-    def toggle_scale_mode(self) -> str:
-        """Toggles between fit-to-window and 1:1 exact native resolution pixel mapping."""
-        if self.scale_mode == "fit":
-            self.scale_mode = "native_1to1"
-            self.zoom = 1.0
-        else:
-            self.scale_mode = "fit"
-        return self.scale_mode
-
     def get_current_display_image(self) -> Image.Image | None:
         """Returns the current image frame with rotation applied for native GPU window."""
         if not self._current_loaded or not self._current_loaded.frames:
@@ -94,11 +84,9 @@ class PictureViewer:
         return cur_frame
 
     def zoom_in(self) -> None:
-        self.scale_mode = "fit"
         self.zoom = min(10.0, self.zoom * 1.25)
 
     def zoom_out(self) -> None:
-        self.scale_mode = "fit"
         self.zoom = max(0.1, self.zoom * 0.8)
 
     def pan(self, dx: float, dy: float) -> None:
@@ -144,7 +132,6 @@ class PictureViewer:
 
     def cycle_zoom_preset(self) -> float:
         """Cycles through resolution and magnification scale presets."""
-        self.scale_mode = "fit"
         presets = [1.0, 1.5, 2.0, 3.0, 0.5, 0.75]
         for p in presets:
             if p > self.zoom + 0.05:
@@ -157,9 +144,6 @@ class PictureViewer:
         """Processes input event. Returns True if event was handled."""
         if isinstance(event, KeyEvent):
             k = event.key.lower()
-            if k in ("1", "z"):
-                self.toggle_scale_mode()
-                return True
             if k in ("+", "="):
                 self.zoom_in()
                 return True
@@ -169,25 +153,16 @@ class PictureViewer:
             if k in ("0", "home"):
                 self.reset_viewport()
                 return True
-            if k in ("up", "k"):
+            if k == "up":
                 self.pan(0, -25)
                 return True
-            if k in ("down", "j"):
+            if k == "down":
                 self.pan(0, 25)
                 return True
-            if k in ("left", "h"):
+            if k == "left":
                 self.pan(-25, 0)
                 return True
-            if k in ("right", "l"):
-                self.pan(25, 0)
-                return True
-            if k == "s":
-                self.pan(0, 25)
-                return True
-            if k == "a":
-                self.pan(-25, 0)
-                return True
-            if k == "d":
+            if k == "right":
                 self.pan(25, 0)
                 return True
             if event.key == "R" or (k == "r" and event.shift) or k == "shift+r":
@@ -238,8 +213,6 @@ class PictureViewer:
         else:
             rotated = cur_frame
 
-        src_w, src_h = rotated.size
-
         if abs(self.zoom - 1.0) < 1e-3 and abs(self.pan_x) < 1e-3 and abs(self.pan_y) < 1e-3:
             transformed = rotated
         else:
@@ -260,23 +233,14 @@ class PictureViewer:
             if self.renderer.mode_name == "kitty" and not getattr(
                 self.renderer, "is_native_active", False
             ):
-                canvas_str = self.renderer.render_braille(
-                    transformed, cols, canvas_rows, exact_1to1=(self.scale_mode == "native_1to1")
-                )
+                canvas_str = self.renderer.render_braille(transformed, cols, canvas_rows)
             else:
-                canvas_str = self.renderer.render_frame(
-                    transformed, cols, canvas_rows, exact_1to1=(self.scale_mode == "native_1to1")
-                )
+                canvas_str = self.renderer.render_frame(transformed, cols, canvas_rows)
         except Exception:
             self.renderer = FallbackManager.degrade_renderer(self.renderer)
-            canvas_str = self.renderer.render_frame(
-                transformed, cols, canvas_rows, exact_1to1=(self.scale_mode == "native_1to1")
-            )
+            canvas_str = self.renderer.render_frame(transformed, cols, canvas_rows)
 
-        if self.scale_mode == "native_1to1":
-            scale_lbl = f"[ACTUAL 1:1 SIZE] {src_w}x{src_h} px"
-        else:
-            scale_lbl = f"[FIT] {int(self.zoom * 100)}%"
+        scale_lbl = f"{int(self.zoom * 100)}%"
 
         # Build Sub-density badge
         if self.renderer.mode_name == "quadrant":
@@ -330,13 +294,13 @@ class PictureViewer:
 
         # Build Responsive 2-Line Footer bar
         if cols >= 95:
-            f1_left = " [n/p] Next/Prev  [+/-] Zoom  [Arrows/WASD] Pan  [0] Reset  [1/z] Fit/1:1 "
+            f1_left = " [n/p] Next/Prev  [+/-] Zoom  [Arrows] Pan  [0] Reset "
             f2_left = " [r/R] Rotate  [m] Mode  [w] GPU Window  [x/Esc] Quit "
         elif cols >= 75:
-            f1_left = " [n/p] Next/Prev  [+/-] Zoom  [WASD] Pan  [1] 1:1 "
+            f1_left = " [n/p] Next/Prev  [+/-] Zoom  [Arrows] Pan "
             f2_left = " [r] Rotate  [m] Mode  [w] GPU  [x] Quit "
         else:
-            f1_left = " [n/p] Next  [+/-] Zoom  [1] 1:1 "
+            f1_left = " [n/p] Next  [+/-] Zoom  [←↑↓→] Pan "
             f2_left = " [r] Rot  [m] Mode  [w] GPU  [x] Quit "
 
         f1_right = " [ ✕ Close Media ] " if cols >= 80 else " [✕] "

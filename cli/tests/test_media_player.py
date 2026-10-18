@@ -370,11 +370,11 @@ def test_coordinator_action_keys_and_window(tmp_path: Path, monkeypatch):
     assert closed is False
     assert session.native_window is None
 
-    # The smaller opening is specific to video; picture windows keep their size.
+    # Pictures now open at the same compact scale as video.
     session.picture_viewer = MagicMock()
     assert session.toggle_native_window() is True
     assert session.native_window is not None
-    assert session.native_window.initial_scale == 1.0
+    assert session.native_window.initial_scale == 0.5
     session.toggle_native_window()
 
 

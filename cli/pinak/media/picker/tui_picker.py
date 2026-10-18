@@ -8,7 +8,7 @@ from ...text_safety import safe_text
 from ..core.input_parser import KeyEvent, MouseEvent
 from ..visualizer.spectrum_bars import _fit_to_width, _visible_len
 from .fuzzy_search import FuzzyMediaFilter
-from .scanner import MediaItem, MediaScanner
+from .scanner import SUPPORTED_EXTENSIONS, MediaItem, MediaScanner
 
 
 class TUIMediaPicker:
@@ -27,13 +27,43 @@ class TUIMediaPicker:
         self.is_inputting_path: bool = False
         self.path_input: str = ""
         self.path_error: str = ""
+        self._cursor_paths: dict[Path, Path] = {}
+        self._cursor_positions: dict[Path, int] = {}
         self._refresh_directory()
 
-    def _refresh_directory(self) -> None:
-        """Scans current directory and reapplies active filter."""
+    def _remember_cursor(self) -> None:
+        if self.visible_items and 0 <= self.cursor_idx < len(self.visible_items):
+            self._cursor_paths[self.current_dir] = self.visible_items[self.cursor_idx].path
+            self._cursor_positions[self.current_dir] = self.cursor_idx
+
+    def _refresh_directory(self, preferred_path: Path | None = None) -> None:
+        """Rescan while restoring the last selected item in this directory."""
         self.all_items = MediaScanner.scan_directory(self.current_dir)
         self.visible_items = FuzzyMediaFilter.filter_items(self.all_items, self.search_query)
-        self.cursor_idx = 0
+        wanted = preferred_path or self._cursor_paths.get(self.current_dir)
+        if wanted is not None:
+            for index, item in enumerate(self.visible_items):
+                if item.path == wanted:
+                    self.cursor_idx = index
+                    break
+            else:
+                self.cursor_idx = min(
+                    self._cursor_positions.get(self.current_dir, 0),
+                    max(0, len(self.visible_items) - 1),
+                )
+        else:
+            self.cursor_idx = 0
+
+    def focus_path(self, path: Path) -> None:
+        """Focus the file when returning from playback, including path-input selections."""
+        if self.current_dir != path.parent:
+            self._remember_cursor()
+            self.current_dir = path.parent
+            self.search_query = ""
+        self._refresh_directory(preferred_path=path)
+        if self.search_query and not any(item.path == path for item in self.visible_items):
+            self.search_query = ""
+            self._refresh_directory(preferred_path=path)
 
     def navigate_up(self) -> None:
         if self.visible_items:
@@ -53,9 +83,11 @@ class TUIMediaPicker:
 
     def ascend_directory(self) -> None:
         if self.current_dir.parent != self.current_dir:
+            departed = self.current_dir
+            self._remember_cursor()
             self.current_dir = self.current_dir.parent
             self.search_query = ""
-            self._refresh_directory()
+            self._refresh_directory(preferred_path=departed)
 
     def select_current(self) -> Path | None:
         """
@@ -68,6 +100,10 @@ class TUIMediaPicker:
 
         selected = self.visible_items[self.cursor_idx]
         if selected.is_dir:
+            if selected.path == self.current_dir.parent:
+                self.ascend_directory()
+                return None
+            self._remember_cursor()
             self.current_dir = selected.path
             self.search_query = ""
             self._refresh_directory()
@@ -99,6 +135,7 @@ class TUIMediaPicker:
                         return True, None
                     target = Path(target_str).expanduser().resolve()
                     if target.is_dir():
+                        self._remember_cursor()
                         self.current_dir = target
                         self.is_inputting_path = False
                         self.path_input = ""
@@ -106,9 +143,12 @@ class TUIMediaPicker:
                         self.search_query = ""
                         self._refresh_directory()
                         return True, None
-                    elif target.is_file():
+                    elif target.is_file() and target.suffix.lower() in SUPPORTED_EXTENSIONS:
                         self.is_inputting_path = False
                         return True, target
+                    elif target.is_file():
+                        self.path_error = "This file type cannot be opened"
+                        return True, None
                     else:
                         self.path_error = f"Not found: {target_str[:25]}"
                         return True, None
@@ -364,8 +404,13 @@ class TUIMediaPicker:
                 mb = item.size_bytes / (1024 * 1024)
                 size_styled = f"{mb:.1f}MB"
                 size_clean = size_styled
-            else:
+            elif item.media_type == "picture":
                 badge = "\x1b[1;32m🖼 [PIC]\x1b[0m"
+                mb = item.size_bytes / (1024 * 1024)
+                size_styled = f"{mb:.1f}MB"
+                size_clean = size_styled
+            else:
+                badge = "\x1b[38;2;150;155;165m📄 [FILE]\x1b[0m"
                 mb = item.size_bytes / (1024 * 1024)
                 size_styled = f"{mb:.1f}MB"
                 size_clean = size_styled
@@ -403,7 +448,12 @@ class TUIMediaPicker:
         if self.visible_items and self.cursor_idx < len(self.visible_items):
             cur = self.visible_items[self.cursor_idx]
             right_lines.append(_box_row(f" Name: {cur.name}"))
-            type_lbl = cur.media_type.upper() if cur.media_type else "DIRECTORY"
+            if cur.is_dir:
+                type_lbl = "DIRECTORY"
+            elif cur.media_type:
+                type_lbl = cur.media_type.upper()
+            else:
+                type_lbl = "UNSUPPORTED FILE"
             right_lines.append(_box_row(f" Type: {type_lbl}"))
             if cur.is_dir:
                 cnt = cur.child_media_count
@@ -415,7 +465,12 @@ class TUIMediaPicker:
                 right_lines.append(_box_row(f" Size: {sz_mb:.2f} MB"))
                 right_lines.append(_box_row(f" Ext:  {cur.path.suffix.upper()}"))
                 right_lines.append(_box_row(""))
-                right_lines.append(_box_row(" \x1b[1;32m▶ Press [Enter] to Play\x1b[0m"))
+                if cur.media_type:
+                    right_lines.append(_box_row(" \x1b[1;32m▶ Press [Enter] to Open\x1b[0m"))
+                else:
+                    right_lines.append(
+                        _box_row(" \x1b[1;33mThis file type cannot be opened\x1b[0m")
+                    )
         else:
             right_lines.append(_box_row(" No item selected"))
 

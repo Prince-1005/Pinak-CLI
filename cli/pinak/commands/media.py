@@ -8,6 +8,7 @@ from pathlib import Path
 from rich.console import Console
 
 from ..media.lifecycle.session_coordinator import MediaSessionCoordinator
+from ..media.picker.scanner import SUPPORTED_EXTENSIONS
 from ..media.picker.sibling_seeder import SiblingPlaylistSeeder
 from ..media.picker.tui_picker import TUIMediaPicker
 from ..media.player.coordinator import MediaSession
@@ -121,19 +122,29 @@ def _play_or_browse(
 
     curr_dir = target_path if target_path.is_dir() else target_path.parent
     selected_file: Path | None = target_path if target_path.is_file() else None
+    picker: TUIMediaPicker | None = None
 
     # Print CLI suspension message before entering TUI
     console.print(MediaSessionCoordinator.format_suspended_cli_banner())
 
     while True:
         if selected_file is None:
-            picker = TUIMediaPicker(start_dir=curr_dir)
+            if picker is None:
+                picker = TUIMediaPicker(start_dir=curr_dir)
             selected_file = _run_picker_loop(picker)
             if not selected_file:
                 # User pressed 'q' or 'esc' in folder browser -> exit TUI
                 break
 
         curr_dir = selected_file.parent
+        if selected_file.suffix.lower() not in SUPPORTED_EXTENSIONS:
+            console.print(
+                f"[yellow]Cannot open this file type:[/yellow] {safe_rich(selected_file.name)}"
+            )
+            if not sys.stdin.isatty():
+                break
+            selected_file = None
+            continue
         playlist, start_idx = SiblingPlaylistSeeder.seed_from_file(selected_file)
 
         session = MediaSession(
@@ -148,6 +159,9 @@ def _play_or_browse(
             break
 
         # Closing media file returns to showing the folder browser in the TUI
+        if picker is None:
+            picker = TUIMediaPicker(start_dir=curr_dir)
+        picker.focus_path(selected_file)
         selected_file = None
 
     # Output return message after session teardown

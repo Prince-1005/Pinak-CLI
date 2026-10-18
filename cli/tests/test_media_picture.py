@@ -135,31 +135,24 @@ def test_sibling_seeder_media_type_isolation(tmp_path: Path):
     assert vid_idx == 0
 
 
-def test_picture_viewer_1to1_exact_resolution_mode(sample_images):
-    """Verifies that PictureViewer defaults to exact 1:1 actual size mode and supports toggling."""
+def test_picture_viewer_uses_zoom_and_arrow_only_pan(sample_images):
+    """Picture controls expose zoom and arrow panning without 1:1 or letter panning."""
     viewer = PictureViewer(sample_images)
-    # Default is actual 1:1 size as requested
-    assert viewer.scale_mode == "native_1to1"
+    output = viewer.render_tui(cols=100, rows=24, elapsed_sec=0.0)
+    assert "Original: 100x50 px" in output
+    assert "[Arrows] Pan" in output
+    assert "1:1" not in output
+    assert "WASD" not in output
 
-    out_1to1 = viewer.render_tui(cols=80, rows=24, elapsed_sec=0.0)
-    assert "[ACTUAL 1:1 SIZE]" in out_1to1
-    assert "Original: 100x50 px" in out_1to1
+    for key in ("up", "down", "left", "right"):
+        assert viewer.handle_input(KeyEvent(key=key)) is True
+    assert viewer.pan_x == viewer.pan_y == 0
+    for key in ("w", "a", "s", "d", "h", "j", "k", "l", "1", "z"):
+        assert viewer.handle_input(KeyEvent(key=key)) is False
+    assert viewer.pan_x == viewer.pan_y == 0
 
-    # Pan in 1:1 mode
-    viewer.handle_input(KeyEvent(key="right"))
-    assert viewer.pan_x == 25
-    out_panned = viewer.render_tui(cols=80, rows=24, elapsed_sec=0.0)
-    assert "[ACTUAL 1:1 SIZE]" in out_panned
-
-    # Toggle to fit with '1'
-    viewer.handle_input(KeyEvent(key="1"))
-    assert viewer.scale_mode == "fit"
-    out_fit = viewer.render_tui(cols=80, rows=24, elapsed_sec=0.0)
-    assert "[FIT]" in out_fit
-
-    # Toggle back to 1:1 with 'z'
-    viewer.handle_input(KeyEvent(key="z"))
-    assert viewer.scale_mode == "native_1to1"
+    assert viewer.handle_input(KeyEvent(key="+")) is True
+    assert "125%" in viewer.render_tui(cols=100, rows=24, elapsed_sec=0.0)
 
 
 def test_picture_viewer_gpu_display_image(sample_images):

@@ -95,8 +95,6 @@ class MediaScanner:
                             examined += 1
                             if examined > max_check or time.monotonic() >= deadline:
                                 return count
-                            if entry.name.startswith("."):
-                                continue
                             try:
                                 if entry.is_file(follow_symlinks=False):
                                     ext = os.path.splitext(entry.name)[1].lower()
@@ -115,66 +113,60 @@ class MediaScanner:
             return 0
 
     @classmethod
-    def scan_directory(cls, dir_path: str | Path, max_entries: int = 2000) -> list[MediaItem]:
+    def scan_directory(
+        cls, dir_path: str | Path, max_entries: int | None = None
+    ) -> list[MediaItem]:
         path = Path(dir_path).resolve()
         if not path.is_dir():
             return []
 
         items: list[MediaItem] = []
         truncated = False
-        deadline = time.monotonic() + 0.25
+        count_deadline = time.monotonic() + 0.25
         try:
-            count = 0
-            for examined, entry in enumerate(os.scandir(path)):
-                if (
-                    count >= max_entries
-                    or examined >= max_entries * 4
-                    or time.monotonic() >= deadline
-                ):
-                    truncated = True
-                    break
-                if entry.name.startswith("."):
-                    continue
+            with os.scandir(path) as entries:
+                for entry in entries:
+                    if max_entries is not None and len(items) >= max_entries:
+                        truncated = True
+                        break
 
-                entry_path = Path(entry.path)
-                try:
-                    if entry.is_dir(follow_symlinks=False):
-                        media_cnt = cls.count_media_in_dir(
+                    entry_path = Path(entry.path)
+                    try:
+                        is_dir = entry.is_dir(follow_symlinks=False)
+                        is_file = entry.is_file(follow_symlinks=False)
+                        size_bytes = entry.stat(follow_symlinks=False).st_size if is_file else 0
+                    except OSError:
+                        is_dir = False
+                        is_file = False
+                        size_bytes = 0
+
+                    media_cnt = (
+                        cls.count_media_in_dir(
                             entry_path,
-                            budget_seconds=min(0.02, max(0.0, deadline - time.monotonic())),
+                            budget_seconds=min(0.02, max(0.0, count_deadline - time.monotonic())),
                         )
-                        items.append(
-                            MediaItem(
-                                path=entry_path,
-                                name=safe_text(entry.name),
-                                is_dir=True,
-                                media_type=None,
-                                size_bytes=0,
-                                child_media_count=media_cnt,
-                            )
+                        if is_dir
+                        else 0
+                    )
+                    media_type = (
+                        SUPPORTED_EXTENSIONS.get(entry_path.suffix.lower()) if is_file else None
+                    )
+                    items.append(
+                        MediaItem(
+                            path=entry_path,
+                            name=safe_text(entry.name),
+                            is_dir=is_dir,
+                            media_type=media_type,
+                            size_bytes=size_bytes,
+                            child_media_count=media_cnt,
                         )
-                        count += 1
-                    elif entry.is_file(follow_symlinks=False):
-                        ext = entry_path.suffix.lower()
-                        if ext in SUPPORTED_EXTENSIONS:
-                            items.append(
-                                MediaItem(
-                                    path=entry_path,
-                                    name=safe_text(entry.name),
-                                    is_dir=False,
-                                    media_type=SUPPORTED_EXTENSIONS[ext],
-                                    size_bytes=entry.stat().st_size,
-                                )
-                            )
-                            count += 1
-                except OSError:
-                    continue
+                    )
         except (PermissionError, OSError):
             return []
 
-        dirs = sorted([x for x in items if x.is_dir], key=lambda x: x.name.lower())
+        dirs = sorted([x for x in items if x.is_dir], key=lambda x: natural_sort_key(x.name))
         files = sorted([x for x in items if not x.is_dir], key=lambda x: natural_sort_key(x.name))
-        if truncated:
+        if truncated and max_entries is not None:
             files.append(
                 MediaItem(
                     path=path,

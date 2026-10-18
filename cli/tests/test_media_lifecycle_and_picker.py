@@ -83,7 +83,8 @@ def test_media_scanner_and_fuzzy_search(tmp_path: Path):
     item_names = [it.name for it in items if not it.is_dir]
     assert "song1.mp3" in item_names
     assert "video1.mp4" in item_names
-    assert "doc.txt" not in item_names
+    assert "doc.txt" in item_names
+    assert next(item for item in items if item.name == "doc.txt").media_type is None
 
     # Fuzzy filter
     filtered = FuzzyMediaFilter.filter_items(items, "song")

@@ -403,7 +403,7 @@ class MediaSession:
             dim_str = f" ({initial_size[0]}x{initial_size[1]})" if initial_size else ""
             self.native_window = NativeVideoWindow(
                 title=f"Pinak {tag} - {name}{dim_str}",
-                initial_scale=0.5 if tag == "Video" else 1.0,
+                initial_scale=0.5,
             )
             if initial_size:
                 try:
@@ -467,13 +467,21 @@ class MediaSession:
                 self.picture_viewer.next_image()
                 self.playlist_manager.current_idx = self.picture_viewer.current_index
             else:
-                self._advance_track(delta=1)
+                self._advance_track(
+                    delta=1,
+                    wrap=bool(self._current_meta and self._current_meta.media_type == "audio"),
+                    manual=True,
+                )
         elif k == "p":
             if self.picture_viewer:
                 self.picture_viewer.prev_image()
                 self.playlist_manager.current_idx = self.picture_viewer.current_index
             else:
-                self._advance_track(delta=-1)
+                self._advance_track(
+                    delta=-1,
+                    wrap=bool(self._current_meta and self._current_meta.media_type == "audio"),
+                    manual=True,
+                )
 
     def _on_tick(self, dt: float, events: list[KeyEvent | MouseEvent]) -> str | None:
         """Main frame tick callback."""
@@ -652,10 +660,12 @@ class MediaSession:
             except Exception:
                 return ""
 
-    def _advance_track(self, delta: int) -> None:
+    def _advance_track(self, delta: int, *, wrap: bool = False, manual: bool = False) -> None:
         """Transitions playback to next or previous playlist entry."""
         next_file = (
-            self.playlist_manager.next_track() if delta > 0 else self.playlist_manager.prev_track()
+            self.playlist_manager.next_track(wrap=wrap, manual=manual)
+            if delta > 0
+            else self.playlist_manager.prev_track(wrap=wrap)
         )
         if not next_file:
             return
@@ -888,6 +898,8 @@ class MediaSession:
                     if self.audio_backend:
                         self.audio_backend.pause()
                     self.master_clock.pause()
+            elif self._current_meta and self._current_meta.media_type == "audio":
+                self._advance_track(delta=1, wrap=True)
             elif self.playlist_manager.has_next():
                 self._advance_track(delta=1)
             else:

@@ -17,7 +17,7 @@ class FuzzyMediaFilter:
         filtered: list[MediaItem] = []
         for item in items:
             # Always preserve parent directory entry
-            if item.name.startswith(".."):
+            if item.is_dir and item.name == ".. [Parent Directory]":
                 filtered.append(item)
                 continue
 

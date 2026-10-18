@@ -7,6 +7,15 @@ Release notes are maintained manually; automatic release creation is disabled.
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-10-18
+
+### Changed
+- Simplify picture viewing to zoom and arrow-key panning, with no Fit/1:1 toggle or letter-key panning.
+- Open music artwork and picture GPU windows at the same compact scale as video windows.
+- Wrap music playback and manual next/previous navigation across playlist ends.
+- Show all files, including unsupported and hidden files, in the media picker; label unsupported types without opening them.
+- Restore the selected folder or file when navigating back or returning from playback, clearing a search filter when it hides a file opened by path input.
+
 ## [1.4.2] - 2026-10-17
 
 ### Packaging
