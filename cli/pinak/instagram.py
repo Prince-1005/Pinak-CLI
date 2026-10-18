@@ -1,4 +1,5 @@
 import contextlib
+import contextvars
 import os
 import re
 import tempfile
@@ -21,7 +22,8 @@ from rich.progress import (
 )
 from yt_dlp.utils import DownloadError, sanitize_filename
 
-from .config import config
+from .config import config as config  # Public compatibility for callers/tests patching settings.
+from .engine import SilentProgress, active_setting, emit_message, emit_progress, in_engine
 from .exceptions import (
     InstagramError,
     InstagramPrivateContentError,
@@ -49,6 +51,16 @@ from .utils import (
 console = Console()
 logger = get_logger("pinak.instagram")
 
+
+def _console_print(*args, **kwargs):
+    if not emit_message(*args):
+        console.print(*args, **kwargs)
+
+
+def _progress_factory(*args, **kwargs):
+    return SilentProgress() if in_engine() else Progress(*args, **kwargs)
+
+
 # Serializes status prints when carousel slides download concurrently.
 _PRINT_LOCK = threading.Lock()
 
@@ -57,9 +69,9 @@ def _say(message: str, *, locked: bool = False) -> None:
     """Print a status line, optionally under the parallel-download lock."""
     if locked:
         with _PRINT_LOCK:
-            console.print(message)
+            _console_print(message)
     else:
-        console.print(message)
+        _console_print(message)
 
 
 def _friendly_instagram_error(exc: Exception) -> InstagramError:
@@ -84,6 +96,8 @@ _task_id = None
 def _yt_dlp_hook(d):
     """yt-dlp progress hook — updates the rich progress bar for video downloads."""
     global _progress, _task_id
+    if emit_progress(d):
+        return
     if _progress is None or _task_id is None:
         return
     if d["status"] == "downloading":
@@ -118,7 +132,7 @@ def download_instagram_media(
     high-res image thumbnails. Embeds metadata into every downloaded file.
     """
     output_dir = Path(output_path)
-    if config.get("auto_sort", False):
+    if active_setting("auto_sort", False):
         output_dir = output_dir / "Instagram"
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -144,8 +158,8 @@ def download_instagram_media(
         ydl_opts["postprocessors"] = [
             {
                 "key": "FFmpegExtractAudio",
-                "preferredcodec": config.get("audio_format", "mp3"),
-                "preferredquality": str(config.get("audio_quality", "192")),
+                "preferredcodec": active_setting("audio_format", "mp3"),
+                "preferredquality": str(active_setting("audio_quality", "192")),
             }
         ]
     else:
@@ -153,7 +167,7 @@ def download_instagram_media(
             normalize_quality(quality) or "best", has_ffmpeg=ffmpeg_available()
         )
 
-    console.print(f"\n[*] Extracting Instagram metadata for: [blue underline]{safe_rich(url)}[/]")
+    _console_print(f"\n[*] Extracting Instagram metadata for: [blue underline]{safe_rich(url)}[/]")
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -168,8 +182,8 @@ def download_instagram_media(
 
     except DownloadError as exc:
         friendly = _friendly_instagram_error(exc)
-        console.print(f"{RED}[X] {friendly}{RESET}")
-        console.print(f"{YELLOW}Tip: {friendly.hint}{RESET}")
+        _console_print(f"{RED}[X] {friendly}{RESET}")
+        _console_print(f"{YELLOW}Tip: {friendly.hint}{RESET}")
         logger.debug("Instagram download failed for %s: %r", url, exc)
         raise friendly from exc
 
@@ -181,14 +195,14 @@ def download_instagram_media(
     errors: list = [outcome["error"] for outcome in outcomes if outcome.get("error")]
     if bad_files:
         errors.append(f"Integrity check failed for {len(bad_files)} file(s): {bad_files}")
-        console.print(f"{YELLOW}[!] Warning: {errors[-1]}{RESET}")
+        _console_print(f"{YELLOW}[!] Warning: {errors[-1]}{RESET}")
 
     return {
         "success": len(valid_files) > 0 and not errors,
         "partial": bool(valid_files) and bool(errors),
         "url": url,
         "audio": extract_audio,
-        "quality": ("audio" if extract_audio else (quality or config.get("quality", "best"))),
+        "quality": ("audio" if extract_audio else (quality or active_setting("quality", "best"))),
         "info": info,
         "files": valid_files,
         "errors": errors,
@@ -221,7 +235,7 @@ def _download_extracted_info(ydl, info, output_dir, filename_suffix, metadata, y
     if info.get("_type") == "playlist":
         entries = [e for e in (info.get("entries") or []) if e]
         total = len(entries)
-        console.print(f"[*] Detected carousel post with {total} items.")
+        _console_print(f"[*] Detected carousel post with {total} items.")
         if total > 1 and ydl_opts is not None:
             return _download_carousel_parallel(
                 ydl_opts, entries, output_dir, filename_suffix, metadata
@@ -229,7 +243,7 @@ def _download_extracted_info(ydl, info, output_dir, filename_suffix, metadata, y
         else:
             outcomes = []
             for index, entry in enumerate(entries, start=1):
-                console.print(f"\n[*] Processing slide {index}/{total}...")
+                _console_print(f"\n[*] Processing slide {index}/{total}...")
                 outcomes.append(
                     _download_entry(ydl, entry, output_dir, index, filename_suffix, metadata)
                 )
@@ -247,7 +261,7 @@ def _download_carousel_parallel(ydl_opts, entries, output_dir, filename_suffix, 
     """
     total = len(entries)
     workers = max(1, min(3, total))
-    console.print(f"[*] Downloading {total} slides with {workers} parallel workers...")
+    _console_print(f"[*] Downloading {total} slides with {workers} parallel workers...")
     # The shared rich progress hook is not thread-safe — workers go without it.
     worker_opts = {k: v for k, v in ydl_opts.items() if k != "progress_hooks"}
     before = get_file_snapshot(str(output_dir))
@@ -274,7 +288,11 @@ def _download_carousel_parallel(ydl_opts, entries, output_dir, filename_suffix, 
             return {"files": [], "error": f"Slide {index}: {exc}"}
 
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="pinak-slide") as pool:
-        outcomes = list(pool.map(_work, list(enumerate(entries, start=1))))
+        futures = [
+            pool.submit(contextvars.copy_context().run, _work, item)
+            for item in enumerate(entries, start=1)
+        ]
+        outcomes = [future.result() for future in futures]
 
     # Single metadata pass: per-entry snapshots would otherwise see (and
     # re-tag) sibling threads' files.
@@ -420,18 +438,18 @@ def embed_metadata_in_video(file_path, metadata):
 
                     video.save()
                 except Exception as e:
-                    console.print(
+                    _console_print(
                         f"{YELLOW}[!] Warning: Mutagen tagging failed, "
                         f"falling back to FFmpeg tags: {e}{RESET}"
                     )
 
-            console.print(f"{GREEN}[+] Embedded properties inside video: {file_path.name}{RESET}")
+            _console_print(f"{GREEN}[+] Embedded properties inside video: {file_path.name}{RESET}")
             return True
     except Exception as e:
         if temp_path.exists():
             with contextlib.suppress(OSError):
                 os.remove(temp_path)
-        console.print(
+        _console_print(
             f"{YELLOW}[!] Warning: Could not embed metadata in video {file_path.name}: {e}{RESET}"
         )
     return False
@@ -492,7 +510,7 @@ def _download_entry(
                     process_fn = candidate
                     break
             if show_progress:
-                with Progress(
+                with _progress_factory(
                     SpinnerColumn(),
                     TextColumn("[progress.description]{task.description}"),
                     BarColumn(),
@@ -651,7 +669,7 @@ def _resolve_entry(ydl, entry):
         break
     else:
         # Loop exhausted without breaking — still unresolved after 5 hops
-        console.print(
+        _console_print(
             f"{YELLOW}[!] Warning: Entry resolution exceeded 5 levels and may be incomplete.{RESET}"
         )
     return resolved
@@ -819,11 +837,11 @@ def _download_binary_with_retry(url, output_file, headers=None):
     exponential backoff + jitter between attempts.
     """
     try:
-        max_attempts = max(1, int(config.get("retry_count", 3)))
+        max_attempts = max(1, int(active_setting("retry_count", 3)))
     except (TypeError, ValueError):
         max_attempts = 3
     try:
-        timeout = float(config.get("read_timeout", 30))
+        timeout = float(active_setting("read_timeout", 30))
     except (TypeError, ValueError):
         timeout = 30.0
     default_headers = {
@@ -866,7 +884,7 @@ def _download_binary_with_retry(url, output_file, headers=None):
             last_exc = exc
             if attempt < max_attempts:
                 wait = backoff_delay(attempt, base=2.0, cap=30.0)
-                console.print(
+                _console_print(
                     f"{YELLOW}[~] Image download attempt {attempt}/{max_attempts} failed "
                     f"({exc}). Retrying in {wait}s...{RESET}"
                 )

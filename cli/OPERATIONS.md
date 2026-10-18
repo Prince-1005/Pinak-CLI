@@ -100,6 +100,36 @@ results retain successful slides and report failed slides as partial failure.
 Trimming uses the generic yt-dlp engine; Instagram image posts cannot be trimmed
 as audio/video.
 
+## Durable local queue
+
+```sh
+pinak queue add "https://example.com/video.mp4" --quality 720p -o downloads
+pinak queue import links.txt
+pinak queue list
+pinak queue run
+pinak queue retry --failed
+```
+
+`queue add` saves the current output, format, quality, subtitle, sorting, timeout,
+retry, and duplicate settings with the job. Later preference changes do not
+change that job. An equivalent unfinished job returns its existing ID; use
+`--force` to intentionally add a separate download. The interactive `ask`
+duplicate preference becomes `skip` for a saved job, because a foreground queue
+run never stops to ask for input. `queue import` validates
+every non-comment line before saving any jobs. REPL `/batch links.txt` imports
+and immediately runs the jobs from that file.
+
+One foreground worker runs queued jobs in order and continues after failed
+jobs. Closing the terminal stops processing. Ctrl+C returns the active job to
+`queued` and retains partial files; the next `queue run` attempts continuation.
+After an abrupt process exit, the next runner recovers stale `running` jobs.
+Failed jobs require `queue retry <id>` or `queue retry --failed`. Job state is
+stored locally in the history database even when history recording is disabled.
+Two queue runners cannot operate on the same local database at once. A crash
+after a media file is completed but before its result is recorded can cause a
+repeat attempt; this is not an exactly-once system. No background service or
+remote download server is started.
+
 ## Preferences and local storage
 
 Run `pinak --config-path` for the actual config location and `/config` in the

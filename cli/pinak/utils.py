@@ -153,9 +153,9 @@ def _resolve_binary(
 def _configured_binary_override(key: str) -> str | None:
     """Read an optional ffmpeg/ffprobe override from config without importing config at module load."""
     try:
-        from .config import config as _config
+        from .engine import active_setting
 
-        value = _config.get(key)
+        value = active_setting(key)
         if value:
             return str(value)
     except Exception:
@@ -330,9 +330,9 @@ def is_online(timeout: float = 5.0) -> bool:
     try:
         connect_timeout = timeout
         try:
-            from .config import config as _config
+            from .engine import active_setting
 
-            connect_timeout = float(_config.get("connect_timeout", timeout))
+            connect_timeout = float(active_setting("connect_timeout", timeout))
         except Exception:
             pass
 

@@ -154,7 +154,7 @@ When running the interactive REPL shell (`pinak`), the following commands are av
 | `/play <path>` | Play a local audio/video file |
 | `/view <path>` | View local pictures |
 | `/ctl <command>` | Control the active player through authenticated local IPC |
-| `/batch <file>` | Download multiple URLs from a text file |
+| `/batch <file>` | Save and run URLs from a text file; unfinished jobs survive restart |
 | `/history` | View a list of recent downloads from your history database |
 | `/config` | Print out the current config settings and environment |
 | `/setout <dir>` | Change the output downloads directory |
@@ -191,6 +191,12 @@ The player reads embedded subtitles and matching `.srt`/`.vtt` sidecar files;
 it does not fetch new languages during playback.
 
 Pinak CLI saves user-specific configuration (like download directory, quality, retry counts) in a standard configuration folder (via `platformdirs`).
+
+For saved downloads outside the interactive shell, use `pinak queue add <URL>`,
+`pinak queue import <file>`, `pinak queue list`, `pinak queue run`, and
+`pinak queue retry --failed`. Jobs retain their settings and partial files
+across restarts; one local worker runs while the terminal stays open. See
+[OPERATIONS.md](OPERATIONS.md) for recovery and duplicate behavior.
 
 - **Windows**: `%LOCALAPPDATA%\pinak\pinak-cli\config.json`
 - **macOS**: `~/Library/Application Support/pinak-cli/config.json`

@@ -52,3 +52,7 @@ pinak media "<local-path>"
 ```
 
 Local playback and remote downloading are separate routes. Download remote media first. See [playback](../playback/).
+
+## Saved download jobs
+
+Use `pinak queue add <URL>` to save a job and `pinak queue run` to process saved jobs in the foreground. `pinak queue list`, `pinak queue import <file>`, and `pinak queue retry <ID|--failed>` manage the queue. See [audio, quality & batches](../downloads/) for restart behavior and limits.

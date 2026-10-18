@@ -53,7 +53,7 @@ from .subtitle_preferences import (
     SUBTITLE_LANGUAGES,
     normalize_subtitle_languages,
 )
-from .utils import BOLD, CYAN, GREEN, RED, RESET, YELLOW, normalize_quality
+from .utils import CYAN, GREEN, RED, RESET, YELLOW, normalize_quality
 
 console = Console()
 
@@ -167,7 +167,7 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
         "/setout": "Change and save the output directory",
         "/open": "Open the current output folder",
         "/history": "View download history",
-        "/batch": "Download multiple URLs from a text file",
+        "/batch": "Save and run URLs from a text file; unfinished jobs survive restart",
         "/any": "Download content from any platform supported by yt-dlp",
         "/instagram": "Download post, reel, igtv from Instagram",
         "/video": "Download video from a URL",
@@ -749,23 +749,22 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 if not os.path.exists(filename):
                     print(f"{RED}[!] Error: Batch file '{filename}' not found.{RESET}")
                     continue
-                with open(filename, encoding="utf-8") as f:
-                    lines = [
-                        line.strip() for line in f if line.strip() and not line.startswith("#")
-                    ]
+                from .commands.queue import _display_job
+                from .queue import import_file, run_queue
 
-                print(f"\n[*] Found {len(lines)} URLs in {filename}.")
-                # Rate limits have been removed as per user request.
-                for idx, batch_url in enumerate(lines):
-                    url, extract_audio, force, quality = parse_download_text(batch_url)
-                    print(f"\n{BOLD}--- Batch Item {idx + 1}/{len(lines)} ---{RESET}")
-                    handle_download(
-                        url,
-                        extract_audio=extract_audio,
-                        force=force,
-                        quality=quality,
-                        interactive=False,
+                try:
+                    imported = import_file(filename)
+                    ids = [job_id for job_id, _created in imported]
+                    console.print(f"Saved {len(imported)} batch entries in the local queue.")
+                    summary = run_queue(ids, on_event=_display_job)
+                    console.print(
+                        f"Batch: {summary.succeeded} succeeded, {summary.skipped} skipped, "
+                        f"{summary.failed} failed."
                     )
+                    if summary.interrupted:
+                        console.print("Unfinished jobs remain queued for the next run.")
+                except (OSError, ValueError, RuntimeError) as exc:
+                    console.print(f"[red]Batch error: {exc}[/]")
                 continue
 
             if lower_cmd == "/ctl" or lower_cmd.startswith("/ctl "):
@@ -974,6 +973,7 @@ def main(
         help="Completely uninstall Pinak CLI and its configurations from your system",
     ),
 ):
+    """Download a URL or start Pinak's interactive shell. Use `pinak queue --help` for saved jobs."""
     init_config()
     init_db()
     initialize_session()
@@ -1043,6 +1043,14 @@ def main(
 
 
 def run_cli():
+    if len(sys.argv) > 1 and sys.argv[1] == "queue":
+        from .commands.queue import main as queue_main
+
+        init_config()
+        init_db()
+        initialize_session()
+        setup_logging()
+        raise SystemExit(queue_main(sys.argv[2:]))
     app()
 
 

@@ -11,7 +11,7 @@ Start with `pinak` and no arguments. Use `/help` for the installed version’s c
 - `/audio <URL>`: audio extraction.
 - `/any <URL>`: route through yt-dlp-supported sources.
 - `/instagram <URL>`: Instagram extraction.
-- `/batch links.txt`: download entries from a text file.
+- `/batch links.txt`: save and immediately run entries from a text file; unfinished jobs remain in the local queue.
 - `/trim 00:15-01:30 <URL>`: select an audio/video range.
 
 ## Preferences

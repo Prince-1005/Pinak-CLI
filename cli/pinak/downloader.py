@@ -17,7 +17,8 @@ from rich.progress import (
 )
 from rich.table import Table
 
-from .config import config
+from .config import config as config  # Public compatibility for callers/tests patching settings.
+from .engine import SilentProgress, active_setting, emit_message, emit_progress, in_engine
 from .exceptions import (
     DownloadFailedError,
     FFmpegNotFoundError,
@@ -66,24 +67,38 @@ rich_progress = None
 rich_task = None
 
 
+def _console_print(*args, **kwargs):
+    if not emit_message(*args):
+        console.print(*args, **kwargs)
+
+
+def _plain_print(*args, **kwargs):
+    if not emit_message(*args):
+        print(*args, **kwargs)
+
+
+def _progress_factory(*args, **kwargs):
+    return SilentProgress() if in_engine() else Progress(*args, **kwargs)
+
+
 def _socket_timeout() -> float:
     """Separate connect/read timeouts: yt-dlp gets the read timeout."""
     try:
-        return float(config.get("read_timeout", 30))
+        return float(active_setting("read_timeout", 30))
     except (TypeError, ValueError):
         return 30.0
 
 
 def _connect_timeout() -> float:
     try:
-        return float(config.get("connect_timeout", 10))
+        return float(active_setting("connect_timeout", 10))
     except (TypeError, ValueError):
         return 10.0
 
 
 def _retry_count() -> int:
     try:
-        return max(1, int(config.get("retry_count", 3)))
+        return max(1, int(active_setting("retry_count", 3)))
     except (TypeError, ValueError):
         return 3
 
@@ -208,6 +223,8 @@ class YTDLLogger:
 
 def yt_dlp_progress_hook(d):
     global rich_progress, rich_task
+    if emit_progress(d):
+        return
     prog = rich_progress
     task = rich_task
     if prog is not None and task is not None:
@@ -272,7 +289,9 @@ def print_download_summary(result):
     if is_audio:
         mode_str = "🎵 Audio"
         quality_str = (
-            f"{config.get('audio_quality', '192')} kbps" if result.get("audio") else "best audio"
+            f"{active_setting('audio_quality', '192')} kbps"
+            if result.get("audio")
+            else "best audio"
         )
     else:
         mode_str = "🎬 Video/Media"
@@ -308,7 +327,7 @@ def print_download_summary(result):
             table.add_row("📏 File Size:", size)
             if path.lower().endswith((".mp3", ".m4a")):
                 table.add_row("🖼️ Thumbnail:", thumb)
-            if config.get("embed_subs", False) and not is_audio:
+            if active_setting("embed_subs", False) and not is_audio:
                 subs = "embedded" if has_embedded_subtitle(path) else "no"
                 table.add_row("💬 Subtitle:", subs)
     else:
@@ -321,7 +340,7 @@ def print_download_summary(result):
         box=box.ROUNDED,
         expand=False,
     )
-    console.print(panel)
+    _console_print(panel)
 
     # Rate limits have been removed as per user request.
 
@@ -351,7 +370,7 @@ def download_media_content(
     else:
         clean_url = post_url
 
-    auto_sort = config.get("auto_sort", False)
+    auto_sort = active_setting("auto_sort", False)
     if auto_sort:
         target_dir = f"{target_dir}/%(extractor_key)s"
 
@@ -365,8 +384,8 @@ def download_media_content(
     if auto_sort:
         actual_dir = os.path.dirname(actual_dir)
 
-    chosen_quality = normalize_quality(quality or config.get("quality", "best")) or "best"
-    audio_quality = str(config.get("audio_quality", "192"))
+    chosen_quality = normalize_quality(quality or active_setting("quality", "best")) or "best"
+    audio_quality = str(active_setting("audio_quality", "192"))
     suffix = f" {filename_suffix}" if filename_suffix else ""
     info = {}
 
@@ -403,17 +422,17 @@ def download_media_content(
             suffix += f" (Trim {trim_range.replace(':', '.')})"
             ydl_opts["outtmpl"] = f"{target_dir}/%(title)s{suffix}.%(ext)s"
         except Exception as e:
-            console.print(f"[yellow][!] Error parsing trim range: {e}. Downloading full file.[/]")
+            _console_print(f"[yellow][!] Error parsing trim range: {e}. Downloading full file.[/]")
 
     has_ffmpeg = ffmpeg_available()
 
-    if config.get("embed_subs", False) and not extract_audio and has_ffmpeg:
+    if active_setting("embed_subs", False) and not extract_audio and has_ffmpeg:
         ydl_opts["writesubtitles"] = True
         ydl_opts["writeautomaticsub"] = True
         # Exact codes bound requests to the configured language limit. Missing languages
         # are skipped by yt-dlp; never fetch unrelated automatic translations.
         ydl_opts["subtitleslangs"] = normalize_subtitle_languages(
-            config.get("subtitle_languages", ["en"])
+            active_setting("subtitle_languages", ["en"])
         )
         ydl_opts["postprocessors"].append(
             {
@@ -444,7 +463,7 @@ def download_media_content(
                 0,
                 {
                     "key": "FFmpegExtractAudio",
-                    "preferredcodec": config.get("audio_format", "mp3"),
+                    "preferredcodec": active_setting("audio_format", "mp3"),
                     "preferredquality": audio_quality,
                 },
             )
@@ -462,25 +481,25 @@ def download_media_content(
             )
             ydl_opts["postprocessor_args"] = {"ffmpeg": ["-id3v2_version", "3"]}
         else:
-            console.print(
+            _console_print(
                 "[yellow]ℹ Notice: FFmpeg not detected. Downloading direct audio stream without transcoding.[/]"
             )
             ydl_opts["format"] = "bestaudio[ext=m4a]/bestaudio/best"
     else:
         ydl_opts["format"] = video_format_for_quality(chosen_quality, has_ffmpeg=has_ffmpeg)
-        vid_fmt = config.get("video_format", "mp4")
+        vid_fmt = active_setting("video_format", "mp4")
         if vid_fmt and has_ffmpeg:
             ydl_opts["merge_output_format"] = vid_fmt
 
     mode = "AUDIO" if extract_audio else "MEDIA"
-    console.print(
+    _console_print(
         f"\n[*] Downloading [bold cyan]{mode}[/] from: [blue underline]{safe_rich(post_url)}[/]"
     )
-    console.print(
+    _console_print(
         "[yellow]💡 Tip: Press [bold]Ctrl+C[/bold] at any time to cancel/stop the download.[/]"
     )
     try:
-        with Progress(
+        with _progress_factory(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
@@ -505,7 +524,7 @@ def download_media_content(
             rich_task = None
 
             if extract_audio and info and has_ffmpeg:
-                audio_fmt = config.get("audio_format", "mp3")
+                audio_fmt = active_setting("audio_format", "mp3")
                 filename = ydl.prepare_filename(info)
                 base = os.path.splitext(filename)[0]
                 final_audio = base + f".{audio_fmt}"
@@ -577,9 +596,9 @@ def download_media_content(
         new_files = []
         root = Path(actual_dir).resolve()
         expected_ext = (
-            config.get("audio_format", "mp3")
+            active_setting("audio_format", "mp3")
             if extract_audio
-            else config.get("video_format", "mp4")
+            else active_setting("video_format", "mp4")
         )
         audio_extensions = {".mp3", ".m4a", ".flac", ".wav", ".opus", ".ogg", ".aac"}
         for candidate in candidates:
@@ -610,19 +629,20 @@ def download_media_content(
             msg = f"Integrity check failed for {len(bad_files)} file(s): {bad_files}"
             logger.errors.append(msg)
             get_logger("pinak.downloader").warning("%s (url=%s)", msg, post_url)
-            console.print(f"[yellow][!] Warning: {msg}[/]")
+            _console_print(f"[yellow][!] Warning: {msg}[/]")
         new_files = valid_files
         success = bool(new_files) and not logger.errors
         if bad_files and not success:
             logger.errors.append("All downloaded files failed integrity verification.")
 
         if success:
-            console.print("\n[bold green][+] Success! Process completed.[/]")
+            _console_print("\n[bold green][+] Success! Process completed.[/]")
             title = info.get("title", "Media") if info else "Media"
             with contextlib.suppress(Exception):
-                notify("PINAK-CLI", f"Successfully downloaded: {title}")
+                if not in_engine():
+                    notify("PINAK-CLI", f"Successfully downloaded: {title}")
         else:
-            console.print("\n[bold red][X] No downloadable media was found.[/]")
+            _console_print("\n[bold red][X] No downloadable media was found.[/]")
 
         return {
             "success": success,
@@ -637,8 +657,8 @@ def download_media_content(
         }
     except KeyboardInterrupt:
         # Keep partial files on disk so a later retry can *resume* via continuedl.
-        console.print("\n[bold red][X] Download canceled by user.[/]")
-        console.print(
+        _console_print("\n[bold red][X] Download canceled by user.[/]")
+        _console_print(
             "[dim]Partial files were kept so you can resume by re-running the same command.[/]"
         )
         return {
@@ -656,9 +676,9 @@ def download_media_content(
         friendly = _classify_download_error(e, post_url)
         hint = getattr(friendly, "hint", str(e))
         error_text = safe_text(e).removeprefix("ERROR:").strip()
-        console.print(f"[bold red][X][/] Error: {safe_rich(error_text)}")
-        console.print(f"[yellow]Tip: {safe_rich(hint)}[/]")
-        if isinstance(friendly, InstagramError):
+        _console_print(f"[bold red][X][/] Error: {safe_rich(error_text)}")
+        _console_print(f"[yellow]Tip: {safe_rich(hint)}[/]")
+        if isinstance(friendly, InstagramError) and not in_engine():
             with contextlib.suppress(Exception):
                 print_instagram_notice(str(e))
         get_logger("pinak.downloader").debug("Download failed for %s: %r", post_url, e)
@@ -727,14 +747,14 @@ def parse_download_text(text):
 
 
 def handle_duplicate(url, interactive=True):
-    action = str(config.get("duplicate_action", "ask")).lower()
+    action = str(active_setting("duplicate_action", "ask")).lower()
     if not url_downloaded_successfully(url):
         return "download"
     if action in ("skip", "download", "rename"):
         return action
     if not interactive:
         return "download"
-    console.print("[yellow][!] This URL is already in successful history.[/]")
+    _console_print("[yellow][!] This URL is already in successful history.[/]")
 
     import questionary
 
@@ -773,14 +793,14 @@ def handle_download(
     log = get_logger("pinak.downloader")
     if not url.startswith(("http://", "https://")):
         err = InvalidURLError(f"Invalid URL: {url!r}")
-        print(f"{RED}[!] Error: {err}{RESET}")
-        print(f"{YELLOW}Tip: {err.hint}{RESET}")
+        _plain_print(f"{RED}[!] Error: {err}{RESET}")
+        _plain_print(f"{YELLOW}Tip: {err.hint}{RESET}")
         return {
             "success": False,
             "url": url,
             "files": [],
             "audio": extract_audio,
-            "quality": quality or config.get("quality", "best"),
+            "quality": quality or active_setting("quality", "best"),
         }
 
     any_platform_reason = None
@@ -791,9 +811,9 @@ def handle_download(
                 f"Not an allowed link type: {url} is not supported by yt-dlp.",
                 hint=UnsupportedLinkTypeError.hint,
             )
-            print(f"{RED}[!] Error: Not an allowed link type.{RESET}")
-            print(f"{YELLOW}    '{url}' is not supported by yt-dlp.{RESET}")
-            print(f"{YELLOW}Tip: {err.hint}{RESET}")
+            _plain_print(f"{RED}[!] Error: Not an allowed link type.{RESET}")
+            _plain_print(f"{YELLOW}    '{url}' is not supported by yt-dlp.{RESET}")
+            _plain_print(f"{YELLOW}Tip: {err.hint}{RESET}")
             log.warning("Unsupported link type for /any: %s", url)
             return {
                 "success": False,
@@ -801,13 +821,13 @@ def handle_download(
                 "url": url,
                 "files": [],
                 "audio": extract_audio,
-                "quality": quality or config.get("quality", "best"),
+                "quality": quality or active_setting("quality", "best"),
             }
 
     if quality is not None and normalize_quality(quality) is None:
         err = InvalidQualityError(f"Invalid quality: {quality!r}")
-        print(f"{RED}[!] Error: {err}{RESET}")
-        print(f"{YELLOW}Tip: {err.hint}{RESET}")
+        _plain_print(f"{RED}[!] Error: {err}{RESET}")
+        _plain_print(f"{YELLOW}Tip: {err.hint}{RESET}")
         return {
             "success": False,
             "url": url,
@@ -822,8 +842,8 @@ def handle_download(
         fetched = ensure_ffmpeg()
         if not ffmpeg_available():
             err = FFmpegNotFoundError("ffmpeg binary not found.")
-            print(f"{YELLOW}[!] Warning: {err}{RESET}")
-            print(f"{YELLOW}Tip: {err.hint}{RESET}")
+            _plain_print(f"{YELLOW}[!] Warning: {err}{RESET}")
+            _plain_print(f"{YELLOW}Tip: {err.hint}{RESET}")
             log.warning("ffmpeg not found; continuing — merging/conversion may fail")
         else:
             log.debug("ffmpeg provisioned via fallback: %s", fetched)
@@ -832,26 +852,27 @@ def handle_download(
     if detected_platform == "Unknown":
         if is_any_command and any_platform_reason:
             detected_platform = any_platform_reason
-            print(f"{GREEN}[*] Detected Platform: {detected_platform}{RESET}")
+            _plain_print(f"{GREEN}[*] Detected Platform: {detected_platform}{RESET}")
         else:
-            print(
+            _plain_print(
                 f"{YELLOW}[!] Notice: The URL does not match any officially supported platform.{RESET}"
             )
-            print("    You can use the /platform command to see valid platforms.")
+            _plain_print("    You can use the /platform command to see valid platforms.")
     else:
-        print(f"{GREEN}[*] Detected Platform: {detected_platform}{RESET}")
+        _plain_print(f"{GREEN}[*] Detected Platform: {detected_platform}{RESET}")
 
     # Rate limits have been removed as per user request.
 
     duplicate_action = "download" if force else handle_duplicate(url, interactive=interactive)
     if duplicate_action == "skip":
-        print(f"{YELLOW}[!] Skipped duplicate URL.{RESET}")
+        _plain_print(f"{YELLOW}[!] Skipped duplicate URL.{RESET}")
         return {
             "success": True,
+            "skipped": True,
             "url": url,
             "files": [],
             "audio": extract_audio,
-            "quality": quality or config.get("quality", "best"),
+            "quality": quality or active_setting("quality", "best"),
         }
 
     filename_suffix = ""
@@ -864,39 +885,39 @@ def handle_download(
         "url": url,
         "files": [],
         "audio": extract_audio,
-        "quality": quality or config.get("quality", "best"),
+        "quality": quality or active_setting("quality", "best"),
     }
 
-    output_dir = str(config.get("output_dir", "downloads"))
+    output_dir = str(active_setting("output_dir", "downloads"))
     try:
         os.makedirs(output_dir, exist_ok=True)
     except OSError as exc:
         err = OutputDirError(str(exc))
-        print(f"{RED}[!] Error: {err}{RESET}")
-        print(f"{YELLOW}Tip: {err.hint}{RESET}")
+        _plain_print(f"{RED}[!] Error: {err}{RESET}")
+        _plain_print(f"{YELLOW}Tip: {err.hint}{RESET}")
         return {
             "success": False,
             "url": url,
             "files": [],
             "audio": extract_audio,
-            "quality": quality or config.get("quality", "best"),
+            "quality": quality or active_setting("quality", "best"),
         }
 
     for attempt in range(1, retries + 1):
         if attempt > 1:
             wait = backoff_delay(attempt - 1, base=2.0, cap=30.0)
-            print(
+            _plain_print(
                 f"{YELLOW}[~] Retry {attempt}/{retries} after {wait}s (exponential backoff)...{RESET}"
             )
             log.debug("Retry %d/%d for %s after %.1fs", attempt, retries, url, wait)
             if not sleep_with_interrupt(wait):
-                print(f"\n{RED}[!] Cancelled during retry wait.{RESET}")
+                _plain_print(f"\n{RED}[!] Cancelled during retry wait.{RESET}")
                 result = {
                     "success": False,
                     "url": url,
                     "files": [],
                     "audio": extract_audio,
-                    "quality": quality or config.get("quality", "best"),
+                    "quality": quality or active_setting("quality", "best"),
                     "canceled": True,
                 }
                 break
@@ -920,7 +941,7 @@ def handle_download(
                     log.warning(
                         "Instagram scraper failed (%s), falling back to generic engine", ig_err
                     )
-                    console.print(
+                    _console_print(
                         "[yellow]ℹ Instagram scraper error; falling back to generic engine...[/]"
                     )
                     result = download_media_content(
@@ -958,13 +979,13 @@ def handle_download(
                 )
         except KeyboardInterrupt:
             is_downloading = False
-            print(f"\n{RED}[!] Download canceled by user.{RESET}")
+            _plain_print(f"\n{RED}[!] Download canceled by user.{RESET}")
             result = {
                 "success": False,
                 "url": url,
                 "files": [],
                 "audio": extract_audio,
-                "quality": quality or config.get("quality", "best"),
+                "quality": quality or active_setting("quality", "best"),
                 "canceled": True,
             }
             break
@@ -1007,5 +1028,6 @@ def handle_download(
         duration=duration,
         is_forced=force,
     )
-    print_download_summary(result)
+    if not in_engine():
+        print_download_summary(result)
     return result

@@ -27,7 +27,19 @@ Create a UTF-8 text file with one URL per line. Blank lines and lines beginning 
 /batch links.txt
 ```
 
-Batch processing is sequential. It is not a durable background queue. Keep the process running to finish the batch.
+`/batch` saves the entries as local jobs and starts those jobs immediately. They run sequentially while Pinak is open. If you close Pinak, unfinished jobs remain in the queue for a later `pinak queue run`.
+
+You can also save jobs without starting them:
+
+```sh
+pinak queue add "<your-media-url>" --quality 720p -o downloads
+pinak queue import links.txt
+pinak queue list
+pinak queue run
+pinak queue retry --failed
+```
+
+Each job keeps the options and preferences captured when it was added. Ctrl+C stops the current run and leaves the active job queued with partial files retained. Failed jobs need an explicit retry. The queue is local and foreground only; it does not keep downloading after the terminal closes.
 
 ## Interrupted downloads
 
