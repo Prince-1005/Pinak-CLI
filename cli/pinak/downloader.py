@@ -647,7 +647,8 @@ def download_media_content(
     except Exception as e:
         friendly = _classify_download_error(e, post_url)
         hint = getattr(friendly, "hint", str(e))
-        console.print(f"[bold red][X][/] Error: {safe_rich(e)}")
+        error_text = safe_text(e).removeprefix("ERROR:").strip()
+        console.print(f"[bold red][X][/] Error: {safe_rich(error_text)}")
         console.print(f"[yellow]Tip: {safe_rich(hint)}[/]")
         if isinstance(friendly, InstagramError):
             with contextlib.suppress(Exception):

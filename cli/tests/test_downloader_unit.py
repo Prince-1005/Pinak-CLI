@@ -1,5 +1,9 @@
 """Unit tests for downloader helpers: classification, resilience, duplicates."""
 
+from io import StringIO
+
+from rich.console import Console
+
 import pinak.downloader as dl_mod
 from pinak.exceptions import DownloadFailedError, NetworkError
 
@@ -52,6 +56,40 @@ def test_ytdl_logger_collects_errors():
     logger.warning("ignored")
     logger.error("boom")
     assert logger.errors == ["boom"]
+
+
+def test_subtitle_rate_limit_error_keeps_message_without_ansi_fragments(monkeypatch, tmp_path):
+    output = StringIO()
+    monkeypatch.setattr(dl_mod, "console", Console(file=output, width=200, force_terminal=False))
+    monkeypatch.setattr(dl_mod, "get_ffmpeg_path", lambda: "ffmpeg")
+    monkeypatch.setattr(dl_mod, "ffmpeg_available", lambda: False)
+
+    class FailingYDL:
+        def __init__(self, opts):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def extract_info(self, url, download=True):
+            raise RuntimeError(
+                "\x1b[0;31mERROR:\x1b[0m Unable to download video subtitles for 'en': "
+                "HTTP Error 429: Too Many Requests"
+            )
+
+    monkeypatch.setattr(dl_mod.yt_dlp, "YoutubeDL", FailingYDL)
+    result = dl_mod.download_media_content("https://youtu.be/example", str(tmp_path))
+
+    assert result["success"] is False
+    assert (
+        "Error: Unable to download video subtitles for 'en': HTTP Error 429: Too Many Requests"
+        in output.getvalue()
+    )
+    assert "Error: ERROR:" not in output.getvalue()
+    assert "[0;31m" not in output.getvalue()
 
 
 def test_progress_hook_finished_state():
