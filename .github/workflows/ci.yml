@@ -161,7 +161,7 @@ jobs:
       - name: Verify pre-MCP upgrade and compatible core downgrade
         run: |
           git fetch --no-tags --depth=1 origin 73de91e766a8073afe356521534ca2239fe7c488
-          git archive --format=zip --output "$RUNNER_TEMP/pinak-pre-mcp.zip" 73de91e766a8073afe356521534ca2239fe7c488 cli
+          git -C .. archive --format=zip --output "$RUNNER_TEMP/pinak-pre-mcp.zip" 73de91e766a8073afe356521534ca2239fe7c488 cli
           python -c "import os, zipfile; from pathlib import Path; root = Path(os.environ['RUNNER_TEMP']); zipfile.ZipFile(root / 'pinak-pre-mcp.zip').extractall(root / 'pinak-pre-mcp')"
           python -m build "$RUNNER_TEMP/pinak-pre-mcp/cli" --wheel --outdir "$RUNNER_TEMP/pinak-pre-mcp-wheels"
           python -c "import os, subprocess, sys; from pathlib import Path; old = next((Path(os.environ['RUNNER_TEMP']) / 'pinak-pre-mcp-wheels').glob('*.whl')); new = next(Path('release-dist').glob('*.whl')); subprocess.run([sys.executable, 'tools/smoke_mcp_upgrade.py', '--legacy-wheel', str(old), '--current-wheel', str(new)], check=True)"
