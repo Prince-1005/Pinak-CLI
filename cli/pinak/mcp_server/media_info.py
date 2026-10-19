@@ -56,11 +56,14 @@ def inspect_media(path: Path) -> dict[str, Any]:
             # Venv launchers and their actual Python PID differ on Windows.
             # The helper reports its identity before touching untrusted media.
             terminate_owned(*identity, token)
-        if sys.platform != "win32":
+        if sys.platform == "win32":
+            process.kill()  # owned launcher; helper Job Object owns descendants
+        elif identity is None:
+            # terminate_owned already killed the verified dedicated group when
+            # an identity was received. Re-signalling its now-empty group races
+            # with process exit and can return EPERM on macOS.
             with contextlib.suppress(ProcessLookupError):
                 os.killpg(process.pid, signal.SIGKILL)
-        else:
-            process.kill()  # helper Job Object owns FFprobe descendants
         process.communicate(timeout=2)
         raise ToolFailure("METADATA_TIMEOUT", "Metadata probe exceeded its time limit.") from exc
     if process.returncode or len(output.encode()) > 32768 or not helper_identity(output, token):
