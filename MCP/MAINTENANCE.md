@@ -40,6 +40,23 @@
 6. Update usage, compatibility, failure and phase evidence together. A version
    bump, tag and PyPI publication require a separate release instruction.
 
+## Downloadable installer bundles
+
+The clean Linux installation job builds and smoke-tests the wheel, verifies the
+upgrade/container checks, then runs `tools/package_mcp.py`. It uploads
+`pinak-mcp-install` with the wheel, INSTALL.md, BUILD-INFO.json and SHA256SUMS.
+The script rejects wheels without the MCP entry point/shared engine or with files
+outside the runtime and package metadata. Its output directory must be fresh.
+Users install that wheel's `[mcp]` extra; they do not need a repository checkout.
+Actions downloads require GitHub sign-in and expire after 90 days. Only recommend
+successful main-branch push runs. Published PyPI installation remains a future
+release step; creating this artifact does not publish to PyPI or change versions.
+
+For a local build, from cli/ run `python -m build --outdir release-dist`, verify
+with `python tools/smoke_wheel.py release-dist --check-mcp`, then
+`python tools/package_mcp.py release-dist --output mcp-install --source-revision <commit>`.
+Never commit generated bundles, user environments or downloaded dependencies.
+
 ## Upgrade and restoration rehearsal
 
 `cli/tools/smoke_mcp_upgrade.py` accepts distinct old/current wheels. It creates

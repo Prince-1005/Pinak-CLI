@@ -5,35 +5,50 @@ that can launch a local MCP process. Its AI provider/model can vary; Pinak does
 not require a provider API key. Cloud-only clients that accept only remote URLs
 cannot connect directly. No hosted service, public URL, or listening port is used.
 
-## Install the current source
+## Install without cloning the repository
 
-These changes are not yet a published PyPI release. Clone the source first:
+Open [CI builds](https://github.com/Prince-1005/Pinak-CLI/actions/workflows/ci.yml),
+choose a successful main-branch **push** run, then download **pinak-mcp-install**
+from its Artifacts section. GitHub sign-in is required. Extract it into a permanent
+folder and open a terminal there. Artifacts expire after 90 days; choose a newer
+successful build if needed. Earlier runs before installer bundles were introduced
+will not have this artifact. Never use a pull-request artifact as a trusted release.
 
-```sh
-git clone https://github.com/Prince-1005/Pinak-CLI.git
-cd Pinak-CLI/cli
-```
+The ZIP contains a wheel, INSTALL.md, BUILD-INFO.json and SHA256SUMS. No repository
+checkout, Git installation, website media or source build is required. Python 3.10+
+is required; pip downloads the runtime dependencies separately. The wheel includes
+Pinak's shared CLI/engine and local MCP adapter, with SDK 2.3.0 in the optional extra.
 
-Then create a dedicated environment:
+For the current 2.0.0 wheel, Windows PowerShell commands are:
 
 ```powershell
 python -m venv .venv-mcp
 .venv-mcp/Scripts/python.exe -m pip install --upgrade pip
-.venv-mcp/Scripts/python.exe -m pip install -e ".[mcp]"
+.venv-mcp/Scripts/python.exe -m pip install "./pinak_cli-2.0.0-py3-none-any.whl[mcp]"
 .venv-mcp/Scripts/python.exe -m pinak.mcp_server doctor --json
 .venv-mcp/Scripts/python.exe -m pinak.mcp_server configure
 ```
 
-On macOS/Linux replace `.venv-mcp/Scripts/python.exe` with
-`.venv-mcp/bin/python`. Python 3.10+ is required; the extra pins the tested official
-MCP SDK 2.3.0. The normal CLI needs no MCP SDK. `pinak-mcp` is also installed as
-an executable in that environment. After publication the intended package is
-`pinak-cli[mcp]`; do not assume the current PyPI release includes it.
+On macOS/Linux, use `python3` to create the environment and replace
+`.venv-mcp/Scripts/python.exe` with `.venv-mcp/bin/python`. The generated INSTALL.md
+uses that bundle's exact wheel filename; use it if the version changes. Keep the
+installation environment at its permanent path after registering the client.
+`pinak-mcp` is also installed as an executable inside the environment.
+
+These are development snapshots identified by source revision, not a new PyPI
+release. The package version can match an older installed build; when updating an
+existing environment, stop/close hosts, run prepare-update, then use
+`pip install --force-reinstall "./<new-wheel-filename>.whl[mcp]"` through that
+same environment's Python. Do not assume the current PyPI release includes MCP.
 
 Doctor checks SDK, output permissions, database compatibility and bounded FFmpeg /
 FFprobe version checks. Conversion/merging needs usable FFmpeg; metadata benefits
 from FFprobe. MCP never silently downloads those binaries. Install/repair them
 explicitly using the regular Pinak installation instructions before retrying.
+
+SHA256SUMS and BUILD-INFO.json identify the exact wheel bytes and source revision.
+On Linux run `sha256sum -c SHA256SUMS`; on macOS use `shasum -a 256 -c SHA256SUMS`.
+On Windows compare `Get-FileHash -Algorithm SHA256 <wheel-filename>` with SHA256SUMS.
 
 ## Register in your client
 

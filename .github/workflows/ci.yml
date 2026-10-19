@@ -170,3 +170,12 @@ jobs:
           docker build --tag pinak-install-check .
           docker run --rm pinak-install-check --version
           docker run --rm pinak-install-check --help
+      - name: Prepare repository-free Pinak-MCP download
+        run: python tools/package_mcp.py release-dist --output mcp-install --source-revision "$GITHUB_SHA"
+      - name: Upload Pinak-MCP installer bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: pinak-mcp-install
+          path: cli/mcp-install/
+          if-no-files-found: error
+          retention-days: 90

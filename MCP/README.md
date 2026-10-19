@@ -5,35 +5,33 @@ Pinak-MCP uses standard MCP **stdio**: the AI application launches a local Pytho
 process. No hosted download service, public endpoint or user account is required.
 The AI host may still send prompts and returned metadata to its provider.
 
-## Get started
+## Get started without downloading the repository
 
-These MCP changes are available from repository source; do not assume the
-published PyPI package includes them yet. Python 3.10+ and a client that supports
-local stdio MCP servers are required.
+Python 3.10+ and an AI application supporting local stdio MCP are required.
 
-```sh
-git clone https://github.com/Prince-1005/Pinak-CLI.git
-cd Pinak-CLI/cli
-python -m venv .venv-mcp
-```
+1. Open [CI builds](https://github.com/Prince-1005/Pinak-CLI/actions/workflows/ci.yml).
+2. Select a successful **main-branch push** run that contains the installer artifact.
+3. Under **Artifacts**, download **pinak-mcp-install** and extract the ZIP.
+4. Follow its **INSTALL.md** to install the included wheel with the `[mcp]` extra
+   in a dedicated Python environment, run doctor and generate client settings.
+5. Enter those launch settings in your AI application and reload it.
 
-On Windows:
+The bundle contains one application wheel, INSTALL.md, BUILD-INFO.json and
+SHA256SUMS. It excludes the repository, website/media, Git history, tests and
+planning. Pinak's shared CLI/engine is included because MCP uses it. Pip separately
+fetches runtime dependencies; Git and Node.js are unnecessary.
 
-```powershell
-.venv-mcp/Scripts/python.exe -m pip install --upgrade pip
-.venv-mcp/Scripts/python.exe -m pip install -e ".[mcp]"
-.venv-mcp/Scripts/python.exe -m pinak.mcp_server doctor --json
-.venv-mcp/Scripts/python.exe -m pinak.mcp_server configure
-```
+GitHub requires sign-in to download Actions artifacts. Bundles are retained for
+90 days; use a newer successful main-branch build if one expires. Older builds
+before this distribution workflow was added do not contain the artifact. Download
+only from this repository's successful main-branch push runs, not pull requests.
+This is a development build of the source revision recorded in BUILD-INFO.json,
+not a new PyPI release. Do not assume the published PyPI package includes MCP yet.
 
-On macOS/Linux, replace `.venv-mcp/Scripts/python.exe` with
-`.venv-mcp/bin/python`. Install FFmpeg/FFprobe explicitly when conversion, merging
-or metadata requires them; the MCP server does not provision these binaries.
-
-Enter the generated command, arguments and environment in your AI application's
-local MCP settings, then reload it. Ask: “Queue this media URL, start the queue,
-and show me its download status.” Adding a job alone does not start downloading.
-Clients that accept only remote HTTP/SSE URLs cannot connect directly.
+Ask: “Queue this media URL, start the queue, and show me its download status.”
+Adding a job alone does not start downloading. Install FFmpeg/FFprobe explicitly
+when conversion, merging or metadata needs them. Remote-URL-only clients cannot
+connect directly. See [complete installation steps](USAGE.md).
 
 ## Documentation
 
