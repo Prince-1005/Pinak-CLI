@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sys
@@ -10,6 +11,8 @@ from typing import Any
 import anyio
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
+from mcp.shared.exceptions import MCPError
+from mcp_types import CONNECTION_CLOSED
 
 from .registry import Registry
 
@@ -18,6 +21,7 @@ class Peer:
     def __init__(self, registry: Registry, name: str, proxy_url: str) -> None:
         self.registry, self.name, self.proxy_url = registry, name, proxy_url
         self.stop = anyio.Event()
+        self.finished = anyio.Event()
         self.session: ClientSession | None = None
         self.error: str | None = None
         self.limiter = anyio.CapacityLimiter(8)
@@ -93,6 +97,18 @@ class Peer:
                     task_status.started()
                     started = True
                     await self.stop.wait()
+                    # The SDK's stdio-close grace is only two seconds. Finish
+                    # owned-worker shutdown before entering that transport close.
+                    with anyio.move_on_after(30, shield=True), contextlib.suppress(Exception):
+                        while True:
+                            stopped = await session.call_tool("_cloud_shutdown", {})
+                            result = stopped.structured_content or {}
+                            if (
+                                result.get("ok")
+                                or result.get("error", {}).get("code") != "SERVER_BUSY"
+                            ):
+                                break
+                            await anyio.sleep(0.2)
         except Exception:
             self.error = (
                 "User adapter unavailable; inspect its operator log and reconcile saved jobs."
@@ -101,6 +117,7 @@ class Peer:
                 raise
         finally:
             self.session = None
+            self.finished.set()
 
     async def call(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         from ..mcp_server.tools import Tools
@@ -120,7 +137,11 @@ class Peer:
             return result.structured_content or Tools.failure(
                 "ADAPTER_ERROR", "Missing structured result."
             )
-        except Exception:
+        except Exception as exc:
+            if isinstance(exc, (anyio.BrokenResourceError, anyio.ClosedResourceError)) or (
+                isinstance(exc, MCPError) and exc.code == CONNECTION_CLOSED
+            ):
+                self.stop.set()
             return Tools.failure(
                 "ADAPTER_UNAVAILABLE",
                 "Call interrupted; reconcile using the same request_key before retrying.",
@@ -133,14 +154,17 @@ class Pool:
     def __init__(self, registry: Registry, proxy_url: str) -> None:
         self.registry, self.proxy_url = registry, proxy_url
         self.peers: dict[str, Peer] = {}
-        self.lock = anyio.Lock()
+        self.locks: dict[str, anyio.Lock] = {}
         self.tasks: Any = None
         self.closing = anyio.Event()
 
     async def get(self, name: str) -> Peer:
-        async with self.lock:
+        async with self.locks.setdefault(name, anyio.Lock()):
             peer = self.peers.get(name)
-            if peer is None or peer.session is None:
+            if peer is not None and peer.stop.is_set():
+                with anyio.fail_after(40):
+                    await peer.finished.wait()
+            if peer is None or peer.session is None or peer.stop.is_set():
                 peer = Peer(self.registry, name, self.proxy_url)
                 await self.tasks.start(peer.run)
                 self.peers[name] = peer
@@ -160,6 +184,6 @@ class Pool:
             users = await anyio.to_thread.run_sync(self.registry.list_users)
             for user in users:
                 if not user["enabled"]:
-                    peer = self.peers.pop(str(user["name"]), None)
+                    peer = self.peers.get(str(user["name"]))
                     if peer:
                         peer.stop.set()

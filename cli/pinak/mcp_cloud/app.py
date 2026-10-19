@@ -74,6 +74,13 @@ def create_app(settings: Settings) -> Any:
     async def invoke(context: Any, params: Any) -> types.CallToolResult:
         name = principal.get()
         try:
+            if params.name not in {*DEFINITIONS, "file_link"}:
+                result = Tools.failure("UNKNOWN_TOOL", "Tool is not available.")
+                return types.CallToolResult(
+                    content=[types.TextContent(type="text", text=json.dumps(result))],
+                    structured_content=result,
+                    is_error=True,
+                )
             peer = await pool.get(name)
             if params.name == "file_link":
                 model = FileLink.model_validate(params.arguments or {})

@@ -7,6 +7,7 @@ import hashlib
 import io
 import json
 import socket
+import tarfile
 import threading
 import time
 import wave
@@ -15,8 +16,10 @@ from pathlib import Path
 
 import anyio
 import httpx2
+import psutil
 import pytest
 import uvicorn
+from filelock import Timeout
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from starlette.testclient import TestClient
@@ -111,6 +114,8 @@ def test_remote_users_and_download_capability(tmp_path: Path) -> None:
         assert len(discovered["tools"]) == 15
         info = call(client, alice, "server_info")
         assert info["data"]["transport"] == "streamable-http", info
+        assert call(client, alice, "_cloud_shutdown")["error"]["code"] == "UNKNOWN_TOOL"
+        assert call(client, alice, "server_info")["ok"]
         for token in (alice, bob):
             added = call(
                 client, token, "queue_add", url="https://example.com/test.mp4", request_key="first"
@@ -362,3 +367,89 @@ def test_operator_cli_and_sdk_compatibility(
     monkeypatch.setattr(cli.importlib.metadata, "version", lambda _: "unsupported")
     assert cli.main() == 2
     assert "SDK 2.3.0" in capsys.readouterr().err
+
+
+def test_adapter_crash_recovery_and_revocation_shutdown(tmp_path: Path) -> None:
+    config = settings(tmp_path)
+    registry = Registry(config)
+    alice, bob = registry.create("alice"), registry.create("bob")
+    with TestClient(create_app(config), base_url=config.public_url) as client:
+        assert call(
+            client, alice, "queue_add", url="https://example.com/a.wav", request_key="persist"
+        )["ok"]
+        assert call(client, bob, "server_info")["ok"]
+
+        def owned_adapter() -> psutil.Process:
+            matches = []
+            for process in psutil.Process().children(recursive=True):
+                try:
+                    if process.cmdline()[-1:] == ["pinak.mcp_cloud.tenant"] and Path(
+                        process.cwd()
+                    ) == registry.root("alice"):
+                        matches.append(process)
+                except psutil.NoSuchProcess:
+                    pass
+            # Windows venv launchers can retain a same-command wrapper parent.
+            parent_ids = {process.ppid() for process in matches}
+            leaves = [process for process in matches if process.pid not in parent_ids]
+            assert len(leaves) == 1
+            return leaves[0]
+
+        process = owned_adapter()
+        process.kill()  # Verified test-owned child with exact module and isolated cwd.
+        process.wait(timeout=5)
+        failed = call(client, alice, "queue_list")
+        assert failed["error"]["code"] == "ADAPTER_UNAVAILABLE"
+        recovered = call(client, alice, "queue_list")
+        assert recovered["ok"] and len(recovered["data"]["items"]) == 1
+        assert call(client, bob, "queue_list")["ok"]
+        replacement = owned_adapter()
+        registry.rotate("alice", revoke=True)
+        replacement.wait(timeout=15)
+        assert call(client, bob, "server_info")["ok"]
+
+
+def test_gateway_rejects_second_supervisor(tmp_path: Path) -> None:
+    config = settings(tmp_path)
+    with TestClient(create_app(config), base_url=config.public_url) as first:
+        with pytest.raises(Timeout), TestClient(create_app(config), base_url=config.public_url):
+            pass
+        assert first.get("/healthz").status_code == 200
+
+
+def test_quiesced_backup_restore_rehearsal(tmp_path: Path) -> None:
+    config = settings(tmp_path / "data")
+    registry = Registry(config)
+    token = registry.create("alice")
+    with TestClient(create_app(config), base_url=config.public_url) as client:
+        assert call(
+            client, token, "queue_add", url="https://example.com/a.wav", request_key="backup"
+        )["ok"]
+        media = registry.root("alice") / "downloads" / "keep.bin"
+        media.write_bytes(b"preserved media")
+    archive_path = tmp_path / "backup.tar.gz"
+    with tarfile.open(archive_path, "w:gz") as archive:
+        archive.add(config.data_dir, arcname=".")
+    registry.rotate("alice", revoke=True)
+    assert registry.authenticate(token) is None
+    registry.path.unlink()
+    media.unlink()
+    (registry.root("alice") / "state/history.db").unlink()
+    # Restore only regular files from this test-created archive to the same
+    # absolute data root, as the container's /data restoration procedure requires.
+    with tarfile.open(archive_path, "r:gz") as archive:
+        for member in archive:
+            if member.isfile():
+                target = (config.data_dir / member.name).resolve()
+                assert target.is_relative_to(config.data_dir)
+                source = archive.extractfile(member)
+                assert source is not None
+                with source:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(source.read())
+    with TestClient(create_app(config), base_url=config.public_url) as client:
+        assert len(call(client, token, "queue_list")["data"]["items"]) == 1
+        assert media.read_bytes() == b"preserved media"
+    # A restored registry also restores old credentials: operators must rotate.
+    Registry(config).rotate("alice")
+    assert Registry(config).authenticate(token) is None

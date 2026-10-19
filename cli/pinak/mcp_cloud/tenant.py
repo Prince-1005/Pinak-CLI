@@ -48,9 +48,23 @@ class CloudTools(Tools):
         self.byte_limit = int(os.environ["PINAK_CLOUD_STORAGE_BYTES"])
         self.job_limit = int(os.environ["PINAK_CLOUD_MAX_JOBS"])
         self.lock = threading.RLock()
+        self.cloud_closed = False
+
+    def close(self) -> None:
+        with self.lock:
+            if not self.cloud_closed:
+                self.cloud_closed = True
+                super().close()
 
     def call(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         with self.lock:
+            if name == "_cloud_shutdown":
+                self.close()
+                return {"ok": True, "data": {"stopped": True}, "warnings": []}
+            if self.cloud_closed:
+                return self.failure(
+                    "ADAPTER_CLOSING", "User adapter is shutting down; saved work is retained."
+                )
             key = arguments.get("request_key")
             if isinstance(key, str):
                 with self.store.connect() as db:

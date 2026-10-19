@@ -17,9 +17,12 @@ local WAV fixture; production has no private-destination bypass setting.
 Local Windows / Python 3.12 evidence from this implementation:
 
 - Full existing-plus-cloud regression passed with 76.94% coverage (75% gate).
-- Twelve cloud tests passed, including official SDK calls over real local HTTP,
+- Cloud tests passed, including official SDK calls over real local HTTP,
   actual WAV/PCM delivery, private metadata-address redirect denial, rate/body
   bounds, quota admission and receipt replay after a limit is reached.
+- Additional recovery checks cover an actually killed user adapter, preserved
+  queue state after replacement, revocation shutdown without affecting another
+  user, refusal of a second gateway supervisor, and a quiesced archive restore.
 - Whole-package Mypy passed; changed Python files passed Ruff, Ruff formatting
   and Black. Bandit reported no medium/high cloud findings.
 - Application wheel built and strict Twine validation passed. The cloud bundle's
@@ -31,6 +34,10 @@ Local Windows / Python 3.12 evidence from this implementation:
   installation instructions require explicit FFmpeg provisioning where needed.
 - Docker Desktop startup was attempted, but the Linux engine socket was still
   unavailable. Image execution and native VPS/Render acceptance remain pending.
+- CI at source `9461320` built the Linux cloud image successfully. Its remote
+  smoke client initially lacked the optional MCP dependencies on the runner;
+  the workflow now explicitly installs the hashed cloud lock before that check.
+  Do not confuse an image build with a completed runtime acceptance test.
 
 These tests do not certify every external extractor, client, proxy or provider.
 

@@ -7,7 +7,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libporta
 WORKDIR /opt/pinak
 COPY requirements-cloud-lock.txt ./
 COPY *.whl ./
-RUN pip install --require-hashes -r requirements-cloud-lock.txt \
+RUN python -m pip install --upgrade "pip>=26.2.1" "setuptools>=83.0.0" \
+    && pip install --require-hashes -r requirements-cloud-lock.txt \
     && pip install --no-deps ./*.whl
 COPY entrypoint.sh /usr/local/bin/pinak-cloud-entrypoint
 RUN chmod 755 /usr/local/bin/pinak-cloud-entrypoint

@@ -121,3 +121,9 @@ deliberately. `ADAPTER_UNAVAILABLE`: inspect startup/storage and reconcile pendi
 mutations before retrying. Disk full/read-only: preserve existing records and
 partials, repair storage, then inspect/retry failed work. Source restrictions or
 missing FFmpeg must remain truthful failed jobs, never fake success.
+
+If a user's adapter process dies, its first interrupted call reports
+`ADAPTER_UNAVAILABLE`. The next call starts a replacement after the previous
+adapter's cleanup completes; saved queue/history and receipts remain available.
+Other users keep their own adapters. A normal call timeout does not itself force
+an adapter restart or prove that an active download stopped.
