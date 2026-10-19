@@ -502,7 +502,8 @@ def test_clear_redraws_header_and_preserves_jobs_and_history(
     cli.repl_loop()
     rendered = output.getvalue()
     assert "\x1b[2J" in rendered
-    after_clear = rendered.split("\x1b[2J", 1)[1]
+    assert "\x1b[3J" in rendered
+    after_clear = rendered.split("\x1b[3J", 1)[1]
     assert "PINAK-CLI" in after_clear and "PINAK CONTROL PANEL" in after_clear
     assert "Unknown command: /batch" in capsys.readouterr().out
     assert queue_mod.list_jobs()[0].id == job_id

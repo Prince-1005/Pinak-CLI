@@ -202,7 +202,8 @@ Inside the interactive shell, use the matching `/queue` commands, for example
 `/queue add <URL>`, `/queue list`, and `/queue run`. Enter `/queue help` for all
 options. To download a text file of links, use `/queue import links.txt`, then
 `/queue run`. The live display shows job progress, transfer size, speed, ETA, and
-processing status. `/clear` redraws the session header without deleting saved data.
+processing status. `/clear` clears the screen and terminal scrollback, then redraws the session header
+without deleting saved data.
 
 - **Windows**: `%LOCALAPPDATA%\pinak\pinak-cli\config.json`
 - **macOS**: `~/Library/Application Support/pinak-cli/config.json`

@@ -45,4 +45,4 @@ Start with `pinak` and no arguments. Use `/help` for the installed version’s c
 
 ## Clear the screen
 
-Use `/clear` (or `clear`) to clear previous terminal output and redraw the Pinak ASCII logo and control panel. Saved jobs, history, preferences, and downloaded files remain intact.
+Use `/clear` (or `clear`) to clear the terminal screen and scrollback, including the shell output from launching Pinak, and redraw the Pinak ASCII logo and control panel. Saved jobs, history, preferences, and downloaded files remain intact.

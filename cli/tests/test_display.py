@@ -126,3 +126,45 @@ def test_show_history_fallback(monkeypatch, capsys, isolated_history_db):
 def test_show_history_empty(capsys, isolated_history_db):
     info_mod.show_history_rendered("")
     assert "No history" in capsys.readouterr().out
+
+
+def test_clear_legacy_windows_erases_full_buffer_before_header(monkeypatch):
+    from io import StringIO
+    from types import SimpleNamespace
+
+    calls = []
+    terminal = SimpleNamespace(
+        is_terminal=True,
+        is_dumb_terminal=False,
+        legacy_windows=True,
+        file=StringIO(),
+        clear=lambda **kwargs: calls.append("viewport"),
+    )
+    monkeypatch.setattr(panels_mod, "console", terminal)
+    monkeypatch.setenv("COMSPEC", r"C:\Windows\System32\cmd.exe")
+    monkeypatch.setattr(panels_mod, "run_cmd", lambda args, **kwargs: calls.append(args))
+    monkeypatch.setattr(panels_mod, "print_banner", lambda: calls.append("logo"))
+    monkeypatch.setattr(panels_mod, "print_welcome_screen", lambda: calls.append("panel"))
+    panels_mod.clear_screen()
+    assert calls == [
+        "viewport",
+        [r"C:\Windows\System32\cmd.exe", "/d", "/c", "cls"],
+        "logo",
+        "panel",
+    ]
+    assert terminal.file.getvalue() == ""
+
+
+def test_clear_redirected_output_has_no_terminal_controls(monkeypatch):
+    from io import StringIO
+
+    from rich.console import Console
+
+    output = StringIO()
+    monkeypatch.setattr(
+        panels_mod, "console", Console(file=output, force_terminal=False, color_system=None)
+    )
+    panels_mod.clear_screen()
+    rendered = output.getvalue()
+    assert "\x1b" not in rendered
+    assert "PINAK-CLI" in rendered and "PINAK CONTROL PANEL" in rendered

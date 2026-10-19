@@ -137,7 +137,8 @@ The interactive shell exposes the same queue through `/queue add <URL>`,
 display shows overall job counts, the active file, bytes, speed, ETA, and processing
 status. Each finished job prints its result; failures include the reason.
 
-`/clear` (or `clear`) clears terminal output and redraws the Pinak ASCII logo and
+`/clear` (or `clear`) clears the terminal screen and scrollback (including the shell output from
+launching Pinak), then redraws the Pinak ASCII logo and
 control panel with current settings. It preserves jobs, history, preferences, and
 downloaded files and does not repeat first-run initialization.
 

@@ -4,12 +4,14 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 
 from rich.console import Console
 from rich.panel import Panel
 
 from ..config import config
+from ..subproc import run_cmd
 from ..utils import CYAN, RESET
 
 console = Console()
@@ -111,7 +113,20 @@ def print_welcome_screen() -> None:
 
 
 def clear_screen() -> None:
-    """Clear terminal output and redraw the current session header."""
+    """Erase the screen and terminal scrollback, then redraw the session header."""
     console.clear(home=True)
+    if console.is_terminal and not console.is_dumb_terminal:
+        if console.legacy_windows:
+            # The legacy Windows screen buffer includes off-screen output.
+            run_cmd(
+                [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", "cls"],
+                capture=False,
+                timeout=5,
+            )
+        else:
+            # Rich's clear() erases the viewport only. ED 3 also erases saved lines.
+            # Write directly so Rich doesn't strip or measure this terminal control.
+            console.file.write("\x1b[3J")
+            console.file.flush()
     print_banner()
     print_welcome_screen()
