@@ -167,6 +167,25 @@ def test_ytdl_logger_collects_errors():
     logger.warning("ignored")
     logger.error("boom")
     assert logger.errors == ["boom"]
+    assert logger.warnings == ["ignored"]
+
+
+@pytest.mark.parametrize(
+    "notice",
+    [
+        "Deprecated Feature: Support for Python version 3.10 has been deprecated.",
+        "\x1b[0;31mDeprecated Feature:\x1b[0m Support for Python version 3.10 has been deprecated.",
+    ],
+)
+def test_ytdl_deprecation_on_stderr_remains_a_warning(notice):
+    logger = dl_mod.YTDLLogger()
+    logger.error(notice)
+    assert logger.errors == []
+    assert logger.warnings == [
+        "Deprecated Feature: Support for Python version 3.10 has been deprecated."
+    ]
+    logger.error("ERROR: Could not download a video titled Deprecated Feature: demo")
+    assert logger.errors == ["ERROR: Could not download a video titled Deprecated Feature: demo"]
 
 
 def test_subtitle_rate_limit_error_keeps_message_without_ansi_fragments(monkeypatch, tmp_path):

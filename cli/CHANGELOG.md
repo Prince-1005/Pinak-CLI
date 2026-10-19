@@ -24,6 +24,7 @@ Release notes are maintained manually; automatic release creation is disabled.
 - **Breaking:** remove `/batch` from the shell, completion, and help. Replace `/batch links.txt` with `/queue import links.txt` followed by `/queue run` (or the equivalent `pinak queue` commands).
 
 ### Fixed
+- Treat yt-dlp runtime deprecation notices as warnings so successful downloads remain successful on Python 3.10.
 - Validate an entire imported link file before saving jobs and report invalid line numbers without leaving a partially imported queue.
 - Recover interrupted retries without mistaking files from a previous failed attempt for a completed job, and support large imported job selections without SQLite parameter-limit failures.
 - Keep worker errors and interruptions visible in queue results, and prevent display-listener failures from changing saved job outcomes.

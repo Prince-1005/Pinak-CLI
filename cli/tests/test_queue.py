@@ -383,9 +383,26 @@ def test_repl_queue_routes_to_same_jobs_and_stays_open(isolated_history_db, tmp_
     assert len(queue_mod.list_jobs()) == 2
 
 
-def test_local_http_download_runs_through_queue(isolated_history_db, tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("startup_deprecation", [False, True])
+def test_local_http_download_runs_through_queue(
+    isolated_history_db, tmp_path, monkeypatch, capsys, startup_deprecation
+):
+    import importlib
+
     import pinak.downloader as downloader
     import pinak.ffmpeg_setup as ffmpeg_setup
+
+    if startup_deprecation:
+        # Exercise yt-dlp's real warning -> stderr -> logger.error routing on
+        # every interpreter, rather than waiting for a Python 3.10 CI runner.
+        monkeypatch.setattr(
+            importlib.import_module("yt_dlp.YoutubeDL"),
+            "_get_system_deprecation",
+            lambda: (
+                "Support for Python version 3.10 has been deprecated. "
+                "Please update to Python 3.11 or above"
+            ),
+        )
 
     (tmp_path / "sample.mp4").write_bytes(b"local fixture media" * 100)
 

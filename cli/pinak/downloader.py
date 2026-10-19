@@ -210,14 +210,21 @@ def verify_files(files: list) -> tuple:
 class YTDLLogger:
     def __init__(self):
         self.errors = []
+        self.warnings = []
 
     def debug(self, msg):
         pass
 
     def warning(self, msg):
-        pass
+        self.warnings.append(safe_text(msg))
 
     def error(self, msg):
+        # yt-dlp.deprecated_feature() also sends the notice through to_stderr(),
+        # which calls logger.error(). It does not indicate a failed download.
+        notice = safe_text(msg).strip()
+        if notice.startswith("Deprecated Feature:"):
+            self.warning(notice)
+            return
         self.errors.append(msg)
 
 
