@@ -28,7 +28,7 @@ from ..queue import (
     get_job,
     import_file,
     list_jobs,
-    remove_job,
+    remove_jobs,
     retry_failed,
     run_queue,
 )
@@ -64,7 +64,10 @@ def _parser(prog: str = "pinak queue") -> argparse.ArgumentParser:
         ("cancel", "Prevent a queued job from running; keep its record"),
     ):
         command = commands.add_parser(action, help=help_text)
-        command.add_argument("id", type=int)
+        if action == "remove":
+            command.add_argument("id", nargs="+", type=int)
+        else:
+            command.add_argument("id", type=int)
     clean = commands.add_parser("clean", help="Remove succeeded/skipped records; keep files")
     clean.add_argument("--completed", action="store_true", required=True)
     run = commands.add_parser("run", help="Run queued jobs until finished or interrupted")
@@ -282,8 +285,8 @@ def main(argv: Sequence[str], *, prog: str = "pinak queue") -> int:
         elif args.action == "show":
             _show_job(args.id)
         elif args.action == "remove":
-            remove_job(args.id)
-            console.print(f"Removed job #{args.id}. Downloaded files were kept.")
+            count = remove_jobs(args.id)
+            console.print(f"Removed {count} job record(s). Downloaded files were kept.")
         elif args.action == "cancel":
             changed = cancel_job(args.id)
             console.print(

@@ -8,6 +8,9 @@ Release notes are maintained manually; automatic release creation is disabled.
 ## [Unreleased]
 
 ### Added
+- Record each queue attempt in local download history together with its saved job result, including skipped and failed attempts, when history is enabled.
+- Accept multiple IDs in `queue remove` and `/queue remove`, with all-or-nothing validation.
+- Render the five letters of the Pinak terminal logo in distinct colors.
 - Add `queue show <id>` to inspect saved job options, files, status, attempts, and the full last error.
 - Add `queue cancel <id>`, `queue remove <id>`, and `queue clean --completed` to the CLI and interactive `/queue` interface. Keep downloaded files and history; protect running jobs with transactional state checks.
 - Add a persistent `cancelled` job state, supported by queue listing and excluded from worker claims and failed-job retries.

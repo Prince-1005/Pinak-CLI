@@ -270,46 +270,12 @@ def record_download(
     duration: int = 0,
     is_forced: bool = False,
 ) -> None:
-    files = files or []
-    try:
-        from .config import config as _config
-
-        if not _config.get("history_enabled", True):
-            return
-    except Exception as exc:
-        logger.debug("Failed to query history_enabled config: %s", exc)
-
-    # Calculate file sizes
-    total_size = 0
-    for f in files:
-        if os.path.exists(f):
-            total_size += os.path.getsize(f)
-
-    files_str = json.dumps(files)
-    current_time = time.time()
-
-    # --- Save to local SQLite ---
+    if not history_enabled():
+        return
     conn = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-        INSERT INTO downloads (time, url, status, mode, quality, files, duration, size, is_forced)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                current_time,
-                url,
-                status,
-                mode,
-                quality,
-                files_str,
-                int(duration),
-                total_size,
-                int(is_forced),
-            ),
-        )
+        insert_download(conn, url, status, mode, files or [], quality, duration, is_forced)
         conn.commit()
         conn.close()
     except Exception as exc:
@@ -317,6 +283,51 @@ def record_download(
     finally:
         if conn is not None:
             conn.close()
+
+
+def history_enabled() -> bool:
+    try:
+        from .config import config as _config
+
+        return bool(_config.get("history_enabled", True))
+    except Exception as exc:
+        logger.debug("Failed to query history_enabled config: %s", exc)
+        return True
+
+
+def insert_download(
+    conn: sqlite3.Connection,
+    url: str,
+    status: str,
+    mode: str,
+    files: list[str],
+    quality: str | None,
+    duration: int,
+    is_forced: bool,
+) -> None:
+    """Insert into an existing transaction, allowing queue state and history to commit together."""
+    total_size = 0
+    for path in files:
+        try:
+            if os.path.isfile(path):
+                total_size += os.path.getsize(path)
+        except OSError:
+            logger.warning("Could not measure downloaded file: %s", path)
+    conn.execute(
+        "INSERT INTO downloads (time, url, status, mode, quality, files, duration, size, is_forced) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            time.time(),
+            url,
+            status,
+            mode,
+            quality,
+            json.dumps(files),
+            int(duration),
+            total_size,
+            int(is_forced),
+        ),
+    )
 
 
 def url_downloaded_successfully(url: str) -> bool:

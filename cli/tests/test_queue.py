@@ -427,6 +427,10 @@ def test_local_http_download_runs_through_queue(
         assert summary.succeeded == 1, job.last_error
         assert job.id == job_id and job.status == "succeeded"
         assert job.files and all(path.endswith(".mp4") for path in job.files)
+        rows = history.get_history()
+        assert len(rows) == 1
+        assert rows[0]["url"] == request.url and rows[0]["status"] == "success"
+        assert rows[0]["files"] == list(job.files)
         assert capsys.readouterr().out == ""
     finally:
         server.shutdown()

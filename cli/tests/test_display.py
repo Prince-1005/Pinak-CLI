@@ -168,3 +168,23 @@ def test_clear_redirected_output_has_no_terminal_controls(monkeypatch):
     rendered = output.getvalue()
     assert "\x1b" not in rendered
     assert "PINAK-CLI" in rendered and "PINAK CONTROL PANEL" in rendered
+
+
+def test_banner_has_distinct_letter_colors(monkeypatch):
+    from io import StringIO
+
+    from rich.console import Console
+
+    output = StringIO()
+    monkeypatch.setattr(
+        panels_mod,
+        "console",
+        Console(
+            file=output, force_terminal=True, color_system="standard", no_color=False, width=100
+        ),
+    )
+    panels_mod.print_banner()
+    rendered = output.getvalue()
+    assert "PINAK-CLI" in rendered
+    for color in ("31m", "33m", "32m", "36m", "35m"):
+        assert color in rendered

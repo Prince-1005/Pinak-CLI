@@ -160,6 +160,9 @@ EventSink = Callable[[DownloadEvent], None]
 _active: contextvars.ContextVar[tuple[DownloadRequest, EventSink] | None] = contextvars.ContextVar(
     "pinak_download_context", default=None
 )
+_queue_owns_history: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "pinak_queue_owns_history", default=False
+)
 _log = logging.getLogger("pinak.engine")
 
 
@@ -174,6 +177,20 @@ def _request_context(request: DownloadRequest, on_event: EventSink) -> Iterator[
 
 def in_engine() -> bool:
     return _active.get() is not None
+
+
+@contextlib.contextmanager
+def queue_owns_history() -> Iterator[None]:
+    """Let the queue persist its result and history in one transaction."""
+    token = _queue_owns_history.set(True)
+    try:
+        yield
+    finally:
+        _queue_owns_history.reset(token)
+
+
+def history_owned_by_queue() -> bool:
+    return _queue_owns_history.get()
 
 
 def active_setting(key: str, default: Any = None) -> Any:

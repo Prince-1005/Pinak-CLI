@@ -206,7 +206,7 @@ processing status. `/clear` clears the screen and terminal scrollback, then redr
 without deleting saved data.
 
 Inspect a job with `/queue show <id>`. Use `/queue cancel <id>` to keep a queued
-job from running, `/queue remove <id>` to remove an inactive record, and
+job from running, `/queue remove <id> [id ...]` to remove inactive records, and
 `/queue clean --completed` to remove succeeded/skipped records. These actions keep
 downloaded files and download history. Running jobs must be stopped with Ctrl+C
 in their runner before cancellation or removal.

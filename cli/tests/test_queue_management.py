@@ -99,13 +99,86 @@ def test_clean_keeps_media_history_and_unfinished_records(
     assert queue_mod.clean_completed() == 0
     assert {j.status for j in queue_mod.list_jobs()} == {"failed", "cancelled", "queued"}
     assert media.read_bytes() == b"original bytes"
-    assert history.get_history() == old_history
+    recorded = history.get_history()
+    assert recorded[:1] == old_history
+    assert [(row["url"].rsplit("/", 1)[1], row["status"]) for row in recorded[1:]] == [
+        ("succeeded", "success"),
+        ("skipped", "skipped"),
+        ("failed", "failed"),
+    ]
     queue_mod.remove_job(ids["failed"])
     queue_mod.remove_job(ids["queued"])
     queue_mod.remove_job(ids["cancelled"])
     assert queue_mod.list_jobs() == []
     assert media.read_bytes() == b"original bytes"
-    assert history.get_history() == old_history
+    assert history.get_history() == recorded
+
+
+def test_bulk_remove_is_atomic_and_keeps_files_and_history(isolated_history_db, tmp_path):
+    ids = [queue_mod.add_job(request(tmp_path, str(index)))[0] for index in range(3)]
+    media = tmp_path / "saved.mp4"
+    media.write_bytes(b"saved media")
+    history.record_download("https://example.com/kept", files=[str(media)])
+    before = history.get_history()
+    with pytest.raises(ValueError, match="not found"):
+        queue_mod.remove_jobs([ids[0], 999, ids[1]])
+    assert {job.id for job in queue_mod.list_jobs()} == set(ids)
+    assert queue_mod.remove_jobs([ids[0], ids[1], ids[0]]) == 2
+    assert [job.id for job in queue_mod.list_jobs()] == [ids[2]]
+    assert media.read_bytes() == b"saved media"
+    assert history.get_history() == before
+
+
+def test_bulk_remove_cli_and_repl(isolated_history_db, tmp_path, capsys):
+    ids = [queue_mod.add_job(request(tmp_path, str(index)))[0] for index in range(4)]
+    assert command.main(["remove", str(ids[0]), str(ids[1])]) == 0
+    assert command.run_repl(f"remove {ids[2]} {ids[3]}") == 0
+    assert queue_mod.list_jobs() == []
+    assert "Removed 2 job record(s)" in capsys.readouterr().out
+
+
+def test_bulk_remove_refuses_running_job_without_partial_delete(isolated_history_db, tmp_path):
+    ids = [queue_mod.add_job(request(tmp_path, str(index)))[0] for index in range(3)]
+    with sqlite3.connect(isolated_history_db) as conn:
+        conn.execute("UPDATE queue_jobs SET status = 'running' WHERE id = ?", (ids[1],))
+    with pytest.raises(ValueError, match="running"):
+        queue_mod.remove_jobs(ids)
+    assert {job.id for job in queue_mod.list_jobs()} == set(ids)
+
+
+def test_queue_records_failed_skipped_and_retry_attempts(
+    isolated_history_db, tmp_path, monkeypatch
+):
+    ids = [queue_mod.add_job(request(tmp_path, str(index)))[0] for index in range(2)]
+    attempts = 0
+
+    def download(req, on_event=None):
+        nonlocal attempts
+        attempts += 1
+        status = "failed" if attempts == 1 else "skipped" if attempts == 2 else "succeeded"
+        return DownloadResult(status, req.url, (), ("network error",) if status == "failed" else ())
+
+    monkeypatch.setattr(queue_mod, "run_download", download)
+    queue_mod.run_queue()
+    assert [(row["url"], row["status"]) for row in history.get_history()] == [
+        (request(tmp_path, "0").url, "failed"),
+        (request(tmp_path, "1").url, "skipped"),
+    ]
+    assert queue_mod.retry_failed(ids[0]) == 1
+    queue_mod.run_queue()
+    assert [row["status"] for row in history.get_history()] == ["failed", "skipped", "success"]
+
+
+def test_queue_obeys_disabled_history_setting(isolated_history_db, tmp_path, monkeypatch):
+    queue_mod.add_job(request(tmp_path))
+    monkeypatch.setitem(config, "history_enabled", False)
+    monkeypatch.setattr(
+        queue_mod,
+        "run_download",
+        lambda req, on_event=None: DownloadResult("succeeded", req.url, (), ()),
+    )
+    assert queue_mod.run_queue().succeeded == 1
+    assert history.get_history() == []
 
 
 def test_management_coordinates_with_running_worker(isolated_history_db, tmp_path, monkeypatch):

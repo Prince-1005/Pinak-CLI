@@ -143,7 +143,7 @@ status. Each finished job prints its result; failures include the reason.
 /queue show 12
 /queue cancel 12
 /queue list --status cancelled
-/queue remove 12
+/queue remove 12 15 21
 /queue clean --completed
 ```
 
@@ -155,7 +155,8 @@ Pinak's shell start with `pinak queue`.
 and are never claimed by the worker or included in `retry --failed`. To download
 one later, add the URL again. Cancelling an already cancelled job is harmless.
 
-`remove` deletes one inactive job record. Running jobs cannot be cancelled or
+`remove` deletes one or more inactive job records in one transaction. If any ID
+is unknown or running, none are removed. Running jobs cannot be cancelled or
 removed: press Ctrl+C in their runner first. Claims and management changes use
 SQLite transactions so a waiting job cannot start after its cancellation or
 removal commits.
@@ -164,7 +165,10 @@ removal commits.
 queued, running, failed, and cancelled records. All three management actions keep
 downloaded and partial files and the separate download history; cleanup does not
 delete media from disk. Unknown/nonpositive IDs produce an error without changing
-other jobs. The `--completed` flag is required for cleanup.
+other jobs. The `--completed` flag is required for cleanup. Each queue attempt
+also updates local download history with its result, files, and saved options
+when history recording is enabled. Removing or cleaning queue records keeps
+those history entries.
 
 `/clear` (or `clear`) clears the terminal screen and scrollback (including the shell output from
 launching Pinak), then redraws the Pinak ASCII logo and

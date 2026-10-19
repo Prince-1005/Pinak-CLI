@@ -1022,19 +1022,22 @@ def handle_download(
     status_val = (
         "canceled" if result.get("canceled") else ("success" if result.get("success") else "failed")
     )
-    record_download(
-        url,
-        status_val,
-        mode=(
-            "audio"
-            if extract_audio or (info.get("vcodec") == "none" and info.get("acodec") != "none")
-            else "media"
-        ),
-        files=result.get("files", []),
-        quality=result.get("quality"),
-        duration=duration,
-        is_forced=force,
-    )
+    from .engine import history_owned_by_queue
+
+    if not history_owned_by_queue():
+        record_download(
+            url,
+            status_val,
+            mode=(
+                "audio"
+                if extract_audio or (info.get("vcodec") == "none" and info.get("acodec") != "none")
+                else "media"
+            ),
+            files=result.get("files", []),
+            quality=result.get("quality"),
+            duration=duration,
+            is_forced=force,
+        )
     if not in_engine():
         print_download_summary(result)
     return result

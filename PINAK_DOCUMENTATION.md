@@ -313,7 +313,7 @@ Running `pinak` without arguments launches an interactive shell with auto-comple
 - `/instagram <URL>` – Download Instagram content
 - `/queue import <file>` then `/queue run` – Save and run a list of URLs
 - `/queue add <url>`, `/queue list`, `/queue retry --failed` – Manage saved download jobs
-- `/queue show <id>`, `/queue cancel <id>`, `/queue remove <id>`, `/queue clean --completed` – Inspect and manage records while keeping downloaded files
+- `/queue show <id>`, `/queue cancel <id>`, `/queue remove <id> [id ...]`, `/queue clean --completed` – Inspect and manage records while keeping downloaded files and history
 - `/clear` – Clear terminal output and redraw the Pinak logo and control panel
 - `/update` – Update tools to latest versions
 - `/exit` – Exit interactive prompt

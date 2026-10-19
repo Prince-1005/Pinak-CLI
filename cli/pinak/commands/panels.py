@@ -9,6 +9,7 @@ import shutil
 
 from rich.console import Console
 from rich.panel import Panel
+from rich.text import Text
 
 from ..config import config
 from ..subproc import run_cmd
@@ -24,23 +25,27 @@ def get_greeting_message() -> str:
 
 
 def print_banner() -> None:
-    banner = r"""
-[cyan]  ____ ___ _   _    _    _  __
- |  _ \_ _| \ | |  / \  | |/ /
- | |_) | ||  \| | / ^ \ | ' / 
- |  __/| || |\  |/ ___ \| . \ 
- |_|  |___|_| \_/_/   \_\_|\_\
-[/]
-       [yellow bold]([/]
-      [yellow bold]/ \ [/]
-     [yellow bold]/   )[/]
- [cyan]>>==[/][yellow bold]|[/][cyan]=======>[/]
-     [yellow bold]\   )[/]
-      [yellow bold]\ /[/]
-       [yellow bold])[/]
-"""
     from rich import box
 
+    glyphs = (
+        (("PPPP ", "P   P", "PPPP ", "P    ", "P    "), "bold red"),
+        (("IIIII", "  I  ", "  I  ", "  I  ", "IIIII"), "bold yellow"),
+        (("N   N", "NN  N", "N N N", "N  NN", "N   N"), "bold green"),
+        ((" AAA ", "A   A", "AAAAA", "A   A", "A   A"), "bold cyan"),
+        (("K   K", "K  K ", "KKK  ", "K  K ", "K   K"), "bold magenta"),
+    )
+    banner = Text("\n")
+    for row in range(5):
+        banner.append("  ")
+        for lines, color in glyphs:
+            banner.append(lines[row], style=color)
+            banner.append(" ")
+        banner.append("\n")
+    banner.append("\n       (\n      / \\ \n     /   )\n ", style="bold yellow")
+    banner.append(">>==", style="bold cyan")
+    banner.append("|", style="bold yellow")
+    banner.append("=======>", style="bold cyan")
+    banner.append("\n     \\   )\n      \\ /\n       )\n", style="bold yellow")
     panel = Panel.fit(
         banner,
         title="[bold yellow]PINAK-CLI 🔱[/]",

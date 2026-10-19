@@ -17,7 +17,7 @@ from filelock import FileLock, Timeout
 
 from . import history
 from .downloader import parse_download_text
-from .engine import DownloadEvent, DownloadRequest, DownloadResult, run_download
+from .engine import DownloadEvent, DownloadRequest, DownloadResult, queue_owns_history, run_download
 
 STATES = frozenset({"queued", "running", "succeeded", "skipped", "failed", "cancelled"})
 
@@ -211,16 +211,27 @@ def cancel_job(job_id: int) -> bool:
     return True
 
 
-def remove_job(job_id: int) -> None:
-    """Remove an inactive queue record; never touch its files or history."""
+def remove_jobs(job_ids: Iterable[int]) -> int:
+    """Atomically remove inactive records; never touch their files or history."""
+    ids = list(dict.fromkeys(job_ids))
+    if not ids:
+        raise ValueError("Provide at least one job ID")
     with contextlib.closing(_connect()) as conn, conn:
         conn.execute("BEGIN IMMEDIATE")
-        row = _find_job(conn, job_id)
-        if row["status"] == "running":
-            raise ValueError(
-                f"Job #{job_id} is running and cannot be removed. Press Ctrl+C in its runner first."
-            )
-        conn.execute("DELETE FROM queue_jobs WHERE id = ?", (job_id,))
+        for job_id in ids:
+            row = _find_job(conn, job_id)
+            if row["status"] == "running":
+                raise ValueError(
+                    f"Job #{job_id} is running and cannot be removed. "
+                    "Press Ctrl+C in its runner first."
+                )
+        conn.executemany("DELETE FROM queue_jobs WHERE id = ?", ((job_id,) for job_id in ids))
+    return len(ids)
+
+
+def remove_job(job_id: int) -> None:
+    """Keep the one-ID Python API for existing clients."""
+    remove_jobs([job_id])
 
 
 def clean_completed() -> int:
@@ -292,7 +303,7 @@ def _claim_next(conn: sqlite3.Connection, selected: set[int] | None) -> QueueJob
         raise
 
 
-def _finish(conn: sqlite3.Connection, job_id: int, result: DownloadResult) -> None:
+def _finish(conn: sqlite3.Connection, job: QueueJob, result: DownloadResult) -> None:
     status = "queued" if result.status == "interrupted" else result.status
     now = time.time()
     with conn:
@@ -305,9 +316,24 @@ def _finish(conn: sqlite3.Connection, job_id: int, result: DownloadResult) -> No
                 None if status == "queued" else now,
                 "; ".join(result.errors) or ("Interrupted" if status == "queued" else None),
                 json.dumps(result.files),
-                job_id,
+                job.id,
             ),
         )
+        if history.history_enabled():
+            history.insert_download(
+                conn,
+                job.request.url,
+                (
+                    "canceled"
+                    if result.status == "interrupted"
+                    else "success" if result.status == "succeeded" else result.status
+                ),
+                "audio" if job.request.extract_audio else "media",
+                list(result.files),
+                job.request.quality,
+                result.duration,
+                job.request.force,
+            )
 
 
 def run_queue(
@@ -352,15 +378,16 @@ def run_queue(
                 processed += 1
                 try:
                     publish(job, DownloadEvent("started"))
-                    result = run_download(
-                        job.request,
-                        on_event=partial(publish, job),
-                    )
+                    with queue_owns_history():
+                        result = run_download(
+                            job.request,
+                            on_event=partial(publish, job),
+                        )
                 except KeyboardInterrupt:
                     result = DownloadResult("interrupted", job.request.url, (), ("Interrupted",))
                 except Exception as exc:
                     result = DownloadResult("failed", job.request.url, (), (str(exc),))
-                _finish(conn, job.id, result)
+                _finish(conn, job, result)
                 publish(
                     job,
                     DownloadEvent(
