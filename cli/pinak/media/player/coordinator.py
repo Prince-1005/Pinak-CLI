@@ -479,7 +479,8 @@ class MediaSession:
         elif k == "r":
             self.playlist_manager.cycle_repeat_mode()
         elif k == "s":
-            self.playlist_manager.toggle_shuffle()
+            if not self.picture_viewer:
+                self.playlist_manager.toggle_shuffle()
         elif k == "n":
             if self.picture_viewer:
                 self.picture_viewer.next_image()
@@ -760,7 +761,8 @@ class MediaSession:
             l2_left = f"   [Audio Hi-Fi | Mode: {self.renderer.mode_name.upper()}] │ FFT: {bands_lbl} │ Vis: {self.current_vis_theme.title()}"
 
         vol_str = f"Vol: {vol_pct}%" if isinstance(vol_pct, int) else f"Vol: {vol_pct}"
-        l2_right = f"{vol_str} │ Rep: {repeat_lbl} "
+        shuffle_lbl = "ON" if self.playlist_manager.is_shuffled else "OFF"
+        l2_right = f"{vol_str} │ Rep: {repeat_lbl} │ Shuf: {shuffle_lbl} "
         v_l2_right = len(self._strip_ansi(l2_right))
         avail_l2_left = max(0, cols - v_l2_right - 1)
         if len(self._strip_ansi(l2_left)) > avail_l2_left:
@@ -799,6 +801,10 @@ class MediaSession:
             else:
                 l1_left = " [Space] Play  [Ctrl+M] Mute  [r] Repeat "
                 l2_left = " [m] Mode  [v] Visualizer  [w] GPU  [x] Quit "
+
+        # Keep the shuffle toggle visible even when the first row is truncated.
+        l2_left = " [s] Shuffle " + l2_left.lstrip()
+        l2_left = l2_left[:cols]
 
         # Close button in bottom navigation bar
         close_btn = " [ ✕ Close Media ] " if cols >= 80 else " [✕] "
@@ -889,7 +895,15 @@ class MediaSession:
         if is_completed:
             if self.turntable:
                 self.turntable.set_parked(True)
-            if is_video:
+            if self.playlist_manager.is_shuffled:
+                if self.playlist_manager.has_next():
+                    self._advance_track(delta=1)
+                else:
+                    self.transport.is_playing = False
+                    if self.audio_backend:
+                        self.audio_backend.pause()
+                    self.master_clock.pause()
+            elif is_video:
                 if self.playlist_manager.has_next():
                     # Videos continue in sequence (under Repeat OFF, ALL, or SOLO)
                     self._advance_track(delta=1)

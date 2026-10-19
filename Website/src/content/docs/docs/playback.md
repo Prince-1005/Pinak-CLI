@@ -21,12 +21,31 @@ Interactive playback needs a terminal. Native windows require a graphical deskto
 - **Ctrl+M:** mute.
 - **n / p:** next/previous track.
 - **r:** repeat mode.
+- **s:** shuffle on/off for songs and videos; the header shows `Shuf: ON/OFF`.
 - **m:** terminal renderer.
 - **w:** toggle an available native window.
 - **c:** cycle available video subtitles.
 - **Esc / x:** close media.
 
 In picture viewing, arrows pan, **+ / −** zoom, and **r / R** rotate. Picture controls differ from audio/video controls.
+
+## Shuffle and repeat
+
+Press **s** to toggle shuffle without changing the playing track. Press **r** to
+cycle repeat through **OFF → ALL → SOLO → OFF**. ALL is the repeat-on mode.
+
+- **Shuffle + ALL:** each next track is randomly chosen from the full playlist.
+  A track can be selected again, including the current track.
+- **Shuffle + OFF:** each next track is randomly chosen from tracks not yet
+  played in this player session. After all tracks have played, playback pauses
+  on the last track. Music does not wrap around in this mode.
+- **Shuffle + SOLO:** completion restarts the current track repeatedly.
+
+**n / p** still let you navigate manually; **p** follows playback history while
+shuffle is on. Manual navigation can change the current track in SOLO. Switching
+shuffle off returns to normal playlist order, keeping the current track. Toggling
+shuffle or repeat does not erase the session's played-track history. Reopen the
+collection to start a fresh session.
 
 ## Rendering
 

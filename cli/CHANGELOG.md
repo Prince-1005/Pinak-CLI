@@ -8,6 +8,7 @@ Release notes are maintained manually; automatic release creation is disabled.
 ## [Unreleased]
 
 ### Added
+- Make audio/video shuffle selectable with `s`, show its state and control in the TUI, choose from the full playlist with repeat ALL, only unplayed tracks with repeat OFF, and repeat the current track with SOLO.
 - Record each queue attempt in local download history together with its saved job result, including skipped and failed attempts, when history is enabled.
 - Accept multiple IDs in `queue remove` and `/queue remove`, with all-or-nothing validation.
 - Render the five letters of the Pinak terminal logo in distinct colors.

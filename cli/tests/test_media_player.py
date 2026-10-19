@@ -55,10 +55,8 @@ def test_playlist_manager_repeat_and_shuffle(fake_tracks):
     assert pl.has_next() is True
 
     pl.repeat_mode = "none"
-    pl.current_idx = 4  # final track of 5
+    # Every track was already played before shuffle was enabled.
     assert pl.has_next() is False
-    pl.current_idx = 2
-    assert pl.has_next() is True
 
     # Turn off shuffle to verify deterministic track index order
     pl.toggle_shuffle()

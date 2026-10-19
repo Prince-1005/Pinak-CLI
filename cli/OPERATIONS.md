@@ -219,11 +219,20 @@ playback ends; the launcher waits for the command and checks its recorded exit
 status.
 
 Space pauses/resumes, arrows seek/change volume, Ctrl+M mutes, `n`/`p` navigate,
-`r` changes repeat mode, `m` changes renderer, `w` toggles a native window and
+`r` changes repeat mode, `s` toggles shuffle, `m` changes renderer, `w` toggles a native window and
 Esc/`x` closes media. Picture controls route to the viewer once. Native-window
 fullscreen belongs to the native window; the deprecated PictureViewer
 fullscreen method is retained for API compatibility. Directory scans and image
 decoding enforce resource budgets, and small terminals request a resize.
+
+For audio and video, shuffle preserves the current track and shows `Shuf: ON/OFF`
+in the header. With repeat ALL (ON), each next track is randomly selected from the
+full playlist, including previously played tracks. With repeat OFF, it selects
+only tracks not yet played in this session and pauses after exhaustion, including
+for music. With repeat SOLO, the current track repeats on completion. Manual
+`n`/`p` navigation can change tracks in SOLO; `p` follows playback history while
+shuffle is on. Toggling shuffle/repeat preserves played history; reopen the
+collection for a fresh session. Shuffle OFF restores normal sequential behavior.
 
 Playback starts without an assessment prompt when measured device resources are
 healthy. It asks for consent when unplugged battery is at or below 15%, free RAM
