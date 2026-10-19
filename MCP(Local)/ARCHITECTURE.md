@@ -2,7 +2,7 @@
 
 ## Package layout to implement
 
-Keep human/GPT planning and setup examples in root `MCP/`. Runtime code belongs
+Keep human/GPT planning and setup examples in root `MCP(Local)/`. Runtime code belongs
 under `cli/pinak/mcp_server/` so the existing wheel discovery includes it.
 
 Proposed modules: `__main__.py` for launch/diagnostic/configuration subcommands,

@@ -188,11 +188,7 @@ jobs:
         run: |
           python -m pip install --require-hashes -r requirements-cloud-lock.txt
           docker run --rm --entrypoint python pinak-cloud-check -c 'import os; import pinak.mcp_cloud.app'
-          docker run --detach --name pinak-cloud-check --publish 127.0.0.1:18000:8000 --volume pinak-cloud-check:/data --env PINAK_CLOUD_URL=http://127.0.0.1:18000 --env PINAK_CLOUD_TEST_LOOPBACK=1 pinak-cloud-check
-          python tools/smoke_cloud_container.py --container pinak-cloud-check --url http://127.0.0.1:18000
-      - name: Clean cloud test container
-        if: always()
-        run: docker rm --force pinak-cloud-check || true
+          python tools/smoke_cloud_container.py --compose-dir cloud-install --url http://127.0.0.1:18000
       - name: Upload self-hosted cloud installer
         uses: actions/upload-artifact@v4
         with:

@@ -339,5 +339,5 @@ responses. They do not promise exactly-once download execution.
 
 No binary provisioning, package updates, network listener, desktop player or
 external AI account setup happens during initialization. Download sources still
-require outbound network access. See ../MCP/USAGE.md and IMPLEMENTATION_STATUS.md
+require outbound network access. See ../MCP(Local)/USAGE.md and IMPLEMENTATION_STATUS.md
 for setup, supported behavior, recovery and outstanding release acceptance.

@@ -12,6 +12,10 @@ Release notes are maintained manually; automatic release creation is disabled.
 - Keep an open GPU/native window across audio and video track changes, refresh its title and media, and retain its size and fullscreen state until the user closes it or exits playback.
 
 ### Added
+- Add optional Local MCP over stdio with fourteen tools for the shared download engine, durable queue, history, metadata, and diagnostics.
+- Add optional user-operated Cloud MCP over authenticated Streamable HTTP, with per-user queues/processes, expiring file links, persistent Docker deployments, and VPS/Render recipes. Pinak does not operate a shared hosted service; live provider-account deployment remains unverified.
+- Document Pinak-MCP Local and user-hosted Cloud on the website, with installation, client compatibility, queue tools, file retrieval, and hosting guides. Rename repository documentation from `MCP/` to `MCP(Local)/`; runtime module and executable names are unchanged.
+- Provide cloud installer archives with deployment dotfiles, checksums, a step-by-step hosting guide, and local Compose verification.
 - Make audio/video shuffle selectable with `s`, show its state and control in the TUI, choose from the full playlist with repeat ALL, only unplayed tracks with repeat OFF, and repeat the current track with SOLO.
 - Record each queue attempt in local download history together with its saved job result, including skipped and failed attempts, when history is enabled.
 - Accept multiple IDs in `queue remove` and `/queue remove`, with all-or-nothing validation.

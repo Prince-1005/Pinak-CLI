@@ -1,4 +1,4 @@
-# Pinak-MCP
+# Pinak-MCP Local
 
 Connect an AI application to Pinak's local download engine and durable queue.
 Pinak-MCP uses standard MCP **stdio**: the AI application launches a local Python

@@ -12,10 +12,18 @@
 > Pinak is an open-source educational project and terminal interface wrapper around [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) and [`FFmpeg`](https://ffmpeg.org/), designed for learning CLI architecture and personal media archiving.  
 > ⚠️ **Notice:** Downloading content may violate a platform's Terms of Service. Only download media that you own, that is freely licensed, or that you have explicit permission to keep. Respect copyright laws and **be excellent to creators!**
 
-Current source release: **1.4.4**. See the [release notes](cli/CHANGELOG.md),
+Current source version: **2.0.0**. See the [release notes](cli/CHANGELOG.md),
 [operating guide](cli/OPERATIONS.md), and [prior release readiness record](RELEASE_READINESS.md)
 for behavior and verification. GitHub releases are created manually;
 automatic release creation is disabled.
+
+## Connect an AI application
+
+Choose [Pinak-MCP Local](<MCP(Local)/README.md>) for a local stdio process, or
+[Pinak-MCP Cloud](<MCP(cloud)/README.md>) to run a remote instance on your own
+server. Both use Pinak's durable queue. Pinak does not host a shared MCP service.
+See the [step-by-step hosting guide](<MCP(cloud)/HOSTING_STEPS.md>) for cloud setup.
+Install from the successful main-branch CI bundles; the PyPI release may differ.
 
 ## Overview
 
@@ -24,7 +32,7 @@ Pinak is a cross-platform Python CLI tool and educational wrapper around `yt-dlp
 **Key Highlights:**
 - 🚀 Clean, modular architecture
 - 🎯 Rich terminal UX with progress bars & tables
-- 🔒 Privacy-first – all data stays local
+- 🔒 Privacy-first – CLI and local MCP media stays on your device
 - ⚡ Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp) for broad URL support
 - 🎬 Seamless media processing via FFmpeg
 - 🩺 Built-in `doctor` for environment diagnostics

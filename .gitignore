@@ -51,18 +51,19 @@ htmlcov/
 phases
 
 # Local MCP implementation plans and superseded progress/session reports
-/MCP/planning/
-/MCP/GPT_IMPLEMENTATION_GUIDE.md
-/MCP/REQUIREMENTS.md
-/MCP/IMPLEMENTATION_STATUS.md
-/MCP/ACCEPTANCE.md
-/MCP/CLIENT_ACCEPTANCE.md
-/MCP/SETUP_AND_UPDATES.md
+/MCP(Local)/planning/
+/MCP(Local)/GPT_IMPLEMENTATION_GUIDE.md
+/MCP(Local)/REQUIREMENTS.md
+/MCP(Local)/IMPLEMENTATION_STATUS.md
+/MCP(Local)/ACCEPTANCE.md
+/MCP(Local)/CLIENT_ACCEPTANCE.md
+/MCP(Local)/SETUP_AND_UPDATES.md
 
 # Generated cloud installers and local deployment state
 /cli/cloud-install/
 /MCP(cloud)/data/
 /MCP(cloud)/backups/
+/MCP(cloud)/dist/
 
 # OS and editor files
 .DS_Store

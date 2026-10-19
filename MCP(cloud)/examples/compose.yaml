@@ -14,7 +14,7 @@ services:
     security_opt:
       - no-new-privileges:true
     cap_drop: [ALL]
-    cap_add: [CHOWN, DAC_OVERRIDE, SETUID, SETGID]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
     healthcheck:
       test: [CMD, python, -c, "import os,urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/healthz',headers={'Host':os.environ['PINAK_CLOUD_URL'].split('://',1)[1]}); urllib.request.urlopen(r,timeout=3)"]
       interval: 30s

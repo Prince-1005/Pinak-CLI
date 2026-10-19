@@ -106,6 +106,13 @@ From `cli/`: `python -m pytest tests/test_mcp_cloud.py`; `ruff check .`;
 Use `python tools/package_cloud.py DIST --output OUTPUT --source-revision SHA`
 after the wheel is built. Docker templates build from the extracted output.
 
+For a private local delivery, add `--archive /absolute/path/pinak-mcp-cloud-install.zip`
+to the packaging command. The ZIP is created outside OUTPUT and includes required
+dotfiles. Use a fresh output directory and ZIP filename; existing outputs are
+refused to prevent mixing stale builds. Label uncommitted source revisions as
+local working trees, and verify the resulting SHA256SUMS before transferring.
+No push or release publication is required to create or use that local archive.
+
 Dependencies: Python 3.10+, pinned MCP 2.3.0 and Uvicorn for the optional cloud
 extra; Python 3.12 in Docker, system FFmpeg/FFprobe, persistent local filesystem,
 HTTPS ingress and a client supporting remote HTTP with bearer headers. No hosted

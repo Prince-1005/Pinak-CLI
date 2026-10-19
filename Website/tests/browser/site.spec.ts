@@ -65,6 +65,38 @@ test('documentation search is built and navigation works', async ({ page }) => {
   await expect(page.locator('.pagefind-ui__result').first()).toBeVisible();
 });
 
+test('MCP editions lead to correct setup guides and remain accessible', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Explore Local & Cloud MCP' }).click();
+  await expect(page.locator('h1')).toContainText('Keep the controls.');
+  await expect(page.locator('#local')).toContainText('pinak-mcp-install');
+  await expect(page.locator('#cloud')).toContainText('pinak-mcp-cloud-install');
+  await expect(page.locator('#cloud')).toContainText('your server');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate(value => { document.documentElement.dataset.theme = value; }, theme);
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+    expect(results.violations).toEqual([]);
+  }
+  await page.getByRole('link', { name: 'Set up Local MCP' }).click();
+  await expect(page).toHaveURL(/\/docs\/mcp-local\/$/);
+  await expect(page.locator('main')).toContainText('pinak.mcp_server configure');
+  await page.goto('/mcp/');
+  await page.getByRole('link', { name: 'Host your Cloud MCP' }).click();
+  await expect(page).toHaveURL(/\/docs\/mcp-cloud\/$/);
+  await expect(page.locator('main')).toContainText('docker compose exec app python -m pinak.mcp_cloud users add alice');
+  await expect(page.locator('main')).toContainText('Live VPS and Render account deployment remains unverified');
+});
+
+test('MCP setup documentation is discoverable through search', async ({ page }) => {
+  await page.goto('/docs/');
+  await page.getByRole('button', { name: /Search/ }).first().click();
+  await page.getByRole('textbox', { name: 'Search', exact: true }).fill('bearer');
+  await expect(page.locator('.pagefind-ui__result').first()).toBeVisible();
+  await expect(page.locator('.pagefind-ui__results')).toContainText('Cloud');
+});
+
 test('future gallery growth paginates at 24 and handles no matches', async ({ page }) => {
   await page.route('**/showcase/', async route => {
     const response = await route.fetch(); const html = await response.text();

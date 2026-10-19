@@ -23,6 +23,7 @@ export default defineConfig({
         { label: 'Start here', items: [{ label: 'Overview', slug: 'docs' }, { label: 'Installation', slug: 'docs/installation' }] },
         { label: 'Download', items: [{ label: 'Commands & options', slug: 'docs/commands' }, { label: 'Audio, quality & batches', slug: 'docs/downloads' }] },
         { label: 'Your workspace', items: [{ label: 'Interactive shell', slug: 'docs/interactive' }, { label: 'Playback & subtitles', slug: 'docs/playback' }, { label: 'Configuration & storage', slug: 'docs/configuration' }] },
+        { label: 'AI connections', items: [{ label: 'Choose Local or Cloud', slug: 'docs/mcp' }, { label: 'Local MCP setup', slug: 'docs/mcp-local' }, { label: 'Host Cloud MCP', slug: 'docs/mcp-cloud' }] },
         { label: 'Keep it working', items: [{ label: 'Diagnostics & troubleshooting', slug: 'docs/troubleshooting' }, { label: 'Updating & contributing', slug: 'docs/contributing' }] }
       ]
     })

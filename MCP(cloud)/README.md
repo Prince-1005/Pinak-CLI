@@ -8,9 +8,13 @@ This optional edition exposes Streamable HTTP at `https://YOUR-HOST/mcp`.
 Several trusted people can use one instance. The administrator gives each person
 an individual bearer token; each has a separate queue, SQLite database, download
 folder and supervised local MCP process. The existing local `stdio` edition is
-documented in [MCP](../MCP/README.md).
+documented in [MCP(Local)](<../MCP(Local)/README.md>).
 
 ## Start here
+
+For a walkthrough, open [step-by-step hosting](HOSTING_STEPS.md). A maintainer can
+also hand you a locally built installer ZIP without pushing code or publishing a
+release; use the same steps to transfer and deploy that ZIP.
 
 1. Obtain the `pinak-mcp-cloud-install` bundle from a successful main-branch
    [CI run](https://github.com/Prince-1005/Pinak-CLI/actions/workflows/ci.yml).

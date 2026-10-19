@@ -1,4 +1,22 @@
 @layer reset, base, components, responsive;
+@layer components {
+  .mcp-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin:35px 0 65px}
+  .mcp-option{padding:36px;border:1px solid var(--line);border-radius:4px;background:var(--surface);min-width:0}
+  .mcp-option h2{font-size:clamp(2rem,4vw,3rem);margin:18px 0}
+  .mcp-option ul{color:var(--muted);padding-left:20px;margin:24px 0}
+  .mcp-option li{margin:12px 0}
+  .mcp-option strong{color:var(--text)}
+  .mcp-option .small{margin-top:18px;overflow-wrap:anywhere}
+  .mcp-workflow{padding-left:22px;color:var(--muted)}
+  .mcp-workflow li{margin:18px 0}.mcp-workflow strong{color:var(--text)}
+  .mcp-example .terminal-body{min-height:0}
+  .mcp-teaser{border-top:1px solid var(--line)}
+  .mcp-teaser h2{margin:20px 0}.mcp-teaser p{max-width:650px;margin-bottom:28px}
+}
+@layer responsive {
+  @media(max-width:1250px){.header-label,.header-separator{display:none}}
+  @media(max-width:800px){.mcp-options{grid-template-columns:1fr}.mcp-option{padding:24px}}
+}
 @layer reset {
   *,*::before,*::after{box-sizing:border-box}body,h1,h2,h3,p{margin:0}button,input,select{font:inherit}button,a,input{-webkit-tap-highlight-color:transparent}button{cursor:pointer}img,video{max-width:100%;display:block}a{color:inherit;text-decoration:none}button{color:inherit} [hidden]{display:none!important}
 }

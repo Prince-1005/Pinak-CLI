@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
+import tempfile
 import time
 import urllib.request
+import uuid
+from pathlib import Path
+from urllib.parse import urlsplit
 
 import anyio
 import httpx2
@@ -15,7 +20,9 @@ from mcp.client.streamable_http import streamable_http_client
 
 
 def docker(*arguments: str) -> str:
-    return subprocess.check_output(["docker", *arguments], text=True).strip()  # nosec B603 B607
+    command = ["docker", *arguments]
+    output = subprocess.check_output(command, text=True, timeout=120)  # nosec B603 B607
+    return output.strip()
 
 
 def wait_health(url: str) -> None:
@@ -62,38 +69,83 @@ async def exercise(url: str, alice: str, bob: str, *, existing: bool = False) ->
         await inspect(bob, "bob")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--container", required=True)
-    parser.add_argument("--url", required=True)
-    args = parser.parse_args()
-    wait_health(args.url)
+def check_container(container: str, url: str) -> None:
+    wait_health(url)
     tokens = {}
     for name in ("alice", "bob"):
-        output = docker(
-            "exec", args.container, "python", "-m", "pinak.mcp_cloud", "users", "add", name
-        )
+        output = docker("exec", container, "python", "-m", "pinak.mcp_cloud", "users", "add", name)
         tokens[name] = json.loads(output)["token"]
     # Inspect the service process, not docker-exec's administrative identity.
     uid = docker(
         "exec",
-        args.container,
+        container,
         "python",
         "-c",
         "import psutil; p=next(p for p in psutil.process_iter() if p.cmdline()[1:3]==['-m','pinak.mcp_cloud'] and 'serve' in p.cmdline()); print(p.uids().real)",
     )
     assert uid == "10001", uid
-    anyio.run(exercise, args.url, tokens["alice"], tokens["bob"])
-    docker("restart", "--time", "40", args.container)
-    wait_health(args.url)
+    anyio.run(exercise, url, tokens["alice"], tokens["bob"])
+    docker("restart", "--time", "40", container)
+    wait_health(url)
 
     async def check_persistence() -> None:
-        await exercise(args.url, tokens["alice"], tokens["bob"], existing=True)
+        await exercise(url, tokens["alice"], tokens["bob"], existing=True)
 
     anyio.run(check_persistence)
     print(
         "Cloud image: non-root service, remote SDK, 15 tools, user isolation and restart persistence passed"
     )
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    target = parser.add_mutually_exclusive_group(required=True)
+    target.add_argument("--container")
+    target.add_argument("--compose-dir", type=Path)
+    parser.add_argument("--url", required=True)
+    parser.add_argument("--image", default="pinak-cloud-check")
+    args = parser.parse_args()
+    if args.container:
+        check_container(args.container, args.url)
+        return
+    endpoint = urlsplit(args.url)
+    if endpoint.scheme != "http" or endpoint.hostname != "127.0.0.1" or not endpoint.port:
+        raise ValueError("Compose smoke verification requires an explicit loopback HTTP port")
+    with tempfile.TemporaryDirectory(prefix="pinak-cloud-compose-") as temporary:
+        root = Path(temporary)
+        for name in ("compose.yaml", "Caddyfile"):
+            shutil.copy2(args.compose_dir / name, root / name)
+        shutil.copy2(args.compose_dir / ".env.example", root / ".env")
+        overrides = {
+            "services": {
+                "app": {
+                    "image": args.image,
+                    "ports": [f"127.0.0.1:{endpoint.port}:8000"],
+                    "environment": {"PINAK_CLOUD_URL": args.url, "PINAK_CLOUD_TEST_LOOPBACK": "1"},
+                }
+            }
+        }
+        (root / "override.json").write_text(json.dumps(overrides), encoding="utf-8")
+        compose = (
+            "compose",
+            "--project-name",
+            "pinak-check-" + uuid.uuid4().hex[:8],
+            "--project-directory",
+            str(root),
+            "--file",
+            str(root / "compose.yaml"),
+            "--file",
+            str(root / "override.json"),
+        )
+        try:
+            docker(*compose, "up", "--detach", "--no-build", "app")
+            container = docker(*compose, "ps", "--quiet", "app")
+            check_container(container, args.url)
+        except BaseException:
+            print(docker(*compose, "logs", "--no-color", "--tail", "100", "app"))
+            raise
+        finally:
+            docker(*compose, "down", "--volumes")
 
 
 if __name__ == "__main__":
