@@ -1,0 +1,7 @@
+{$PINAK_CLOUD_DOMAIN} {
+    # Access logging stays off: /files contains short-lived bearer capabilities.
+    request_body {
+        max_size 64KB
+    }
+    reverse_proxy app:8000
+}

@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: pinak-mcp-cloud
+    runtime: docker
+    plan: 1c-2g
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    numInstances: 1
+    autoDeployTrigger: "off"
+    maxShutdownDelaySeconds: 45
+    healthCheckPath: /healthz
+    disk:
+      name: pinak-data
+      mountPath: /data
+      sizeGB: 50
+    envVars:
+      - key: PINAK_CLOUD_URL
+        sync: false
+      - key: PINAK_CLOUD_DATA
+        value: /data
+      - key: PINAK_CLOUD_MAX_USERS
+        value: "20"
+      - key: PINAK_CLOUD_STORAGE_BYTES
+        value: "10737418240"

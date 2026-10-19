@@ -179,3 +179,24 @@ jobs:
           path: cli/mcp-install/
           if-no-files-found: error
           retention-days: 90
+      - name: Prepare self-hosted cloud installer
+        run: python tools/package_cloud.py release-dist --output cloud-install --source-revision "$GITHUB_SHA"
+      - name: Build cloud deployment image
+        run: docker build --tag pinak-cloud-check cloud-install
+      - name: Verify cloud image and persistent storage
+        shell: bash
+        run: |
+          docker run --rm --entrypoint python pinak-cloud-check -c 'import os; import pinak.mcp_cloud.app'
+          docker run --detach --name pinak-cloud-check --publish 127.0.0.1:18000:8000 --volume pinak-cloud-check:/data --env PINAK_CLOUD_URL=http://127.0.0.1:18000 --env PINAK_CLOUD_TEST_LOOPBACK=1 pinak-cloud-check
+          python tools/smoke_cloud_container.py --container pinak-cloud-check --url http://127.0.0.1:18000
+      - name: Clean cloud test container
+        if: always()
+        run: docker rm --force pinak-cloud-check || true
+      - name: Upload self-hosted cloud installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: pinak-mcp-cloud-install
+          path: cli/cloud-install/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 90

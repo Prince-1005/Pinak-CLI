@@ -35,6 +35,10 @@ connect directly. See [complete installation steps](USAGE.md).
 
 ## Documentation
 
+For an optional remote instance on your own VPS or Render account, see
+[Pinak-MCP Cloud](<../MCP(cloud)/README.md>). Its cloud deployment acceptance
+is recorded separately; this page describes the local stdio edition.
+
 - [Installation, client setup and everyday usage](USAGE.md)
 - [Policy and client configuration examples](examples/README.md)
 - [Tool contract and errors](TOOL_CONTRACT.md)

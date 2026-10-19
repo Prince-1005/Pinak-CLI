@@ -45,6 +45,7 @@ dependencies = [
 
 [project.optional-dependencies]
 mcp = ["mcp==2.3.0"]
+cloud = ["mcp==2.3.0", "uvicorn==0.54.0"]
 dev = [
     "setuptools>=83.0.0",
     "build>=1.2",
@@ -75,6 +76,7 @@ ffmpeg = [
 [project.scripts]
 pinak = "pinak.cli:run_cli"
 pinak-mcp = "pinak.mcp_server.__main__:main"
+pinak-mcp-cloud = "pinak.mcp_cloud.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

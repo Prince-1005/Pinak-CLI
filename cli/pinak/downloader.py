@@ -113,6 +113,11 @@ def _resilience_opts() -> dict:
     """
     retries = _retry_count()
     return {
+        **(
+            {"proxy": os.environ["PINAK_CLOUD_PROXY"], "hls_prefer_native": True}
+            if os.environ.get("PINAK_CLOUD_PROXY")
+            else {}
+        ),
         "continuedl": True,
         "retries": retries,
         "fragment_retries": retries,

@@ -59,6 +59,11 @@ phases
 /MCP/CLIENT_ACCEPTANCE.md
 /MCP/SETUP_AND_UPDATES.md
 
+# Generated cloud installers and local deployment state
+/cli/cloud-install/
+/MCP(cloud)/data/
+/MCP(cloud)/backups/
+
 # OS and editor files
 .DS_Store
 Thumbs.db
