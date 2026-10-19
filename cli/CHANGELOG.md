@@ -7,6 +7,13 @@ Release notes are maintained manually; automatic release creation is disabled.
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-20
+
+### Added
+- Add Pinak Library: a local SQLite catalog of successful downloads and explicitly scanned folders, searchable with FTS5 or a SQLite fallback.
+- Add `pinak library` and `/library` commands for listing, searching, tagging, ordered collections, timestamped bookmarks, relinking, and forgetting records without deleting media.
+- Save audio/video playback position, resume later, and allow starting from the beginning or a bookmark. Keep downloads and playback usable when catalog access fails.
+
 ### Fixed
 - Wrap selected filenames in both media browser panels, provide left/right name paging, and show audio/video duration through a cached background inspector lookup.
 - Keep an open GPU/native window across audio and video track changes, refresh its title and media, and retain its size and fullscreen state until the user closes it or exits playback.

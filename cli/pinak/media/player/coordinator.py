@@ -7,6 +7,7 @@ import logging
 import queue
 import re
 import shutil
+import sqlite3
 import threading
 import time
 from collections.abc import Sequence
@@ -66,6 +67,7 @@ class MediaSession:
         enable_consent_prompt: bool = True,
         enable_native_window: bool = False,
         ipc_port: int = MediaIPCServer.DEFAULT_PORT,
+        initial_start_seconds: float | None = None,
     ) -> None:
         self.playlist_manager = PlaylistManager(playlist, initial_index=initial_index)
         self.target_fps = target_fps
@@ -121,6 +123,9 @@ class MediaSession:
         self._subtitle_loader = SubtitleLoader()
         self._cached_audio_thumb: Image.Image | None = None
         self.ipc_server = MediaIPCServer(self, port=ipc_port)
+        self._initial_start_seconds = initial_start_seconds
+        self._first_track = True
+        self._last_library_save = time.monotonic()
         self._ipc_requests: queue.Queue[tuple[int, str, threading.Event, dict[str, Any]]] = (
             queue.Queue(maxsize=64)
         )
@@ -221,6 +226,7 @@ class MediaSession:
             self.master_clock.resume()
         else:
             self.master_clock.pause()
+            self._save_library_position()
 
     def set_muted(self, muted: bool) -> None:
         self.transport.is_muted = muted
@@ -317,9 +323,44 @@ class MediaSession:
                 self._current_meta.media_type, "Video"
             )
             self.native_window.set_title(f"Pinak {tag} - {cur_file.name}")
+        self._restore_library_position(cur_file)
+
+    def _restore_library_position(self, path: Path) -> None:
+        if not self._current_meta or self._current_meta.media_type == "picture":
+            self._first_track = False
+            return
+        try:
+            if self._first_track and self._initial_start_seconds is not None:
+                position = self._initial_start_seconds
+            else:
+                from ...library import get_by_path
+
+                item = get_by_path(path)
+                position = item.position if item else 0.0
+            if position > 0:
+                self.seek_to(position)
+        except (OSError, ValueError, RuntimeError, sqlite3.Error) as exc:
+            logger.warning("Library resume unavailable; playing from start: %s", exc)
+            with contextlib.suppress(Exception):
+                self.seek_to(0.0)
+        finally:
+            self._first_track = False
+
+    def _save_library_position(self) -> None:
+        path = self.playlist_manager.get_current()
+        if not path or not self._current_meta or self._current_meta.media_type == "picture":
+            return
+        try:
+            from ...library import save_position
+
+            save_position(path, self.transport.current_pts, self.transport.duration_sec)
+        except (OSError, ValueError, RuntimeError, sqlite3.Error) as exc:
+            logger.warning("Library progress could not be saved: %s", exc)
+        self._last_library_save = time.monotonic()
 
     def _teardown_media_components(self, *, preserve_native_window: bool = False) -> None:
         """Releases hardware resources."""
+        self._save_library_position()
         self._cancel_pending_controls()
         self._subtitle_loader.clear()
         for name, method in (
@@ -879,6 +920,8 @@ class MediaSession:
         # Update Master Clock
         master_pts = self.master_clock.get_time()
         self.transport.current_pts = master_pts
+        if time.monotonic() - self._last_library_save >= 15:
+            self._save_library_position()
 
         # Track completion, tone-arm parking, and auto-advance
         dur = self.transport.duration_sec

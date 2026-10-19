@@ -36,6 +36,9 @@ Start with `pinak` and no arguments. Use `/help` for the installed version’s c
 
 ## Media
 
+- `/library scan <folder>`: add local files from a folder you choose; `/library scan --all` refreshes chosen folders.
+- `/library list`, `/library search <text>`, `/library show <ID>`: browse the local catalog.
+- `/library tag`, `/library collection`, `/library bookmark`: organize files and play saved moments. [See the Library guide](../library/).
 - `/media <local-path>`: open a file or local browser.
 - `/play <local-path>`: play local media.
 - `/view <local-path>`: open pictures.

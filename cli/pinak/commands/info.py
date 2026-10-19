@@ -90,6 +90,7 @@ def print_help() -> None:
             "/queue <action>",
             "Manage saved downloads, inspect, cancel, remove, or clean; /queue help",
         ),
+        ("/library <action>", "Search and organize saved media; /library help"),
         ("/clear", "Clear the screen; keep the Pinak logo and control panel"),
         (
             "/any <url>",

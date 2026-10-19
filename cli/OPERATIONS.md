@@ -1,4 +1,4 @@
-# Pinak 2.0.0: current operating guide
+# Pinak: current operating guide
 
 This guide describes the current source. [Historical design notes](https://github.com/Prince-1005/Pinak-CLI/blob/main/PINAK_DOCUMENTATION.md)
 describe an earlier state. See [release readiness](https://github.com/Prince-1005/Pinak-CLI/blob/main/RELEASE_READINESS.md)
@@ -175,6 +175,28 @@ launching Pinak), then redraws the Pinak ASCII logo and
 control panel with current settings. It preserves jobs, history, preferences, and
 downloaded files and does not repeat first-run initialization.
 
+## Local Library
+
+Successful direct and queued downloads are cataloged locally, independent of
+download-history recording. To catalog existing files, run
+`pinak library scan <folder>`; `pinak library scan --all` refreshes only folders
+previously chosen by you. Use `pinak library list`, `show <id>`, and
+`search <text>` to find items. The same commands work inside the shell as
+`/library ...`. `pinak library --help` lists every subcommand.
+
+`tag add/remove`, `collection create/list/add/remove/move/show/play`, and
+`bookmark add/list/open/remove` organize media without moving or copying it.
+An ordered collection plays through the existing local player. Audio/video
+progress is saved during playback and on pause/exit; `play <id> --from-start`
+overrides it. If a file moves, `relink <id> <new-path>` preserves its metadata.
+`forget <id>` removes the catalog record but never deletes the media file.
+
+The Library uses a separate `library.db` in Pinak's user-data directory. Its
+search falls back to ordinary SQLite matching if FTS5 is unavailable. It does
+not scan in the background or follow symbolic links. Catalog errors are logged
+without changing a successful download into a failed one. The
+[Library guide](../Website/src/content/docs/docs/library.md) has examples.
+
 ## Preferences and local storage
 
 Run `pinak --config-path` for the actual config location and `/config` in the
@@ -284,8 +306,8 @@ excluded. The static-ffmpeg fallback downloads upstream binaries; Pinak does not
 independently attest their provenance or hashes. Use administrator-provisioned,
 verified executables where that assurance is required.
 
-From `cli/`, build with `python -m build --outdir release-dist/2.0.0`, then
-`python tools/smoke_wheel.py release-dist/2.0.0`. The smoke check installs the wheel
+From `cli/`, build with `python -m build --outdir release-dist/2.1.0`, then
+`python tools/smoke_wheel.py release-dist/2.1.0`. The smoke check installs the wheel
 outside the source tree and exercises imports, version and JSON dry-run. Rebuild
 after source changes and use a fresh version-specific directory for each release.
 Old files in `cli/dist/` are historical 1.0.0 artifacts.
@@ -298,8 +320,8 @@ run manually. The retained Release Please configuration is inactive.
 Create GitHub releases manually. Publishing a GitHub release or manually running
 `publish.yml` first checks the requested version against `pyproject.toml`,
 `pinak.__version__`, and the release manifest. Release tags must be `v<VERSION>`
-(for example `v2.0.0`). Manual dispatch requires the exact version string in its
-`version` input (for example `2.0.0`). A mismatch stops before building or upload.
+(for example `v2.1.0`). Manual dispatch requires the exact version string in its
+`version` input (for example `2.1.0`). A mismatch stops before building or upload.
 The workflow then invokes the reusable quality/security workflow for that revision,
 builds fresh artifacts, verifies a clean wheel installation, and then uploads to
 PyPI using trusted publishing. The trusted publisher must match repository

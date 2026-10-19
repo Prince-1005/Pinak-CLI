@@ -169,6 +169,7 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
         "/open": "Open the current output folder",
         "/history": "View download history",
         "/queue": "Manage saved downloads; /queue help lists all actions",
+        "/library": "Find and organize saved media; /library help lists all actions",
         "/any": "Download content from any platform supported by yt-dlp",
         "/instagram": "Download post, reel, igtv from Instagram",
         "/video": "Download video from a URL",
@@ -754,6 +755,12 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                 run_repl(cmd[len("/queue") :].strip())
                 continue
 
+            if lower_cmd == "/library" or lower_cmd.startswith("/library "):
+                from .commands.library import run_repl
+
+                run_repl(cmd[len("/library") :].strip())
+                continue
+
             if lower_cmd == "/ctl" or lower_cmd.startswith("/ctl "):
                 from .commands.control import handle_control
 
@@ -1030,6 +1037,12 @@ def main(
 
 
 def run_cli():
+    if len(sys.argv) > 1 and sys.argv[1] == "library":
+        from .commands.library import main as library_main
+
+        init_config()
+        setup_logging()
+        raise SystemExit(library_main(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "queue":
         from .commands.queue import main as queue_main
 

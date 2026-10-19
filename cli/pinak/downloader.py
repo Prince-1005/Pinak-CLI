@@ -1,6 +1,7 @@
 import contextlib
 import datetime
 import os
+import sqlite3
 import tempfile
 from pathlib import Path
 
@@ -1045,6 +1046,18 @@ def handle_download(
             duration=duration,
             is_forced=force,
         )
+    if result.get("success") and result.get("files"):
+        try:
+            from .library import add_files
+
+            _, missed = add_files(tuple(result["files"]))
+            if missed:
+                log.warning(
+                    "Library could not index %s downloaded file(s); run pinak library scan", missed
+                )
+        except (OSError, ValueError, RuntimeError, sqlite3.Error) as exc:
+            # Cataloging is supplementary. A completed media download remains successful.
+            log.warning("Library indexing unavailable; run pinak library scan later: %s", exc)
     if not in_engine():
         print_download_summary(result)
     return result
