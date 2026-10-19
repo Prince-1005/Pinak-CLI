@@ -1,4 +1,4 @@
-# Pinak 1.4.3: current operating guide
+# Pinak 2.0.0: current operating guide
 
 This guide describes the current source. [Historical design notes](https://github.com/Prince-1005/Pinak-CLI/blob/main/PINAK_DOCUMENTATION.md)
 describe an earlier state. See [release readiness](https://github.com/Prince-1005/Pinak-CLI/blob/main/RELEASE_READINESS.md)
@@ -231,8 +231,8 @@ excluded. The static-ffmpeg fallback downloads upstream binaries; Pinak does not
 independently attest their provenance or hashes. Use administrator-provisioned,
 verified executables where that assurance is required.
 
-From `cli/`, build with `python -m build --outdir release-dist/1.4.3`, then
-`python tools/smoke_wheel.py release-dist/1.4.3`. The smoke check installs the wheel
+From `cli/`, build with `python -m build --outdir release-dist/2.0.0`, then
+`python tools/smoke_wheel.py release-dist/2.0.0`. The smoke check installs the wheel
 outside the source tree and exercises imports, version and JSON dry-run. Rebuild
 after source changes and use a fresh version-specific directory for each release.
 Old files in `cli/dist/` are historical 1.0.0 artifacts.
@@ -245,8 +245,8 @@ run manually. The retained Release Please configuration is inactive.
 Create GitHub releases manually. Publishing a GitHub release or manually running
 `publish.yml` first checks the requested version against `pyproject.toml`,
 `pinak.__version__`, and the release manifest. Release tags must be `v<VERSION>`
-(for example `v1.4.3`). Manual dispatch requires the exact version string in its
-`version` input (for example `1.4.3`). A mismatch stops before building or upload.
+(for example `v2.0.0`). Manual dispatch requires the exact version string in its
+`version` input (for example `2.0.0`). A mismatch stops before building or upload.
 The workflow then invokes the reusable quality/security workflow for that revision,
 builds fresh artifacts, verifies a clean wheel installation, and then uploads to
 PyPI using trusted publishing. The trusted publisher must match repository

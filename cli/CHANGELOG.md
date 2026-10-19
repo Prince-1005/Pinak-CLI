@@ -7,6 +7,27 @@ Release notes are maintained manually; automatic release creation is disabled.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-19
+
+### Added
+- Add a durable local SQLite download queue with `pinak queue add`, `import`, `list`, `run`, and `retry`, plus matching `/queue` commands in the interactive shell.
+- Capture each job's output folder, formats, quality, subtitle preferences, retry policy, and other download options when it is added; unfinished jobs survive process restarts even when history recording is disabled.
+- Expose a reusable download engine with immutable requests, structured results, and progress events for clients that do not render terminal output.
+- Show a live queue panel with overall job counts, active file, transferred size, speed, ETA, processing status, and per-job results.
+- Add `/clear` and `clear` to erase the terminal screen and scrollback, then redraw the Pinak logo and control panel while preserving saved data.
+
+### Changed
+- Run queued jobs through one foreground worker with a process lock, continue after failures, and return interrupted jobs to the queue for a later run.
+- Resolve the interactive `ask` duplicate preference to `skip` for saved jobs; use `--force` to explicitly repeat a download.
+
+### Removed
+- **Breaking:** remove `/batch` from the shell, completion, and help. Replace `/batch links.txt` with `/queue import links.txt` followed by `/queue run` (or the equivalent `pinak queue` commands).
+
+### Fixed
+- Validate an entire imported link file before saving jobs and report invalid line numbers without leaving a partially imported queue.
+- Recover interrupted retries without mistaking files from a previous failed attempt for a completed job, and support large imported job selections without SQLite parameter-limit failures.
+- Keep worker errors and interruptions visible in queue results, and prevent display-listener failures from changing saved job outcomes.
+
 ## [1.4.4] - 2026-10-19
 
 ### Added

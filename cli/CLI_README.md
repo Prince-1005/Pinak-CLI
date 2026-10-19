@@ -1,4 +1,4 @@
-# 🔱 PINAK CLI 1.4.4 — Media Content Downloader
+# 🔱 PINAK CLI 2.0.0 — Media Content Downloader
 
 PINAK CLI is a powerful, highly aesthetic command-line media downloader wrapper around `yt-dlp` and `ffmpeg`. It features a rich, interactive REPL shell with auto-completions, suggestions, customized banners, diagnostic tools, and automatic download tracking.
 
