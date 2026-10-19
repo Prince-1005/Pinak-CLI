@@ -226,7 +226,7 @@ class WorkerController:
                         encoding="utf-8",
                         cwd=Path.home(),
                         start_new_session=os.name != "nt",
-                        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                     )
                     started = psutil.Process(process.pid).create_time()
                     self._children[run_id] = (process, started)

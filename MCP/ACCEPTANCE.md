@@ -81,6 +81,14 @@ for download behavior delegated to the shared engine.
 
 ## Release gates still open
 
+Local performance checkpoint (Windows/Python 3.12, twenty samples each): p95
+server_info 0.0001s, queue_list(limit=100) over 10,000 saved records 0.0885s,
+media_info 0.5992s, actual worker start 0.5450s, cooperative stop 0.7419s.
+These are direct shared-service timings with temporary SQLite/WAV/loopback HTTP
+fixtures, not AI-provider or desktop-host response latency. All are within the
+provisional local targets. Native OS timing/resource and long-duration stress
+acceptance remains open.
+
 Do not describe all phases as verified until these results exist:
 
 - Final commit CI: Windows/macOS/Linux across Python 3.10–3.14, package/container
@@ -88,7 +96,7 @@ Do not describe all phases as verified until these results exist:
 - A real Windows desktop client and a real macOS/Linux desktop client, with
   versions and dated discovery/download/stop/reconnect evidence.
 - Published-version/pipx update pairs and rollback restore rehearsal.
-- Repeated p95 timing/resource measurements; hostile media, disk-full,
+- Cross-OS timing/resource measurements; hostile media, disk-full,
   suspend/resume and long-duration logging stress checks described above.
 
 The current session cannot hot-attach arbitrary stdio tools through its exposed

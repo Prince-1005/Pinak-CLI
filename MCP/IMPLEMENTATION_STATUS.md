@@ -65,6 +65,13 @@ Local evidence so far (2026-10-19, Windows, Python 3.12):
 Local evidence is Windows/Python 3.12. No live client configuration was changed.
 Disposable logs/configs are under cli/.venv/ and are not committed.
 
+Remote checkpoint: source commit 25e2542 pushed and synced into D:/pinak. First
+CI run identified Unix type stubs rejecting Windows-only subprocess constants;
+the follow-up resolves them portably and verifies both --platform linux/darwin
+locally. Security and secret scans passed; website verification passed. Final
+matrix status must be checked against the follow-up SHA, not the first attempt.
+Local twenty-sample performance results are recorded in ACCEPTANCE.md.
+
 Compatibility decision: keep PRAGMA user_version=1 for the unchanged core queue;
 add `pinak_extensions(name='mcp',version=1)` and additive tables. Old core readers
 remain compatible; unknown MCP extension versions fail closed. A consistent

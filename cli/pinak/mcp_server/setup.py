@@ -59,7 +59,7 @@ def diagnose(policy: Policy | None = None) -> dict[str, Any]:
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     timeout=2,
-                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
                 usable = result.returncode == 0
             except (OSError, subprocess.TimeoutExpired):

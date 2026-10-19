@@ -26,7 +26,7 @@ def inspect_media(path: Path) -> dict[str, Any]:
         encoding="utf-8",
         cwd=Path.home(),
         start_new_session=os.name != "nt",
-        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     try:
         output, _ = process.communicate(timeout=12)
