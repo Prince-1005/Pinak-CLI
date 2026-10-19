@@ -137,6 +137,35 @@ The interactive shell exposes the same queue through `/queue add <URL>`,
 display shows overall job counts, the active file, bytes, speed, ETA, and processing
 status. Each finished job prints its result; failures include the reason.
 
+### Inspecting and managing saved jobs
+
+```text
+/queue show 12
+/queue cancel 12
+/queue list --status cancelled
+/queue remove 12
+/queue clean --completed
+```
+
+Replace `12` with an ID from `/queue list`. `show` displays saved options, status,
+attempts, output paths, and the full last error. The equivalent commands outside
+Pinak's shell start with `pinak queue`.
+
+`cancel` changes only a queued job to `cancelled`; cancelled jobs remain visible
+and are never claimed by the worker or included in `retry --failed`. To download
+one later, add the URL again. Cancelling an already cancelled job is harmless.
+
+`remove` deletes one inactive job record. Running jobs cannot be cancelled or
+removed: press Ctrl+C in their runner first. Claims and management changes use
+SQLite transactions so a waiting job cannot start after its cancellation or
+removal commits.
+
+`clean --completed` deletes only `succeeded` and `skipped` records. It preserves
+queued, running, failed, and cancelled records. All three management actions keep
+downloaded and partial files and the separate download history; cleanup does not
+delete media from disk. Unknown/nonpositive IDs produce an error without changing
+other jobs. The `--completed` flag is required for cleanup.
+
 `/clear` (or `clear`) clears the terminal screen and scrollback (including the shell output from
 launching Pinak), then redraws the Pinak ASCII logo and
 control panel with current settings. It preserves jobs, history, preferences, and

@@ -56,3 +56,6 @@ Local playback and remote downloading are separate routes. Download remote media
 ## Saved download jobs
 
 Use `pinak queue add <URL>` to save a job and `pinak queue run` to process saved jobs in the foreground. `pinak queue list`, `pinak queue import <file>`, and `pinak queue retry <ID|--failed>` manage the queue. See [audio, quality & batches](../downloads/) for restart behavior and limits.
+
+
+Inspect and manage a saved job with `pinak queue show <ID>`, `pinak queue cancel <ID>`, or `pinak queue remove <ID>`. Use `pinak queue clean --completed` to remove succeeded/skipped records while keeping files and history. The interactive shell offers the same actions under `/queue`. Running jobs must be stopped with Ctrl+C in their runner before cancellation or removal.

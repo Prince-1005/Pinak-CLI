@@ -46,6 +46,20 @@ Each job keeps the options and preferences captured when it was added. Ctrl+C st
 
 Inside the interactive shell, the same actions are available as `/queue add <URL>`, `/queue import <file>`, `/queue list`, `/queue run`, and `/queue retry --failed`. Enter `/queue help` for options.
 
+## Manage saved jobs
+
+```text
+/queue show 12
+/queue cancel 12
+/queue list --status cancelled
+/queue remove 12
+/queue clean --completed
+```
+
+Use an ID from `/queue list`. `show` displays the saved options, files, attempts, and full last error. `cancel` marks a queued job as cancelled and keeps its record; cancelled jobs do not run or retry automatically. Add the URL again to download it later. `remove` deletes one inactive record. Stop a running job with Ctrl+C in its runner before cancelling or removing it.
+
+`clean --completed` removes only succeeded/skipped records. Failed, cancelled, queued, and running jobs remain available. Cancellation, removal, and cleanup preserve media files, partial downloads, and the separate download history. Outside the interactive shell, replace `/queue` with `pinak queue`.
+
 ## Interrupted downloads
 
 Partial files are retained for continuation where supported. Re-run the same command to attempt resume. This does not guarantee that every source or stream can resume indefinitely.

@@ -7,6 +7,11 @@ Release notes are maintained manually; automatic release creation is disabled.
 
 ## [Unreleased]
 
+### Added
+- Add `queue show <id>` to inspect saved job options, files, status, attempts, and the full last error.
+- Add `queue cancel <id>`, `queue remove <id>`, and `queue clean --completed` to the CLI and interactive `/queue` interface. Keep downloaded files and history; protect running jobs with transactional state checks.
+- Add a persistent `cancelled` job state, supported by queue listing and excluded from worker claims and failed-job retries.
+
 ## [2.0.0] - 2026-10-19
 
 ### Added

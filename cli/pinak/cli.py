@@ -168,7 +168,7 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
         "/setout": "Change and save the output directory",
         "/open": "Open the current output folder",
         "/history": "View download history",
-        "/queue": "Manage saved jobs: add, import, list, run, retry",
+        "/queue": "Manage saved downloads; /queue help lists all actions",
         "/any": "Download content from any platform supported by yt-dlp",
         "/instagram": "Download post, reel, igtv from Instagram",
         "/video": "Download video from a URL",

@@ -86,7 +86,10 @@ def print_help() -> None:
             "/history [filter]",
             "View history; filters: failed, audio, media, search <text>",
         ),
-        ("/queue <action>", "Manage downloads: add, import, list, run, retry; /queue help"),
+        (
+            "/queue <action>",
+            "Manage saved downloads, inspect, cancel, remove, or clean; /queue help",
+        ),
         ("/clear", "Clear the screen; keep the Pinak logo and control panel"),
         (
             "/any <url>",

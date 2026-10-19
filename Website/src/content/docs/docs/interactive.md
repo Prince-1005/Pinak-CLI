@@ -11,7 +11,8 @@ Start with `pinak` and no arguments. Use `/help` for the installed version’s c
 - `/audio <URL>`: audio extraction.
 - `/any <URL>`: route through yt-dlp-supported sources.
 - `/instagram <URL>`: Instagram extraction.
-- `/queue add <URL>`, `/queue list`, `/queue run`, `/queue retry --failed`: manage the same durable jobs without leaving the shell. Use `/queue help` for all options.
+- `/queue add <URL>`, `/queue list`, `/queue run`, `/queue retry --failed`: manage the same durable jobs without leaving the shell.
+- `/queue show <ID>`, `/queue cancel <ID>`, `/queue remove <ID>`, `/queue clean --completed`: inspect jobs and manage their records while keeping downloaded files. Use `/queue help` for all options.
 - `/trim 00:15-01:30 <URL>`: select an audio/video range.
 
 ## Preferences

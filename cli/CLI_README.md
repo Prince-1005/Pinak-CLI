@@ -154,7 +154,7 @@ When running the interactive REPL shell (`pinak`), the following commands are av
 | `/play <path>` | Play a local audio/video file |
 | `/view <path>` | View local pictures |
 | `/ctl <command>` | Control the active player through authenticated local IPC |
-| `/queue <action>` | Manage saved jobs with `add`, `import`, `list`, `run`, or `retry` |
+| `/queue <action>` | Manage jobs with `add`, `import`, `list`, `show`, `run`, `retry`, `cancel`, `remove`, or `clean` |
 | `/clear` | Clear terminal output and redraw the Pinak logo and control panel |
 | `/history` | View a list of recent downloads from your history database |
 | `/config` | Print out the current config settings and environment |
@@ -204,6 +204,12 @@ options. To download a text file of links, use `/queue import links.txt`, then
 `/queue run`. The live display shows job progress, transfer size, speed, ETA, and
 processing status. `/clear` clears the screen and terminal scrollback, then redraws the session header
 without deleting saved data.
+
+Inspect a job with `/queue show <id>`. Use `/queue cancel <id>` to keep a queued
+job from running, `/queue remove <id>` to remove an inactive record, and
+`/queue clean --completed` to remove succeeded/skipped records. These actions keep
+downloaded files and download history. Running jobs must be stopped with Ctrl+C
+in their runner before cancellation or removal.
 
 - **Windows**: `%LOCALAPPDATA%\pinak\pinak-cli\config.json`
 - **macOS**: `~/Library/Application Support/pinak-cli/config.json`

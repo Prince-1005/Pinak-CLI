@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 import shlex
+import sqlite3
 import threading
 from collections.abc import Sequence
 from datetime import datetime
@@ -18,7 +19,20 @@ from rich.table import Table
 from rich.text import Text
 
 from ..engine import DownloadEvent, DownloadRequest
-from ..queue import QueueJob, add_job, import_file, list_jobs, retry_failed, run_queue
+from ..queue import (
+    STATES,
+    QueueJob,
+    add_job,
+    cancel_job,
+    clean_completed,
+    get_job,
+    import_file,
+    list_jobs,
+    remove_job,
+    retry_failed,
+    run_queue,
+)
+from ..text_safety import safe_text
 from ..utils import human_size
 
 console = Console()
@@ -43,7 +57,16 @@ def _parser(prog: str = "pinak queue") -> argparse.ArgumentParser:
     imported = commands.add_parser("import", help="Save a UTF-8 batch file as jobs")
     imported.add_argument("file")
     listed = commands.add_parser("list", help="Show saved jobs")
-    listed.add_argument("--status", choices=("queued", "running", "succeeded", "skipped", "failed"))
+    listed.add_argument("--status", choices=sorted(STATES))
+    for action, help_text in (
+        ("show", "Inspect saved options, files, and the last error"),
+        ("remove", "Delete an inactive job record; keep downloaded files"),
+        ("cancel", "Prevent a queued job from running; keep its record"),
+    ):
+        command = commands.add_parser(action, help=help_text)
+        command.add_argument("id", type=int)
+    clean = commands.add_parser("clean", help="Remove succeeded/skipped records; keep files")
+    clean.add_argument("--completed", action="store_true", required=True)
     run = commands.add_parser("run", help="Run queued jobs until finished or interrupted")
     run.add_argument("--limit", type=int)
     retry = commands.add_parser("retry", help="Put failed jobs back in the queue")
@@ -196,6 +219,43 @@ def _show_jobs(status: str | None = None) -> None:
     console.print(table)
 
 
+def _show_job(job_id: int) -> None:
+    job = get_job(job_id)
+    details = Table.grid(padding=(0, 2))
+    for label, value in (
+        ("Status", job.status),
+        ("Attempts", str(job.attempts)),
+        ("Added", datetime.fromtimestamp(job.created_at).isoformat(sep=" ", timespec="seconds")),
+        ("Updated", datetime.fromtimestamp(job.updated_at).isoformat(sep=" ", timespec="seconds")),
+    ):
+        details.add_row(Text(label, style="cyan"), Text(value))
+    console.print(Panel(details, title=f"Queue job #{job.id}", border_style="cyan"))
+    options = Table(title="Saved options", show_lines=True)
+    options.add_column("Option", style="cyan")
+    options.add_column("Value", overflow="fold")
+    for key, value in job.request.to_dict().items():
+        if value is None:
+            shown = "—"
+        elif isinstance(value, (list, tuple)):
+            shown = ", ".join(str(item) for item in value)
+        else:
+            shown = str(value)
+        options.add_row(Text(key), Text(safe_text(shown)))
+    console.print(options)
+    console.print(
+        Panel(
+            Text("\n".join(safe_text(path) for path in job.files) or "No output files recorded."),
+            title="Recorded files",
+        )
+    )
+    console.print(
+        Panel(
+            Text(safe_text(job.last_error) if job.last_error else "No errors recorded."),
+            title="Last error",
+        )
+    )
+
+
 def main(argv: Sequence[str], *, prog: str = "pinak queue") -> int:
     parser = _parser(prog)
     try:
@@ -219,6 +279,19 @@ def main(argv: Sequence[str], *, prog: str = "pinak queue") -> int:
             )
         elif args.action == "list":
             _show_jobs(args.status)
+        elif args.action == "show":
+            _show_job(args.id)
+        elif args.action == "remove":
+            remove_job(args.id)
+            console.print(f"Removed job #{args.id}. Downloaded files were kept.")
+        elif args.action == "cancel":
+            changed = cancel_job(args.id)
+            console.print(
+                f"Job #{args.id} {'cancelled' if changed else 'already cancelled'}; it will not run."
+            )
+        elif args.action == "clean":
+            count = clean_completed()
+            console.print(f"Removed {count} completed job record(s). Downloaded files were kept.")
         elif args.action == "retry":
             count = retry_failed(None if args.failed else args.id)
             console.print(f"Queued {count} failed job(s) for retry.")
@@ -248,8 +321,8 @@ def main(argv: Sequence[str], *, prog: str = "pinak queue") -> int:
                 return 130
             return 1 if summary.failed else 0
         return 0
-    except (ValueError, OSError, RuntimeError) as exc:
-        console.print(f"Queue error: {exc}")
+    except (ValueError, OSError, RuntimeError, sqlite3.Error) as exc:
+        console.print(Text(f"Queue error: {exc}", style="red"))
         return 2
 
 

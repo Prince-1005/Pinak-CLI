@@ -19,7 +19,7 @@ from . import history
 from .downloader import parse_download_text
 from .engine import DownloadEvent, DownloadRequest, DownloadResult, run_download
 
-STATES = frozenset({"queued", "running", "succeeded", "skipped", "failed"})
+STATES = frozenset({"queued", "running", "succeeded", "skipped", "failed", "cancelled"})
 
 
 @dataclass(frozen=True)
@@ -174,6 +174,61 @@ def list_jobs(status: str | None = None) -> list[QueueJob]:
                 "SELECT * FROM queue_jobs WHERE status = ? ORDER BY id DESC", (status,)
             ).fetchall()
     return [_row_job(row) for row in rows]
+
+
+def _find_job(conn: sqlite3.Connection, job_id: int) -> sqlite3.Row:
+    if job_id < 1:
+        raise ValueError("Job ID must be positive")
+    row = conn.execute("SELECT * FROM queue_jobs WHERE id = ?", (job_id,)).fetchone()
+    if row is None:
+        raise ValueError(f"Job #{job_id} was not found")
+    return row
+
+
+def get_job(job_id: int) -> QueueJob:
+    with contextlib.closing(_connect()) as conn:
+        return _row_job(_find_job(conn, job_id))
+
+
+def cancel_job(job_id: int) -> bool:
+    """Cancel a waiting job atomically against the worker's claim transaction."""
+    with contextlib.closing(_connect()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = _find_job(conn, job_id)
+        if row["status"] == "cancelled":
+            return False
+        if row["status"] != "queued":
+            raise ValueError(
+                f"Only queued jobs can be cancelled; job #{job_id} is {row['status']}. "
+                "For an active download, press Ctrl+C in its runner first."
+            )
+        now = time.time()
+        conn.execute(
+            "UPDATE queue_jobs SET status = 'cancelled', updated_at = ?, finished_at = ? "
+            "WHERE id = ? AND status = 'queued'",
+            (now, now, job_id),
+        )
+    return True
+
+
+def remove_job(job_id: int) -> None:
+    """Remove an inactive queue record; never touch its files or history."""
+    with contextlib.closing(_connect()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = _find_job(conn, job_id)
+        if row["status"] == "running":
+            raise ValueError(
+                f"Job #{job_id} is running and cannot be removed. Press Ctrl+C in its runner first."
+            )
+        conn.execute("DELETE FROM queue_jobs WHERE id = ?", (job_id,))
+
+
+def clean_completed() -> int:
+    """Delete only successful/skipped queue records, leaving media on disk."""
+    with contextlib.closing(_connect()) as conn, conn:
+        return conn.execute(
+            "DELETE FROM queue_jobs WHERE status IN ('succeeded', 'skipped')"
+        ).rowcount
 
 
 def retry_failed(job_id: int | None = None) -> int:
