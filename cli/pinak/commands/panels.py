@@ -27,19 +27,27 @@ def get_greeting_message() -> str:
 def print_banner() -> None:
     from rich import box
 
-    glyphs = (
-        (("PPPP ", "P   P", "PPPP ", "P    ", "P    "), "bold red"),
-        (("IIIII", "  I  ", "  I  ", "  I  ", "IIIII"), "bold yellow"),
-        (("N   N", "NN  N", "N N N", "N  NN", "N   N"), "bold green"),
-        ((" AAA ", "A   A", "AAAAA", "A   A", "A   A"), "bold cyan"),
-        (("K   K", "K  K ", "KKK  ", "K  K ", "K   K"), "bold magenta"),
+    logo = r"""  ____ ___ _   _    _    _  __
+ |  _ \_ _| \ | |  / \  | |/ /
+ | |_) | ||  \| | / ^ \ | ' / 
+ |  __/| || |\  |/ ___ \| . \ 
+ |_|  |___|_| \_/_/   \_\_|\_\
+"""
+    # The original font joins neighboring strokes, so letter edges vary by row.
+    letter_edges = (
+        (7, 11, 17, 24, 30),
+        (7, 10, 17, 24, 30),
+        (8, 10, 17, 24, 30),
+        (7, 10, 17, 24, 30),
+        (6, 11, 17, 24, 30),
     )
+    colors = ("bold red", "bold yellow", "bold green", "bold cyan", "bold magenta")
     banner = Text("\n")
-    for row in range(5):
-        banner.append("  ")
-        for lines, color in glyphs:
-            banner.append(lines[row], style=color)
-            banner.append(" ")
+    for line, edges in zip(logo.splitlines(), letter_edges, strict=True):
+        start = 0
+        for end, color in zip(edges, colors, strict=True):
+            banner.append(line[start:end], style=color)
+            start = end
         banner.append("\n")
     banner.append("\n       (\n      / \\ \n     /   )\n ", style="bold yellow")
     banner.append(">>==", style="bold cyan")
