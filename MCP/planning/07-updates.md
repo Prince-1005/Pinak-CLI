@@ -1,6 +1,6 @@
 # Phase 07 — Updates, migration, and compatibility maintenance
 
-Status: Backup/compatibility checks passed; installer-pair/restore gates pending.
+Status: Source-revision venv/pipx upgrade and restoration drills passed; published-version pair remains a release gate.
 
 ## Inputs
 
@@ -42,9 +42,8 @@ with seeded old jobs; verify jobs are neither discarded nor redownloaded implici
 
 ## Completion notes
 
-2026-10-19: prepare-update refuses runner locks/active records and snapshots SQLite/settings without installing anything. Unicode seeded queue/history backup integrity and failure preservation passed. Core schema remains 1 with additive MCP extension 1. Published-version/pipx upgrade pairs and restore drills pending.
+2026-10-19: prepare-update refuses runner locks/active records and snapshots SQLite/settings without installing anything. Unicode seeded queue/history backup integrity and failure preservation passed. Core schema remains 1 with additive MCP extension 1. Actual pre-MCP/current wheel upgrade, compatible core downgrade, re-upgrade and receipt replay passed in an isolated venv. Pipx 1.18.4 force-install/reinstall/upgrade retained the extra and passed real stdio. Failed migration rollback, atomic snapshot publication, incomplete-backup refusal and a disposable restoration drill passed. See MAINTENANCE.md and tools/smoke_mcp_upgrade.py. Both source revisions identify as 2.0.0; no new package release was published.
 
 Remaining original gate checklist:
 
-Pending: upgrade pairs tested, installer versions, readable schema floor,
-backup/restore evidence, skipped combinations, and commits.
+Pending: first published-version upgrade pair and final follow-up CI. Source-pair installer and backup/restore evidence is recorded in ACCEPTANCE.md.

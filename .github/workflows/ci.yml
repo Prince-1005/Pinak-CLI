@@ -53,6 +53,13 @@ jobs:
         shell: bash
         run: |
           pytest --cov=pinak --cov-report=term-missing --cov-fail-under=75
+      - name: Measure local MCP performance
+        run: python tools/benchmark_mcp.py --output benchmark-results/mcp.json
+      - name: Upload MCP timing evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-timings-${{ matrix.os }}-py${{ matrix.python }}
+          path: cli/benchmark-results/mcp.json
   security:
     name: security audit
     runs-on: ubuntu-latest
@@ -151,6 +158,13 @@ jobs:
           python -m build --outdir release-dist
           python -m twine check --strict release-dist/*
           python tools/smoke_wheel.py release-dist --check-playback-imports --check-mcp
+      - name: Verify pre-MCP upgrade and compatible core downgrade
+        run: |
+          git fetch --no-tags --depth=1 origin 73de91e766a8073afe356521534ca2239fe7c488
+          git archive --format=zip --output "$RUNNER_TEMP/pinak-pre-mcp.zip" 73de91e766a8073afe356521534ca2239fe7c488 cli
+          python -c "import os, zipfile; from pathlib import Path; root = Path(os.environ['RUNNER_TEMP']); zipfile.ZipFile(root / 'pinak-pre-mcp.zip').extractall(root / 'pinak-pre-mcp')"
+          python -m build "$RUNNER_TEMP/pinak-pre-mcp/cli" --wheel --outdir "$RUNNER_TEMP/pinak-pre-mcp-wheels"
+          python -c "import os, subprocess, sys; from pathlib import Path; old = next((Path(os.environ['RUNNER_TEMP']) / 'pinak-pre-mcp-wheels').glob('*.whl')); new = next(Path('release-dist').glob('*.whl')); subprocess.run([sys.executable, 'tools/smoke_mcp_upgrade.py', '--legacy-wheel', str(old), '--current-wheel', str(new)], check=True)"
       - name: Verify container installation
         run: |
           docker build --tag pinak-install-check .

@@ -109,5 +109,8 @@ For an editable source environment, upgrade explicitly with
 users can use `python -m pip install --upgrade "pinak-cli[mcp]"`. Neither operation
 is invoked by the server. A broken environment can be replaced by a clean venv
 installed from a retained compatible wheel; use the same policy/data locations,
-then run doctor and inspect saved jobs before resuming. Pipx-specific upgrade and
-actual old/new published-version pair validation remain release acceptance gates.
+then run doctor and inspect saved jobs before resuming. Isolated pipx 1.18.4
+force-install/reinstall/upgrade and ordinary venv upgrade/downgrade/re-upgrade
+passed with actual pre-MCP/current source wheels and real stdio. See
+MAINTENANCE.md for the repeatable drill. Both fixtures identify as 2.0.0;
+actual old/new published-version pair validation remains a release acceptance gate.

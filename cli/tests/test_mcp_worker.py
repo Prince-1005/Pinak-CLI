@@ -99,3 +99,34 @@ def test_empty_run_does_not_spawn_worker(isolated_history_db, tmp_path):
         assert not tools.controller._children
     finally:
         tools.close()
+
+
+def test_actual_output_write_failure_is_saved_without_destination_fallback(
+    isolated_history_db, tmp_path, download_server
+):
+    output = tmp_path / "output"
+    output.mkdir()
+    blocked = output / "blocked"
+    blocked.write_bytes(b"keep this existing user file")
+    tools = Tools(Policy(default_output_dir=output))
+    try:
+        job = tools.call(
+            "queue_add",
+            {
+                "url": download_server[0],
+                "options": {"output_dir": str(blocked)},
+                "request_key": "add",
+            },
+        )
+        assert job["ok"], job
+        run = tools.call("queue_start", {"job_ids": [job["data"]["job_id"]], "request_key": "run"})
+        assert run["ok"], run
+        state = await_terminal(tools, run["data"]["run_id"])
+        assert state["summary"]["failed"] == 1
+        saved = core.get_job(job["data"]["job_id"])
+        assert saved.status == "failed" and saved.last_error
+        assert saved.request.output_dir == str(blocked)
+        assert blocked.read_bytes() == b"keep this existing user file"
+        assert list(output.iterdir()) == [blocked]
+    finally:
+        tools.close()

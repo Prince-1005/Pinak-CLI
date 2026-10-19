@@ -5,7 +5,6 @@ from __future__ import annotations
 import contextlib
 import os
 import sqlite3
-import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -14,6 +13,7 @@ from filelock import FileLock, Timeout
 
 from .. import __version__, history
 from ..config import CONFIG_FILE
+from .backup import backup_database
 from .models import config_path
 from .policy import ToolFailure
 
@@ -55,17 +55,7 @@ def prepare_update() -> dict[str, Any]:
                             "RUNNER_BUSY",
                             "A run is active or needs reconciliation. Stop it and inspect its status before updating.",
                         )
-                deadline = time.monotonic() + 10
-
-                def progress(_status: int, _remaining: int, _total: int) -> None:
-                    if time.monotonic() > deadline:
-                        raise TimeoutError(
-                            "Database backup exceeded ten seconds; original unchanged"
-                        )
-
-                with contextlib.closing(sqlite3.connect(backup)) as target:
-                    source.backup(target, pages=128, progress=progress, sleep=0.01)
-                os.chmod(backup, 0o600)
+                backup_database(source, backup)
             for path in (config_path(), Path(CONFIG_FILE)):
                 if path.is_file():
                     if path.stat().st_size > 65536:

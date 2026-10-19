@@ -15,6 +15,7 @@ from filelock import FileLock, Timeout
 
 from .. import history
 from .. import queue as queue_core
+from .backup import backup_database, verify_backup
 from .models import Policy
 from .policy import ToolFailure
 
@@ -51,8 +52,9 @@ class Store:
                     # SQLite backup API includes WAL state; never copy a live .db alone.
                     backup = Path(history.DB_FILE + ".pre-mcp-1.bak")
                     if not backup.exists():
-                        with contextlib.closing(sqlite3.connect(backup)) as target:
-                            conn.backup(target)
+                        backup_database(conn, backup)
+                    else:
+                        verify_backup(backup)
                     with conn:
                         conn.execute("BEGIN IMMEDIATE")
                         conn.execute(

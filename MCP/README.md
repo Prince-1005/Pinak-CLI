@@ -16,6 +16,8 @@ or MCP Registry listing; check those separately if separate publication is wante
 The runtime lives in `cli/pinak/mcp_server/`. Start with the
 [connection and usage guide](USAGE.md); see the
 [status ledger](IMPLEMENTATION_STATUS.md) for verified checks and remaining gates.
+Dependency/schema updates and installer rehearsal are documented in
+[maintenance](MAINTENANCE.md).
 No live AI client has been registered and no package release has been published.
 The package version remains unchanged.
 

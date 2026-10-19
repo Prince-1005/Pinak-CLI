@@ -13,6 +13,7 @@ dist/
 build/
 /cli/release-dist/
 /cli/mcp-release-dist/
+/cli/benchmark-results/
 
 # Local virtual environments, including the audit compatibility environment
 .venv/

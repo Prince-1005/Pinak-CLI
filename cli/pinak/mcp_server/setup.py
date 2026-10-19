@@ -23,6 +23,7 @@ from filelock import FileLock
 from .. import __version__, history
 from ..config import CONFIG_FILE, config, validate_settings
 from ..utils import get_ffmpeg_path, get_ffprobe_path
+from .backup import verify_backup
 from .models import Policy, config_path, load_policy
 from .policy import clean
 
@@ -74,6 +75,7 @@ def diagnose(policy: Policy | None = None) -> dict[str, Any]:
     db = Path(history.DB_FILE)
     schema = None
     active_runs = 0
+    mcp_initialized = False
     if db.exists():
         try:
             with sqlite3.connect(db.as_uri() + "?mode=ro", uri=True, timeout=1) as conn:
@@ -92,6 +94,7 @@ def diagnose(policy: Policy | None = None) -> dict[str, Any]:
                     if row and row[0] != 1:
                         errors.append("MCP database extension version is incompatible.")
                     if row and row[0] == 1:
+                        mcp_initialized = True
                         active_runs = conn.execute(
                             "SELECT COUNT(*) FROM mcp_runs WHERE state IN ('starting','running','stopping')"
                         ).fetchone()[0]
@@ -103,6 +106,19 @@ def diagnose(policy: Policy | None = None) -> dict[str, Any]:
                     errors.append("Database integrity check failed; preserve it before repair.")
         except sqlite3.Error:
             errors.append("Database is locked, unreadable, or corrupt; preserve it before repair.")
+    retained_backup = Path(str(db) + ".pre-mcp-1.bak")
+    if retained_backup.is_file():
+        try:
+            verify_backup(retained_backup)
+        except (sqlite3.Error, OSError):
+            if mcp_initialized:
+                warnings.append(
+                    "Retained pre-MCP backup is incomplete or unreadable; preserve it and verify a new snapshot before rollback."
+                )
+            else:
+                errors.append(
+                    "First MCP setup is blocked by an incomplete or unreadable pre-MCP backup. Preserve it and create a verified snapshot before migration."
+                )
     ancestor = policy.default_output_dir
     while not ancestor.exists() and ancestor != ancestor.parent:
         ancestor = ancestor.parent
