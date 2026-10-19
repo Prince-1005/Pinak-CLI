@@ -7,6 +7,9 @@ Release notes are maintained manually; automatic release creation is disabled.
 
 ## [Unreleased]
 
+### Fixed
+- Keep an open GPU/native window across audio and video track changes, refresh its title and media, and retain its size and fullscreen state until the user closes it or exits playback.
+
 ### Added
 - Make audio/video shuffle selectable with `s`, show its state and control in the TUI, choose from the full playlist with repeat ALL, only unplayed tracks with repeat OFF, and repeat the current track with SOLO.
 - Record each queue attempt in local download history together with its saved job result, including skipped and failed attempts, when history is enabled.

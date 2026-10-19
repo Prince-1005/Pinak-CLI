@@ -234,6 +234,11 @@ for music. With repeat SOLO, the current track repeats on completion. Manual
 shuffle is on. Toggling shuffle/repeat preserves played history; reopen the
 collection for a fresh session. Shuffle OFF restores normal sequential behavior.
 
+An open GPU/native window stays open across automatic track changes, repeat,
+shuffle, and manual next/previous navigation. The same window displays the next
+video or song artwork and updates its title while keeping its size and fullscreen
+state. `w` still closes it explicitly; exiting playback releases it.
+
 Playback starts without an assessment prompt when measured device resources are
 healthy. It asks for consent when unplugged battery is at or below 15%, free RAM
 is below the media's estimated playback budget (at least 512 MB), or a readable

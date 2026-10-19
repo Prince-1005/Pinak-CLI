@@ -13,6 +13,11 @@ Or use `/media`, `/play`, or `/view` inside the interactive shell. With no path,
 
 Interactive playback needs a terminal. Native windows require a graphical desktop; audio needs a functioning output device.
 
+An open GPU/native window stays open when playback advances to another song or
+video, including shuffle and repeat. Its media and title update in place while
+its size and fullscreen state remain. Press **w** to close the window explicitly,
+or close playback to release it.
+
 ## Controls
 
 - **Space:** pause/resume.

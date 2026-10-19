@@ -103,7 +103,7 @@ def test_tui_shuffle_controls_and_real_completion_transitions(
     )
     session._current_meta = metadata
     monkeypatch.setattr(MediaProbe, "probe", lambda path: replace(metadata, file_path=path))
-    monkeypatch.setattr(session, "_teardown_media_components", lambda: None)
+    monkeypatch.setattr(session, "_teardown_media_components", lambda **kwargs: None)
 
     def initialize():
         session.video_decoder = MagicMock() if media_type == "video" else None

@@ -312,7 +312,13 @@ class MediaSession:
             self._buffered_video_frame = self.video_decoder.read_frame()
             self._last_frame_pts = 0.0
 
-    def _teardown_media_components(self) -> None:
+        if self.native_window and self.native_window.is_open:
+            tag = {"audio": "Audio Thumbnail", "picture": "Photo"}.get(
+                self._current_meta.media_type, "Video"
+            )
+            self.native_window.set_title(f"Pinak {tag} - {cur_file.name}")
+
+    def _teardown_media_components(self, *, preserve_native_window: bool = False) -> None:
         """Releases hardware resources."""
         self._cancel_pending_controls()
         self._subtitle_loader.clear()
@@ -323,6 +329,13 @@ class MediaSession:
             ("video_decoder", "close"),
         ):
             component = getattr(self, name, None)
+            if (
+                name == "native_window"
+                and preserve_native_window
+                and component
+                and component.is_open
+            ):
+                continue
             try:
                 if component:
                     getattr(component, method)()
@@ -685,7 +698,7 @@ class MediaSession:
         )
         if not next_file:
             return
-        self._teardown_media_components()
+        self._teardown_media_components(preserve_native_window=True)
         self._current_meta = None
         try:
             self._current_meta = MediaProbe.probe(next_file)
@@ -914,7 +927,7 @@ class MediaSession:
                     self.playlist_manager.current_idx = 0
                     first_file = self.playlist_manager.get_current()
                     if first_file:
-                        self._teardown_media_components()
+                        self._teardown_media_components(preserve_native_window=True)
                         self._current_meta = None
                         try:
                             self._current_meta = MediaProbe.probe(first_file)
@@ -935,6 +948,12 @@ class MediaSession:
                 self.transport.is_playing = False
                 if self.audio_backend:
                     self.audio_backend.pause()
+
+            # The window's first new frame must carry the new track's controls.
+            cur_file = self.playlist_manager.get_current()
+            cur_name = cur_file.name if cur_file else "Media"
+            master_pts = self.transport.current_pts
+            dur = self.transport.duration_sec
 
         # Check for window size change (maximize/minimize) to clear screen cleanly
         if not hasattr(self, "_last_term_size") or self._last_term_size != (cols, rows):

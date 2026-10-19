@@ -68,6 +68,44 @@ def test_native_video_window_key_mapping():
     assert win._map_key_code(ord("c")) == "c"
 
 
+def test_title_change_keeps_opencv_window_handle_and_fullscreen():
+    fake_cv2 = MagicMock()
+    fake_cv2.getWindowProperty.return_value = 1
+    fake_cv2.getWindowImageRect.return_value = (0, 0, 16, 16)
+    fake_cv2.waitKeyEx.return_value = -1
+    with patch.object(NativeVideoWindow, "_init_backend"):
+        win = NativeVideoWindow(title="First track")
+    win._backend = "cv2"
+    win._cv2_module = fake_cv2
+    win.is_open = True
+    win.is_fullscreen = True
+    win.set_title("Second track")
+    assert win.title == "Second track" and win.is_fullscreen
+    fake_cv2.setWindowTitle.assert_called_once_with("First track", "Second track")
+    win.show_frame(Image.new("RGB", (16, 16), "blue"))
+    assert fake_cv2.imshow.call_args.args[0] == "First track"
+    fake_cv2.namedWindow.assert_not_called()
+    fake_cv2.resizeWindow.assert_not_called()
+    win.close()
+    fake_cv2.destroyWindow.assert_called_once_with("First track")
+
+
+def test_title_change_keeps_tkinter_root_and_geometry():
+    with patch.object(NativeVideoWindow, "_init_backend"):
+        win = NativeVideoWindow(title="First track")
+    root = MagicMock()
+    win._backend = "tkinter"
+    win._tk_root = root
+    win.is_open = True
+    win.is_fullscreen = True
+    win.set_title("Second track")
+    root.title.assert_called_once_with("Second track")
+    root.destroy.assert_not_called()
+    root.geometry.assert_not_called()
+    root.attributes.assert_not_called()
+    assert win._tk_root is root and win.is_fullscreen and win.is_open
+
+
 def test_native_window_fills_viewport_without_distortion():
     """A smaller decoded frame scales to a viewable window with letterboxing."""
     import numpy as np

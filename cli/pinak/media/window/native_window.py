@@ -21,6 +21,8 @@ class NativeVideoWindow:
 
     def __init__(self, title: str = "Pinak Media Player", initial_scale: float = 1.0) -> None:
         self.title = title
+        # OpenCV uses the original name as its handle, even after a title change.
+        self._window_name = title
         self.initial_scale = initial_scale
         self.is_open = False
         self.is_fullscreen = False
@@ -138,10 +140,10 @@ class NativeVideoWindow:
         if self._backend == "cv2" and self._cv2_module is not None:
             try:
                 cv2 = self._cv2_module
-                cv2.namedWindow(self.title, cv2.WINDOW_NORMAL)
+                cv2.namedWindow(self._window_name, cv2.WINDOW_NORMAL)
                 with contextlib.suppress(Exception):
                     cv2.setWindowProperty(
-                        self.title, cv2.WND_PROP_ASPECT_RATIO, cv2.WINDOW_KEEPRATIO
+                        self._window_name, cv2.WND_PROP_ASPECT_RATIO, cv2.WINDOW_KEEPRATIO
                     )
 
                 init_w, init_h = (
@@ -151,14 +153,16 @@ class NativeVideoWindow:
                 )
                 screen_w, screen_h = self._available_screen_size()
                 win_w, win_h = self._opening_size(init_w, init_h, screen_w, screen_h)
-                cv2.resizeWindow(self.title, win_w, win_h)
+                cv2.resizeWindow(self._window_name, win_w, win_h)
+                if self.title != self._window_name:
+                    self.set_title(self.title)
                 self._last_image_size = (init_w, init_h)
                 self.is_open = True
                 return True
             except Exception as e:
                 logger.warning(f"Failed to open native OpenCV window: {e}")
                 with contextlib.suppress(Exception):
-                    self._cv2_module.destroyWindow(self.title)
+                    self._cv2_module.destroyWindow(self._window_name)
                 self._init_backend(allow_cv2=False)
 
         if self._backend == "tkinter" and self._tk_module is not None:
@@ -204,6 +208,17 @@ class NativeVideoWindow:
 
         return False
 
+    def set_title(self, title: str) -> None:
+        """Update the caption without recreating, resizing, or exiting fullscreen."""
+        self.title = title
+        try:
+            if self._backend == "cv2" and self._cv2_module is not None:
+                self._cv2_module.setWindowTitle(self._window_name, title)
+            elif self._backend == "tkinter" and self._tk_root is not None:
+                self._tk_root.title(title)
+        except Exception as exc:
+            logger.debug("Could not update native window title: %s", exc)
+
     def show_frame(
         self,
         frame_img: Image.Image,
@@ -233,7 +248,7 @@ class NativeVideoWindow:
                 cv2 = self._cv2_module
                 # Check if window was closed by the user clicking the OS close 'X' button
                 try:
-                    vis_prop = cv2.getWindowProperty(self.title, cv2.WND_PROP_VISIBLE)
+                    vis_prop = cv2.getWindowProperty(self._window_name, cv2.WND_PROP_VISIBLE)
                     if isinstance(vis_prop, (int, float)) and vis_prop < 1:
                         self.is_open = False
                         return []
@@ -246,7 +261,7 @@ class NativeVideoWindow:
 
                 # Query current client window dimensions
                 try:
-                    rect = cv2.getWindowImageRect(self.title)
+                    rect = cv2.getWindowImageRect(self._window_name)
                     if isinstance(rect, (tuple, list)) and len(rect) >= 4:
                         win_w, win_h = int(rect[2]), int(rect[3])
                     else:
@@ -280,7 +295,7 @@ class NativeVideoWindow:
                 canvas[oy : oy + new_h, ox : ox + new_w] = resized
                 final_arr = canvas
 
-                cv2.imshow(self.title, final_arr)
+                cv2.imshow(self._window_name, final_arr)
 
                 # Poll window events with 1ms timeout
                 key_code = cv2.waitKeyEx(1)
@@ -351,7 +366,7 @@ class NativeVideoWindow:
             try:
                 cv2 = self._cv2_module
                 try:
-                    if cv2.getWindowProperty(self.title, cv2.WND_PROP_VISIBLE) < 1:
+                    if cv2.getWindowProperty(self._window_name, cv2.WND_PROP_VISIBLE) < 1:
                         self.is_open = False
                         return []
                 except Exception:
@@ -386,7 +401,7 @@ class NativeVideoWindow:
             cv2 = self._cv2_module
             self.is_fullscreen = not self.is_fullscreen
             prop_val = cv2.WINDOW_FULLSCREEN if self.is_fullscreen else cv2.WINDOW_NORMAL
-            cv2.setWindowProperty(self.title, cv2.WND_PROP_FULLSCREEN, prop_val)
+            cv2.setWindowProperty(self._window_name, cv2.WND_PROP_FULLSCREEN, prop_val)
             return self.is_fullscreen
         elif self._backend == "tkinter" and self._tk_root is not None and self.is_open:
             try:
@@ -402,7 +417,7 @@ class NativeVideoWindow:
         if self.is_open:
             if self._backend == "cv2" and self._cv2_module is not None:
                 with contextlib.suppress(Exception):
-                    self._cv2_module.destroyWindow(self.title)
+                    self._cv2_module.destroyWindow(self._window_name)
             elif self._backend == "tkinter" and self._tk_root is not None:
                 with contextlib.suppress(Exception):
                     self._tk_root.destroy()
