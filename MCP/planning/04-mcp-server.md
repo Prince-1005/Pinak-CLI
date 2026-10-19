@@ -40,7 +40,7 @@ in phase 01 (the plan does not assume a specific version's CLI syntax).
 
 ## Completion notes
 
-2026-10-19: Official SDK callbacks expose fourteen typed tools. Actual SDK initialize/list/call/error/download/MP3/history/replay/overload/cancellation tests passed. Inspector 2.11.0 independently discovered 14 tools and called server_info. No live client registration was changed.
+2026-10-19: Official SDK callbacks expose fourteen typed tools. Actual SDK initialize/list/call/error/download/MP3/history/replay/overload/cancellation tests passed. Inspector 2.11.0 independently discovered 14 tools and called server_info. Later, an explicitly authorized temporary Cursor 3.23.12 Windows registration passed discovery, actual download, metadata, errors, progress, stop and disconnect/reconnect. Original client configuration was restored exactly; see CLIENT_ACCEPTANCE.md.
 
 Remaining original gate checklist:
 

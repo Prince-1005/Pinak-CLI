@@ -43,7 +43,12 @@ config writes in temporary directories. Then test a user-approved real client.
 
 2026-10-19: Generic configure prints client-neutral stdio fields. Claude-format preview/apply/backup/merge/atomic-failure tests passed against disposable files. Core-only and MCP-extra clean wheel installs with actual protocol download passed. USAGE.md documents source setup; PyPI publication has not happened.
 
+Windows Cursor 3.23.12 real-client setup, discovery, download, metadata, error,
+stop and reconnect passed with an isolated temporary registration. The original
+config was restored byte-for-byte and no temporary server processes remained.
+See CLIENT_ACCEPTANCE.md. This does not certify macOS/Linux desktop clients.
+
 Remaining original gate checklist:
 
-Pending: exact installer commands verified, client versions/OS, disposable and
-real-client setup results, documentation locations, and commits.
+Pending: macOS/Linux desktop setup and first published-version installation.
+Source-revision venv/pipx installer drills are recorded in MAINTENANCE.md.

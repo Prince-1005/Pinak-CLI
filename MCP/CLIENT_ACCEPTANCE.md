@@ -30,11 +30,20 @@ Observed in Cursor:
   Job 2 remained queued with attempts=1 and last_error=Interrupted; partial files
   were retained. No queue records or downloaded files were removed.
 
-Reconnect/disconnect acceptance remains pending. Removing the temporary entry
-restored the exact original config bytes, but the existing server processes were
-still present after ten seconds; file removal alone is not shutdown evidence.
-A WSL Debug Console occluded Cursor's settings controls. Its terminal UI was
-not automated; the user was asked to move it before the explicit reload check.
+Disconnect/reconnect also passed. After removing the temporary entry, a later
+process inspection confirmed no matching test server processes and no active
+runs. The same isolated entry was re-added; Cursor successfully called server_info,
+both queue_show records and history_list through the reconnected server. Job 1
+remained succeeded with one attempt; job 2 remained queued with one attempt and
+Interrupted. History retained its success and canceled rows. No downloads started
+on reconnect. The temporary entry was then removed again and the original client
+configuration restored byte-for-byte, preserving unrelated plugin MCPs.
+Final process inspection found zero matching test servers. Both temporary
+loopback fixture servers also exited; the production server exposes no HTTP port.
+
+A WSL Debug Console briefly occluded Cursor's settings controls. Its terminal UI
+was not automated. Atomic configuration changes and observed successful tool
+calls completed the reconnect check without touching that window.
 
 This evidence covers this named Windows host only. It does not certify every
 client, macOS/Linux desktop rendering, suspend/resume or long-duration soak tests.

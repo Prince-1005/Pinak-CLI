@@ -17,9 +17,10 @@ The runtime lives in `cli/pinak/mcp_server/`. Start with the
 [connection and usage guide](USAGE.md); see the
 [status ledger](IMPLEMENTATION_STATUS.md) for verified checks and remaining gates.
 Dependency/schema updates and installer rehearsal are documented in
-[maintenance](MAINTENANCE.md).
-No live AI client has been registered and no package release has been published.
-The package version remains unchanged.
+[maintenance](MAINTENANCE.md). A temporary isolated Windows Cursor 3.23.12
+connection passed real tool/download/stop/reconnect checks and was removed after
+testing; see [desktop evidence](CLIENT_ACCEPTANCE.md). No package release has been
+published. The package version remains unchanged.
 
 ## Intended experience
 

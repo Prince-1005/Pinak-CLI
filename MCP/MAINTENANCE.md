@@ -11,8 +11,8 @@
 - Tool contract: 1.0. Policy: config_schema_version=1, unknown fields rejected.
 - Database: core user_version=1; additive pinak_extensions.mcp=1. Pre-MCP source
   revision 73de91e766a8073afe356521534ca2239fe7c488 is the tested core reader floor.
-- Desktop acceptance: Windows Cursor 3.23.12 discovery/download/metadata/error/stop
-  passed; reconnect and macOS/Linux desktop checks remain open. The Claude
+- Desktop acceptance: Windows Cursor 3.23.12 discovery/download/metadata/error/stop/
+  disconnect/reconnect passed; macOS/Linux desktop checks remain open. The Claude
   JSON generator is tested against disposable configuration files; generic stdio
   output is launch information, not a universal host configuration format.
 

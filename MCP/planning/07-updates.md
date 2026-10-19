@@ -46,4 +46,4 @@ with seeded old jobs; verify jobs are neither discarded nor redownloaded implici
 
 Remaining original gate checklist:
 
-Pending: first published-version upgrade pair and final follow-up CI. Source-pair installer and backup/restore evidence is recorded in ACCEPTANCE.md.
+Pending: first published-version upgrade pair. Source-pair installer and backup/restore evidence is recorded in ACCEPTANCE.md. Final source CI 41dd4e8 passed the clean Linux upgrade/core downgrade/re-upgrade drill.

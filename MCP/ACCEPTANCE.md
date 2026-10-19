@@ -2,13 +2,14 @@
 
 Source implementation, reviewed 2026-10-19. Local checks use Windows/Python 3.12,
 MCP SDK 2.3.0. This document tracks evidence, not a claim of universal readiness.
-The package version is unchanged; no tag, PyPI release or live host registration.
+The package version is unchanged; no tag or PyPI release. The temporary isolated
+Cursor registration was removed after testing and original config restored.
 
 ## Requirements
 
 - R1: official SDK stdio initialization, fourteen tools, compatible text/structured
   results; independent Inspector 2.11.0 discovery and server_info call passed.
-  Actual desktop-client acceptance remains outstanding.
+  Windows Cursor 3.23.12 discovery and real calls passed; other hosts remain open.
 - R2: lazy imports and core-only clean-wheel missing-extra remedy passed.
 - R3: contracts/store/stdio tests verify typed inputs, all queue operations,
   transactions, replay, retention and preservation of downloaded files/history.
@@ -21,16 +22,18 @@ The package version is unchanged; no tag, PyPI release or live host registration
 - R7: pagination/root containment/redaction, real duration probe and isolated
   metadata process with watchdog implemented; hostile metadata stress is pending.
 - R8: USAGE.md, configure generic stdio, disposable JSON merge/backup, doctor,
-  regular CLI fallback and actual installed-wheel protocol smoke passed. No named
-  desktop-host version is certified yet.
+  regular CLI fallback and actual installed-wheel protocol smoke passed. Named
+  Windows Cursor 3.23.12 download/stop/disconnect/reconnect acceptance passed.
 - R9: consistent SQLite backup, migration receipts, future-extension refusal,
   Unicode seeded state, failed-backup preservation and live-run refusal passed.
   Actual pre-MCP/current local wheel upgrade, compatible core downgrade, re-upgrade
   and receipt replay passed in a venv. Pipx 1.18.4 force-install/reinstall/upgrade
   retained the extra and passed stdio. Disposable backup restoration passed.
   Both fixture source revisions identify as 2.0.0; no new release was published.
-- R10: baseline tests/lint/format/types/security/build/install passed locally;
-  complete final source CI matrix, performance and manual acceptance remain gates.
+- R10: final source CI passed all eighteen jobs, including the complete native
+  OS/Python matrix, package/container, upgrade and security checks. All fifteen
+  timing reports were inspected; manual acceptance and the noted metadata target
+  miss remain limitations.
 
 ## Failure scenarios 1–30
 
@@ -39,7 +42,7 @@ for download behavior delegated to the shared engine.
 
 1. Missing extra: clean core-only wheel smoke; stderr remedy and no stdout.
 2. SDK mismatch: exact version check before optional imports; baseline native CI
-   passed all fifteen OS/Python combinations. Final hardening CI pending.
+   passed all fifteen OS/Python combinations, including final source 41dd4e8.
 3. Wrong cwd: real SDK/wheel subprocesses launch from unrelated directories;
    generated interpreter is absolute. Moving an installed interpreter requires reconfigure.
 4. Framing: real SDK and independent Inspector; no banner on stdout.
@@ -92,6 +95,15 @@ for download behavior delegated to the shared engine.
 
 ## Release gates still open
 
+Final source 41dd4e84606afb9ecf3c75c2f69aa99bdb5eaffd passed
+[all eighteen CI jobs](https://github.com/Prince-1005/Pinak-CLI/actions/runs/39261336830).
+All fifteen twenty-sample timing artifacts were inspected. Across native targets,
+p95 ranges in seconds were: server_info 0.0001–0.0004, queue_list 0.0429–0.1061,
+media_info 0.4200–1.0240, worker start 0.3851–0.9281 and stop 0.5486–1.2314.
+Windows/Python 3.12 narrowly missed the provisional 1s metadata target; no timeout
+or correctness failure occurred. Profiling/startup improvements remain follow-up
+work, and these fixture timings are not desktop-host or AI-provider latency.
+
 Local performance checkpoint (Windows/Python 3.12, twenty samples each): p95
 server_info 0.0001s, queue_list(limit=100) over 10,000 saved records 0.0885s,
 media_info 0.5992s, actual worker start 0.5450s, cooperative stop 0.7419s.
@@ -110,18 +122,16 @@ met. Both reports remain under ignored cli/benchmark-results/.
 
 Do not describe all phases as verified until these results exist:
 
-- Final commit CI: Windows/macOS/Linux across Python 3.10–3.14, package/container
-  smoke, coverage and security scans.
-- A real Windows desktop client and a real macOS/Linux desktop client, with
-  versions and dated discovery/download/stop/reconnect evidence.
+- A real macOS/Linux desktop client, with version and dated
+  discovery/download/stop/reconnect evidence. Windows Cursor 3.23.12 passed.
 - First published-version upgrade acceptance after a separately authorized release.
-- Cross-OS timing artifacts from the final CI run; hostile-media memory,
-  suspend/resume and prolonged resource soak checks described above.
+- Hostile-media memory, suspend/resume and prolonged resource soak checks
+  described above; investigate metadata startup against the provisional target.
 
 The current session cannot hot-attach arbitrary stdio tools through its exposed
 tool API. SDK client tests and Inspector independently exercise the server;
 neither substitutes for the desktop-host gates above. After a stopped first
 attempt and exact config restoration, the user authorized a fresh Cursor test.
-Cursor 3.23.12 Windows discovery/download/metadata/error/progress/stop passed;
-see CLIENT_ACCEPTANCE.md for scope and cleanup. Reconnect and macOS/Linux desktop
-acceptance remain open.
+Cursor 3.23.12 Windows discovery/download/metadata/error/progress/stop and real
+disconnect/reconnect passed; see CLIENT_ACCEPTANCE.md for scope and exact config
+restoration. macOS/Linux desktop acceptance remains open.

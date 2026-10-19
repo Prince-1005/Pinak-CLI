@@ -47,7 +47,16 @@ website checks. Preserve logs/artifacts with credentials and private URLs redact
 
 2026-10-19: Local baseline checkpoint: 630 tests passed, coverage 77.12%. Later protocol/lifecycle additions passed focused tests. Strict metadata, clean core/MCP install, installed stdio download and advisory audit passed. IMPLEMENTATION_STATUS.md and ACCEPTANCE.md record limits; no package release/tag was created.
 
+Final local checkpoint: 642 passed, coverage 77.42%. Final source 41dd4e8 passed
+all eighteen jobs in CI run 39261336830, including fifteen Windows/macOS/Linux
+Python 3.10–3.14 targets, installed artifact/upgrade/container and security checks.
+All native timing reports were inspected; metadata p95 reached 1.024s on one
+target, slightly above the provisional 1s target. Windows Cursor 3.23.12 real
+discovery/download/metadata/error/progress/stop/disconnect/reconnect passed and
+temporary configuration was restored. See ACCEPTANCE.md and CLIENT_ACCEPTANCE.md.
+
 Remaining original gate checklist:
 
-Pending: final commit SHA, CI URLs/results, wheel hashes, tested host versions,
-audit links, known limitations, release authorization/status, and maintenance owner.
+Pending: macOS/Linux desktop, hostile-media memory, suspend/resume and prolonged
+soak acceptance; published-version upgrade and release authorization. Release
+artifact hashes must be recorded for a separately authorized release candidate.

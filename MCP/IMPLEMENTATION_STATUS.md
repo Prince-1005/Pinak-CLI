@@ -26,13 +26,14 @@ Last planning review: 2026-10-19.
 - 05 Installation/client setup: preview/apply/backup/atomic merge implemented and
   temporary-directory tests passed. Client-neutral launch fields implemented.
   Clean core-only/MCP-extra wheel installation passed. Named Windows Cursor
-  tool calls passed; reconnect and other desktop-host gates remain open.
+  tool calls and disconnect/reconnect passed; other desktop-host gates remain open.
 - 06 Recovery/hardening: corruption disclosure/quarantine, disk-full/read-only
   classification, atomic rollback, receipt expiry and launch failure cleanup tested;
   metadata probes isolated with deadlines. Further hardening now verifies atomic
   snapshot publication, failed migration rollback, actual SQLite FULL/read-only
   refusal, bounded redacted logs/broken stderr, filesystem failure and forced
-  cleanup of the real metadata helper plus its child. Final hardening CI pending.
+  cleanup of the real metadata helper plus its child. Final hardening CI passed
+  all fifteen native OS/Python combinations at 41dd4e8.
 - 07 Updates/compatibility: explicit backup preflight implemented. Unicode seeded
   queue/history preservation, snapshot integrity, failure cleanup and runner refusal
   passed. A disposable restoration drill and actual pre-MCP/current wheel upgrade,
@@ -42,11 +43,12 @@ Last planning review: 2026-10-19.
 - 08 Verification/release: local baseline passed (630 tests, 77.12% coverage at the
   full-suite checkpoint). Later concurrency/cancellation/forced-parent tests passed.
   Clean wheel/sdist metadata, actual installed stdio download, dependency consistency
-  and advisory audit passed. Final CI and manual release gates remain pending.
+  and advisory audit passed. Final source CI passed all eighteen jobs; manual
+  release gates remain pending.
 
 ## Next action
 
-Finish final source CI and record external client acceptance. No phase is globally verified
+Finish the remaining external/manual acceptance. No phase is globally verified
 until its required matrix/manual gates are recorded. SDK source verified locally:
 MCPServer and official low-level Server callbacks in mcp 2.3.0; low-level callbacks
 are used for explicit flat schemas/error envelopes, without custom JSON-RPC code.
@@ -87,6 +89,17 @@ reproducible old/new wheel upgrades and twenty-sample performance reports. CI no
 runs the compatible-core upgrade drill and collects timing artifacts on every
 native OS/Python target. A final follow-up CI run is required for these changes.
 
+Final source checkpoint: 41dd4e84606afb9ecf3c75c2f69aa99bdb5eaffd passed
+[CI run 39261336830](https://github.com/Prince-1005/Pinak-CLI/actions/runs/39261336830):
+all eighteen jobs, including fifteen OS/Python combinations, security/secret
+scans, clean installed-wheel download, pre-MCP upgrade/core downgrade/re-upgrade,
+and container installation. Two prior failures were corrected: archive paths
+were relative to cli/, and macOS could reject a duplicate signal to an exited
+probe group. The real timeout/descendant test passed after removing the duplicate.
+All fifteen timing artifacts were inspected; Windows/Python 3.12 metadata p95
+1.024s narrowly missed the provisional 1s target. Other timing ranges and remaining
+manual gates are recorded in ACCEPTANCE.md. Source is synced into D:/pinak.
+
 Latest local regression: 642 passed in 105.00s, coverage 77.42%; Ruff, Black and
 MyPy passed. Fresh wheel/sdist metadata and clean installed MCP download/PCM/
 queue/history, dependency consistency and advisory checks passed. Production-
@@ -101,7 +114,9 @@ configuration was restored byte-for-byte. Do not resume desktop automation witho
 fresh user authorization. The user subsequently authorized a new attempt;
 Cursor 3.23.12 successfully discovered and invoked Pinak tools, downloaded and
 inspected a local fixture, reported an invalid job and cooperatively stopped a
-slow download. Reconnect is still pending; see CLIENT_ACCEPTANCE.md.
+slow download. A real disconnect/reconnect retained queue/history and returned
+successful calls; the temporary entry was removed and original config restored
+again afterward. See CLIENT_ACCEPTANCE.md for scope.
 
 Compatibility decision: keep PRAGMA user_version=1 for the unchanged core queue;
 add `pinak_extensions(name='mcp',version=1)` and additive tables. Old core readers
