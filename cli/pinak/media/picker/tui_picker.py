@@ -6,9 +6,26 @@ from pathlib import Path
 
 from ...text_safety import safe_text
 from ..core.input_parser import KeyEvent, MouseEvent
-from ..visualizer.spectrum_bars import _fit_to_width, _visible_len
+from ..visualizer.spectrum_bars import _char_width, _fit_to_width, _visible_len
+from .duration import DurationInspector
 from .fuzzy_search import FuzzyMediaFilter
 from .scanner import SUPPORTED_EXTENSIONS, MediaItem, MediaScanner
+
+
+def _wrap_filename(name: str, width: int) -> list[str]:
+    """Fold at terminal-cell boundaries without discarding spaces or Unicode."""
+    lines: list[str] = []
+    current = ""
+    cells = 0
+    for char in safe_text(name):
+        size = _char_width(char)
+        if current and cells + size > width:
+            lines.append(current)
+            current, cells = "", 0
+        current += char
+        cells += size
+    lines.append(current)
+    return lines
 
 
 class TUIMediaPicker:
@@ -29,7 +46,14 @@ class TUIMediaPicker:
         self.path_error: str = ""
         self._cursor_paths: dict[Path, Path] = {}
         self._cursor_positions: dict[Path, int] = {}
+        self._duration_inspector = DurationInspector()
+        self._name_selection: Path | None = None
+        self._name_page = 0
+        self._max_name_page = 0
         self._refresh_directory()
+
+    def close(self) -> None:
+        self._duration_inspector.close()
 
     def _remember_cursor(self) -> None:
         if self.visible_items and 0 <= self.cursor_idx < len(self.visible_items):
@@ -225,6 +249,11 @@ class TUIMediaPicker:
                         return True, None
                 return True, None
 
+            if k in ("left", "right"):
+                self._name_page = max(
+                    0, min(self._max_name_page, self._name_page + (1 if k == "right" else -1))
+                )
+                return True, None
             if k == "up":
                 self.navigate_up()
                 return True, None
@@ -351,31 +380,59 @@ class TUIMediaPicker:
 
         # Responsive footer bar - fullscreen [f] option removed
         if cols >= 95:
-            footer_text = " [↑/↓] Navigate  [Enter] Open  [p] Enter Path  [Backspace] Up  [/] Search  [Esc] Exit "
+            footer_text = (
+                " [↑/↓] Navigate [←/→] Name [Enter] Open [p] Path [Bksp] Up [/] Search [Esc] Exit "
+            )
         elif cols >= 75:
-            footer_text = " [↑/↓] Nav  [Enter] Open  [p] Path  [Bksp] Up  [/] Search  [Esc] Exit "
+            footer_text = " [↑/↓] Nav [←/→] Name [Enter] Open [p] Path [/] Search [Esc] Exit "
         elif cols >= 60:
-            footer_text = " [↑/↓] Nav  [Enter] Open  [p] Path  [/] Search  [Esc] Exit "
+            footer_text = " [↑/↓] Nav [←/→] Name [Enter] Open [/] Search [Esc] Exit "
         else:
-            footer_text = " [↑/↓] Nav  [Enter] Open  [Esc] Exit "
+            footer_text = " [↑↓] Nav [←→] Name [Enter] Open [Esc] Exit "
 
         raw_footer = f"\x1b[48;2;28;34;46m\x1b[38;2;215;225;235m{footer_text}\x1b[0m"
         footer_bar = f"\x1b[2K{_fit_to_width(raw_footer, cols)}"
 
         content_rows = max(4, rows - 3)
-        left_w = max(32, int(cols * 0.58))
+        left_w = max(18, int(cols * 0.58))
         if cols >= 65 and (cols - left_w - 1) < 25:
             left_w = cols - 26
         right_w = max(20, cols - left_w - 1)
+        box_w = max(18, min(right_w - 2, 54))
+        inner_w = box_w - 2
+        selected = (
+            self.visible_items[self.cursor_idx]
+            if 0 <= self.cursor_idx < len(self.visible_items)
+            else None
+        )
+        if (selected.path if selected else None) != self._name_selection:
+            self._name_selection = selected.path if selected else None
+            self._name_page = 0
+        left_name_rows = max(1, content_rows // 2)
+        right_name_rows = max(1, content_rows - 11)
+        right_name = _wrap_filename(selected.name, inner_w - 2) if selected else [""]
+        show_size = left_w >= 40
+        size_w = 9 if show_size else 0
+        # Badges occupy eight terminal cells, plus cursor and spacing.
+        name_w = max(1, left_w - 3 - 8 - 1 - (size_w + 1 if show_size else 0))
+        left_name = _wrap_filename(selected.name, name_w) if selected else [""]
+        self._max_name_page = max(
+            (len(left_name) - 1) // left_name_rows, (len(right_name) - 1) // right_name_rows
+        )
+        self._name_page = min(self._name_page, self._max_name_page)
+
+        def name_page(lines: list[str], capacity: int) -> list[str]:
+            page = min(self._name_page, (len(lines) - 1) // capacity)
+            return lines[page * capacity : (page + 1) * capacity]
 
         # File list lines
         file_lines: list[str] = []
-        scroll_start = max(
-            0, min(self.cursor_idx - content_rows // 2, len(self.visible_items) - content_rows)
-        )
+        scroll_start = max(0, self.cursor_idx - content_rows // 2)
         visible_slice = self.visible_items[scroll_start : scroll_start + content_rows]
 
         for idx, item in enumerate(visible_slice):
+            if len(file_lines) >= content_rows:
+                break
             actual_idx = scroll_start + idx
             is_cursor = actual_idx == self.cursor_idx
             pointer = " ▸ " if is_cursor else "   "
@@ -415,12 +472,11 @@ class TUIMediaPicker:
                 size_styled = f"{mb:.1f}MB"
                 size_clean = size_styled
 
-            size_w = 9
             size_pad = max(0, size_w - len(size_clean))
-            size_col = (" " * size_pad) + size_styled
+            size_col = (" " * size_pad) + size_styled if show_size else ""
 
-            name_w = max(8, left_w - 3 - badge_w - 1 - size_w - 1)
-            name_col = _fit_to_width(item.name, name_w)
+            chunks = name_page(left_name, left_name_rows) if is_cursor else [safe_text(item.name)]
+            name_col = _fit_to_width(chunks[0], name_w)
 
             row_core = f"{pointer}{badge} {name_col} {size_col}"
             row_fitted = _fit_to_width(row_core, left_w)
@@ -428,14 +484,15 @@ class TUIMediaPicker:
             row_str = f"\x1b[48;2;36;55;92m\x1b[1m{row_fitted}\x1b[0m" if is_cursor else row_fitted
 
             file_lines.append(row_str)
+            for chunk in chunks[1:]:
+                continuation = _fit_to_width(" " * (3 + badge_w + 1) + chunk, left_w)
+                file_lines.append(f"\x1b[48;2;36;55;92m\x1b[1m{continuation}\x1b[0m")
 
         while len(file_lines) < content_rows:
             file_lines.append(" " * left_w)
 
         # Right pane: Media Inspector card with box borders
         right_lines: list[str] = []
-        box_w = max(18, min(right_w - 2, 54))
-        inner_w = box_w - 2
 
         def _box_row(content: str) -> str:
             fitted = _fit_to_width(content, inner_w)
@@ -447,7 +504,14 @@ class TUIMediaPicker:
 
         if self.visible_items and self.cursor_idx < len(self.visible_items):
             cur = self.visible_items[self.cursor_idx]
-            right_lines.append(_box_row(f" Name: {cur.name}"))
+            page_label = (
+                f" ({self._name_page + 1}/{self._max_name_page + 1}; ←/→)"
+                if self._max_name_page
+                else ""
+            )
+            right_lines.append(_box_row(f" Name:{page_label}"))
+            for chunk in name_page(right_name, right_name_rows):
+                right_lines.append(_box_row(f" {chunk}"))
             if cur.is_dir:
                 type_lbl = "DIRECTORY"
             elif cur.media_type:
@@ -463,6 +527,9 @@ class TUIMediaPicker:
             else:
                 sz_mb = cur.size_bytes / (1024 * 1024)
                 right_lines.append(_box_row(f" Size: {sz_mb:.2f} MB"))
+                if cur.media_type in ("audio", "video"):
+                    duration = self._duration_inspector.read(cur.path)
+                    right_lines.append(_box_row(f" Length: {duration}"))
                 right_lines.append(_box_row(f" Ext:  {cur.path.suffix.upper()}"))
                 right_lines.append(_box_row(""))
                 if cur.media_type:

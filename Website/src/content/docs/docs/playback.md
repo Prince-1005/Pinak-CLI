@@ -20,6 +20,14 @@ or close playback to release it.
 
 ## Controls
 
+In the file browser, the selected filename wraps in both panels. Use **left/right**
+to page through especially long names; choosing another item returns to its first
+name page. The Media Inspector shows audio/video **Length** as `M:SS` or
+`H:MM:SS`. It loads in the background without blocking navigation. When duration
+cannot be read, the inspector displays **Unavailable**.
+
+During playback:
+
 - **Space:** pause/resume.
 - **Left/right:** seek audio/video.
 - **Up/down:** change audio volume.

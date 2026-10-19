@@ -218,6 +218,12 @@ falls back to the current terminal. The macOS Terminal tab may remain open when
 playback ends; the launcher waits for the command and checks its recorded exit
 status.
 
+The file browser wraps the selected filename in the list and Media Inspector.
+Use left/right arrows to page through names too long to fit vertically; selecting
+another item resets the name page. The inspector shows audio/video length as
+`M:SS` or `H:MM:SS`. Duration loads in the background and is cached until the
+file changes; unreadable or unsupported duration is shown as `Unavailable`.
+
 Space pauses/resumes, arrows seek/change volume, Ctrl+M mutes, `n`/`p` navigate,
 `r` changes repeat mode, `s` toggles shuffle, `m` changes renderer, `w` toggles a native window and
 Esc/`x` closes media. Picture controls route to the viewer once. Native-window

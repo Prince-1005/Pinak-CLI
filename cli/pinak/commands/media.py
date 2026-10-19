@@ -172,6 +172,7 @@ def _run_picker_loop(picker: TUIMediaPicker) -> Path | None:
     """Runs the interactive TUI picker loop until selection or exit."""
     import shutil
     import time
+    from contextlib import closing
 
     if not sys.stdin.isatty():
         return None
@@ -180,7 +181,7 @@ def _run_picker_loop(picker: TUIMediaPicker) -> Path | None:
     from ..media.core.lifecycle import TerminalSessionContext
 
     parser = InputParser()
-    with TerminalSessionContext(enable_mouse=True):
+    with closing(picker), TerminalSessionContext(enable_mouse=True):
         while True:
             cols, rows = shutil.get_terminal_size(fallback=(80, 24))
             frame_str = picker.render_tui(cols, rows)

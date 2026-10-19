@@ -8,6 +8,7 @@ Release notes are maintained manually; automatic release creation is disabled.
 ## [Unreleased]
 
 ### Fixed
+- Wrap selected filenames in both media browser panels, provide left/right name paging, and show audio/video duration through a cached background inspector lookup.
 - Keep an open GPU/native window across audio and video track changes, refresh its title and media, and retain its size and fullscreen state until the user closes it or exits playback.
 
 ### Added
