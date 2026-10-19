@@ -86,4 +86,5 @@ host. Record app version, OS/Python, launch fields, discovery, successful downlo
 CLI history, stop/disconnect/reconnect and invalid-path/missing-binary feedback.
 Machine suspend/resume and prolonged resource checks require an appropriate test
 machine. SDK, Inspector and native process tests do not substitute for that UI
-evidence. Keep unobserved checks open in ACCEPTANCE.md rather than invent results.
+evidence. Keep unobserved checks explicit in README.md's verified scope rather
+than inventing results.

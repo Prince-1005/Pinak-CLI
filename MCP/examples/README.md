@@ -2,7 +2,7 @@
 
 These templates use placeholders, not real installation paths. Install the source
 MCP extra first and use `pinak-mcp configure` to obtain actual launch fields.
-See [the usage guide](../USAGE.md). No desktop-client version is certified yet.
+See [the usage guide](../USAGE.md) and [tested scope](../README.md#verified-scope).
 
 `claude-desktop.template.json` illustrates a local stdio launch through a dedicated
 Python environment with Pinak's MCP extra installed. The path is to Python itself,

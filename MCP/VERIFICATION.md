@@ -2,8 +2,8 @@
 
 Existing gates remain mandatory. Run from `cli/` in an environment containing
 the test/development tools and the implemented optional MCP extra. The test files
-below exist; current evidence and missing gates are recorded in
-IMPLEMENTATION_STATUS.md and ACCEPTANCE.md.
+below exist; current evidence and remaining gates are summarized in
+[the verified scope](README.md#verified-scope).
 
 ## Baseline commands
 
@@ -93,7 +93,7 @@ left after controlled shutdown. Inspect process handles and locks in tests.
 
 ## Requirement audit
 
-Map R1–R10 from REQUIREMENTS.md and scenarios 1–30 from FAILURE_RECOVERY.md to
-tests or dated manual evidence. Record missing/skipped evidence as incomplete.
+Map the public tool contract, usage and scenarios 1–30 from FAILURE_RECOVERY.md
+to tests or dated manual evidence. Record missing/skipped evidence as incomplete.
 No universal zero-bug claim, no exactly-once claim, no false successful downloads,
 and no end-to-end completion claim before this audit passes.

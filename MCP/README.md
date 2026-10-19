@@ -1,86 +1,71 @@
-# Pinak-MCP implementation plan
+# Pinak-MCP
 
-Status: **implemented in source; release acceptance in progress.**
+Connect an AI application to Pinak's local download engine and durable queue.
+Pinak-MCP uses standard MCP **stdio**: the AI application launches a local Python
+process. No hosted download service, public endpoint or user account is required.
+The AI host may still send prompts and returned metadata to its provider.
 
-Prepared 2026-10-19 against the existing Pinak engine and durable queue.
+## Get started
 
-## Product decision
+These MCP changes are available from repository source; do not assume the
+published PyPI package includes them yet. Python 3.10+ and a client that supports
+local stdio MCP servers are required.
 
-The name **Pinak-MCP** is suitable. The proposed executable is `pinak-mcp`,
-the import namespace is `pinak.mcp_server`, and the client configuration key is
-`pinak`. Keep this work in the current repository. Initially ship it as the
-optional `mcp` extra of `pinak-cli`, sharing one release with its core engine.
-These names do not assert ownership or availability of a separate PyPI package
-or MCP Registry listing; check those separately if separate publication is wanted.
+```sh
+git clone https://github.com/Prince-1005/Pinak-CLI.git
+cd Pinak-CLI/cli
+python -m venv .venv-mcp
+```
 
-The runtime lives in `cli/pinak/mcp_server/`. Start with the
-[connection and usage guide](USAGE.md); see the
-[status ledger](IMPLEMENTATION_STATUS.md) for verified checks and remaining gates.
-Dependency/schema updates and installer rehearsal are documented in
-[maintenance](MAINTENANCE.md). A temporary isolated Windows Cursor 3.23.12
-connection passed real tool/download/stop/reconnect checks and was removed after
-testing; see [desktop evidence](CLIENT_ACCEPTANCE.md). No package release has been
-published. The package version remains unchanged.
+On Windows:
 
-## Intended experience
+```powershell
+.venv-mcp/Scripts/python.exe -m pip install --upgrade pip
+.venv-mcp/Scripts/python.exe -m pip install -e ".[mcp]"
+.venv-mcp/Scripts/python.exe -m pinak.mcp_server doctor --json
+.venv-mcp/Scripts/python.exe -m pinak.mcp_server configure
+```
 
-1. Install the optional extra using a documented, isolated Python environment.
-2. Generate and inspect a client launch configuration; apply it only when requested.
-3. Restart a compatible local MCP host and verify Pinak's tools are discoverable.
-4. Ask the AI to queue media, start a local run, inspect results, or manage jobs.
-5. Read the same queue and download history through Pinak CLI and MCP.
-6. Close/reopen the host without losing saved jobs. Interrupted attempts remain
-   resumable where the source/download engine supports partial-file continuation.
+On macOS/Linux, replace `.venv-mcp/Scripts/python.exe` with
+`.venv-mcp/bin/python`. Install FFmpeg/FFprobe explicitly when conversion, merging
+or metadata requires them; the MCP server does not provision these binaries.
 
-All execution and storage belong to the user's machine. Stdio transport requires
-no hosted backend, public endpoint, account database, or inbound network port.
-Downloads still require connections to their source websites. A cloud-backed AI
-host may process prompts and returned metadata remotely; local transport does not
-make that host offline.
+Enter the generated command, arguments and environment in your AI application's
+local MCP settings, then reload it. Ask: “Queue this media URL, start the queue,
+and show me its download status.” Adding a job alone does not start downloading.
+Clients that accept only remote HTTP/SSE URLs cannot connect directly.
 
-## Read in this order
+## Documentation
 
-1. [GPT implementation guide](GPT_IMPLEMENTATION_GUIDE.md)
-2. [Requirements and scope](REQUIREMENTS.md)
-3. [Architecture and worker lifecycle](ARCHITECTURE.md)
-4. [Tool contract](TOOL_CONTRACT.md)
-5. [Failures and recovery](FAILURE_RECOVERY.md)
-6. [Installation, client configuration, and updates](SETUP_AND_UPDATES.md)
-7. [Verification and release gates](VERIFICATION.md)
-8. [Implementation status](IMPLEMENTATION_STATUS.md)
+- [Installation, client setup and everyday usage](USAGE.md)
+- [Policy and client configuration examples](examples/README.md)
+- [Tool contract and errors](TOOL_CONTRACT.md)
+- [Architecture and worker lifecycle](ARCHITECTURE.md)
+- [Failure handling and recovery](FAILURE_RECOVERY.md)
+- [Updates, compatibility and maintenance](MAINTENANCE.md)
+- [Verification commands and release checks](VERIFICATION.md)
 
-## Sequential delivery phases
+Runtime code is in `cli/pinak/mcp_server/`; the SDK is an optional dependency of
+`pinak-cli[mcp]`. Ordinary CLI users do not need to install it. CLI and MCP share
+the user's existing local queue/history. Downloaded media stays on the user's
+device and is not included in tool responses.
 
-- [01 — Compatibility and foundation](planning/01-foundation.md)
-- [02 — Contracts and shared services](planning/02-contracts.md)
-- [03 — Durable worker control](planning/03-worker.md)
-- [04 — MCP transport and tools](planning/04-mcp-server.md)
-- [05 — Installation and client setup](planning/05-client-setup.md)
-- [06 — Failure recovery and operational hardening](planning/06-recovery.md)
-- [07 — Updates and compatibility](planning/07-updates.md)
-- [08 — End-to-end verification and release](planning/08-release.md)
+## Verified scope
 
-Phases are checkpoints, not separately advertised complete products. The first
-public release must include all eight, including MCP-initiated download runs.
-Queue management alone does not satisfy this plan.
+Windows Cursor 3.23.12 discovered all fourteen tools and passed actual local
+download, metadata, history, error, progress, stop and disconnect/reconnect checks.
+The temporary test registration was removed and original configuration restored.
+SDK client and Inspector 2.11.0 interoperability also passed.
 
-## Reliability promise
+[Source CI at 41dd4e8](https://github.com/Prince-1005/Pinak-CLI/actions/runs/39261336830)
+passed all eighteen jobs, including Windows/macOS/Linux on Python 3.10–3.14,
+installed-wheel downloads, upgrade/downgrade, container and security checks.
+Local regression: 642 tests passed, 77.42% coverage. One native metadata timing
+measured p95 1.024s, slightly above the provisional one-second target.
 
-Do not promise software with zero possible bugs or universal client compatibility.
-Deliver tested behavior, bounded operations, visible failure reasons, preserved
-data, and supported recovery steps. A failed download must never be presented as
-successful merely because an MCP request returned successfully.
+macOS/Linux desktop-host acceptance, hostile-media memory checks, suspend/resume,
+long-duration resource testing and a first published-version upgrade remain open.
+This is not universal client certification or an exactly-once download guarantee.
 
-## Official references
-
-Recheck these at implementation time; SDK APIs and host formats can change.
-
-- [Python SDK repository](https://github.com/modelcontextprotocol/python-sdk)
-- [SDK running and transports](https://py.sdk.modelcontextprotocol.io/run/)
-- [MCP tools specification](https://modelcontextprotocol.io/specification/latest/server/tools)
-- [MCP compatibility specification](https://modelcontextprotocol.io/specification/latest/basic/lifecycle)
-- [Official server and desktop configuration tutorial](https://modelcontextprotocol.io/docs/develop/build-server)
-
-The SDK guidance inspected for this plan uses `MCPServer` and local stdio.
-Verify the installed release's actual API and supported Python versions before
-choosing bounds; do not copy an older FastMCP example or an unpinned main branch.
+Implementation planning and superseded progress reports are ignored local files.
+They are unnecessary for installation, building or running Pinak-MCP.

@@ -7,8 +7,14 @@ cannot connect directly. No hosted service, public URL, or listening port is use
 
 ## Install the current source
 
-These changes are not yet a published PyPI release. From the repository's `cli`
-directory create a dedicated environment:
+These changes are not yet a published PyPI release. Clone the source first:
+
+```sh
+git clone https://github.com/Prince-1005/Pinak-CLI.git
+cd Pinak-CLI/cli
+```
+
+Then create a dedicated environment:
 
 ```powershell
 python -m venv .venv-mcp
@@ -102,7 +108,10 @@ storage is reported as busy, never reset. Keep the quarantined file for recovery
 Before upgrades: stop runs, close hosts, run `pinak-mcp prepare-update`, save its
 backup paths, then upgrade explicitly with your original installation method.
 Run doctor, inspect jobs/history, reconnect and resume explicitly. Read
-[update/rollback limits](SETUP_AND_UPDATES.md) before restoring a backup.
+[update/rollback limits](MAINTENANCE.md#upgrade-and-restoration-rehearsal) before
+restoring a backup. Preserve an archive of the current database, stop every writer,
+verify the backup and use compatible code. Restoring a snapshot loses records
+created after that snapshot; restoration is never automatic.
 
 Logs rotate locally (512 KiB, two backups). Returned URLs redact credentials and
 query strings; text strips terminal controls. Your AI host can still send prompts
@@ -113,6 +122,5 @@ to the model by default.
 
 The official SDK client tests initialize, discover all tools and execute actual
 local downloads, audio conversion, history, replay and process cleanup. See
-[IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) for exact evidence. Real
-desktop-host and cross-platform release acceptance must be recorded separately;
-protocol interoperability does not mean every AI application is certified.
+[verified scope](README.md#verified-scope) for current evidence and remaining
+checks. Protocol interoperability does not mean every AI application is certified.

@@ -17,6 +17,7 @@ build/
 
 # Local virtual environments, including the audit compatibility environment
 .venv/
+.venv-mcp/
 .venv-audit*/
 venv/
 env/
@@ -47,6 +48,15 @@ htmlcov/
 /unnecessary_files/
 
 phases
+
+# Local MCP implementation plans and superseded progress/session reports
+/MCP/planning/
+/MCP/GPT_IMPLEMENTATION_GUIDE.md
+/MCP/REQUIREMENTS.md
+/MCP/IMPLEMENTATION_STATUS.md
+/MCP/ACCEPTANCE.md
+/MCP/CLIENT_ACCEPTANCE.md
+/MCP/SETUP_AND_UPDATES.md
 
 # OS and editor files
 .DS_Store
