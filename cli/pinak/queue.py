@@ -305,6 +305,9 @@ def _claim_next(conn: sqlite3.Connection, selected: set[int] | None) -> QueueJob
 
 def _finish(conn: sqlite3.Connection, job: QueueJob, result: DownloadResult) -> None:
     status = "queued" if result.status == "interrupted" else result.status
+    history_status = {"interrupted": "canceled", "succeeded": "success"}.get(
+        result.status, result.status
+    )
     now = time.time()
     with conn:
         conn.execute(
@@ -323,11 +326,7 @@ def _finish(conn: sqlite3.Connection, job: QueueJob, result: DownloadResult) -> 
             history.insert_download(
                 conn,
                 job.request.url,
-                (
-                    "canceled"
-                    if result.status == "interrupted"
-                    else "success" if result.status == "succeeded" else result.status
-                ),
+                history_status,
                 "audio" if job.request.extract_audio else "media",
                 list(result.files),
                 job.request.quality,
