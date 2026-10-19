@@ -1,0 +1,14 @@
+{
+  "config_schema_version": 1,
+  "default_output_dir": "<ABSOLUTE_APPROVED_DOWNLOAD_DIRECTORY>",
+  "output_roots": ["<ABSOLUTE_APPROVED_DOWNLOAD_DIRECTORY>"],
+  "read_roots": ["<ABSOLUTE_APPROVED_MEDIA_DIRECTORY>"],
+  "max_page_size": 100,
+  "max_mutation_items": 100,
+  "max_response_bytes": 102400,
+  "shutdown_grace_seconds": 10,
+  "parent_heartbeat_seconds": 2,
+  "orphan_threshold_seconds": 30,
+  "mutation_receipt_retention_days": 7,
+  "update_checks": "manual"
+}

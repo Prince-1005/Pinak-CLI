@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "pinak": {
+      "command": "<ABSOLUTE_PATH_TO_VENV_PYTHON>",
+      "args": ["-m", "pinak.mcp_server", "serve", "--transport", "stdio"],
+      "env": {
+        "PINAK_MCP_CONFIG": "<ABSOLUTE_PATH_TO_USER_PINAK_MCP_CONFIG>"
+      }
+    }
+  }
+}
