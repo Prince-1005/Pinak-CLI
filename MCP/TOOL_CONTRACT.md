@@ -1,7 +1,8 @@
-# Proposed public tool contract
+# Public tool contract 1.0
 
-All names and commands here are planned. No tools exist until implementation and
-protocol verification. Freeze schemas in phase 02 before adding SDK decorators.
+These fourteen tools are implemented with the official SDK. Input schemas are
+generated from `cli/pinak/mcp_server/models.py`; actual SDK discovery/call tests
+verify the protocol. Desktop-client acceptance remains a separate release gate.
 
 ## Common rules
 
@@ -64,6 +65,13 @@ Batch URL enqueue/import may be added as typed arrays with atomic validation,
 not an arbitrary local file-reading tool. Freeze precise maximum counts in phase 02;
 initial targets are 100 IDs/URLs per mutation and 100 KiB structured response.
 Results must advertise truncation/pagination rather than silently drop records.
+Queue/history pages scan at most limit+1 records and omit entries outside the
+configured roots. A page can therefore be empty with has_more=true; advance its
+cursor. History entries without files remain visible. queue_show uses a one-based
+file-index cursor and truncates errors at 8,000 characters with error_truncated.
+queue_retry(all_failed=true) returns a count rather than an unbounded ID array.
+Record-only mutations operate on the shared user queue; output/read roots limit
+downloads and returned file information, not independent queue ownership.
 
 ## Readiness and capability fallbacks
 

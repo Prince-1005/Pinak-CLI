@@ -264,6 +264,8 @@ def _download_carousel_parallel(ydl_opts, entries, output_dir, filename_suffix, 
     _console_print(f"[*] Downloading {total} slides with {workers} parallel workers...")
     # The shared rich progress hook is not thread-safe — workers go without it.
     worker_opts = {k: v for k, v in ydl_opts.items() if k != "progress_hooks"}
+    if in_engine():
+        worker_opts["progress_hooks"] = [_yt_dlp_hook]
     before = get_file_snapshot(str(output_dir))
 
     def _work(item):

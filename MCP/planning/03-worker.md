@@ -1,6 +1,6 @@
 # Phase 03 — Durable supervised download worker
 
-Status: planned. Dependencies: phases 01–02 verified.
+Status: Local Windows lifecycle verification passed; native POSIX verification pending.
 
 ## Inputs
 
@@ -41,6 +41,10 @@ for lifecycle tests and native Windows/POSIX runners for tree ownership checks.
 - A completed run never quietly starts newly enqueued jobs outside its snapshot.
 
 ## Completion notes
+
+2026-10-19: Real downloads, stop/requeue, adapter EOF/forced kill, worker crash, hung descendant, PID ownership and startup-write failure cleanup passed. Windows uses KILL_ON_JOB_CLOSE; POSIX uses a dedicated process group. Defaults: grace 10s, heartbeat 2s, orphan threshold 30s. Repeated p95 measurement pending.
+
+Remaining original gate checklist:
 
 Pending: process ownership mechanism per OS, measured deadlines, exact injected
 crashes, cleanup evidence, performance results, and commits.

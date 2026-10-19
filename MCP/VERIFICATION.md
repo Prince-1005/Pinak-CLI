@@ -1,8 +1,9 @@
 # Verification and release gates
 
 Existing gates remain mandatory. Run from `cli/` in an environment containing
-the test/development tools and the implemented optional MCP extra. The proposed
-test filenames below are deliverables, not files that already exist.
+the test/development tools and the implemented optional MCP extra. The test files
+below exist; current evidence and missing gates are recorded in
+IMPLEMENTATION_STATUS.md and ACCEPTANCE.md.
 
 ## Baseline commands
 

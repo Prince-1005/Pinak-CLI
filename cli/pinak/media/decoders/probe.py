@@ -56,7 +56,9 @@ class MediaProbe:
     """Probes media files using fast header signatures, Mutagen, Pillow, and FFprobe."""
 
     @classmethod
-    def probe(cls, file_path: str | Path) -> MediaMetadata:
+    def probe(
+        cls, file_path: str | Path, *, allow_provision: bool = True, include_artwork: bool = True
+    ) -> MediaMetadata:
         is_url = isinstance(file_path, str) and file_path.lower().startswith(
             ("http://", "https://", "rtsp://", "rtmp://")
         )
@@ -77,11 +79,19 @@ class MediaProbe:
             return cls._probe_image(path, file_size)
 
         # 2. Audio/Video path: Try FFprobe first if installed
-        ffprobe_meta = cls._probe_with_ffprobe(path, file_size)
+        ffprobe_meta = (
+            cls._probe_with_ffprobe(path, file_size)
+            if allow_provision
+            else cls._probe_with_ffprobe(path, file_size, allow_provision=False)
+        )
         if ffprobe_meta is not None:
             if ffprobe_meta.duration_seconds <= 0.0:
                 ffprobe_meta.duration_seconds = cls._probe_duration_with_ffmpeg(path)
-            cls._enrich_tags(path, ffprobe_meta)
+            (
+                cls._enrich_tags(path, ffprobe_meta)
+                if include_artwork
+                else cls._enrich_tags(path, ffprobe_meta, include_artwork=False)
+            )
             return ffprobe_meta
 
         # 3. Fallback: Mutagen for audio
@@ -93,7 +103,11 @@ class MediaProbe:
             ".opus",
             ".ogg",
         ):
-            audio_meta = cls._probe_audio_mutagen(path, file_size)
+            audio_meta = (
+                cls._probe_audio_mutagen(path, file_size)
+                if include_artwork
+                else cls._probe_audio_mutagen(path, file_size, include_artwork=False)
+            )
             if audio_meta is not None:
                 return audio_meta
 
@@ -110,7 +124,10 @@ class MediaProbe:
             file_size_bytes=file_size,
             duration_seconds=ffmpeg_dur,
         )
-        cls._enrich_tags(path, meta)
+        if include_artwork:
+            cls._enrich_tags(path, meta)
+        else:
+            cls._enrich_tags(path, meta, include_artwork=False)
         return meta
 
     @classmethod
@@ -215,9 +232,16 @@ class MediaProbe:
         return 0.0
 
     @classmethod
-    def _probe_with_ffprobe(cls, path: Path, file_size: int) -> MediaMetadata | None:
+    def _probe_with_ffprobe(
+        cls, path: Path, file_size: int, *, allow_provision: bool = True
+    ) -> MediaMetadata | None:
         """Invokes ffprobe sub-process if available."""
-        ffprobe_bin = ensure_ffprobe()
+        if allow_provision:
+            ffprobe_bin = ensure_ffprobe()
+        else:
+            from ...utils import get_ffprobe_path
+
+            ffprobe_bin = get_ffprobe_path()
         if not ffprobe_bin or not (os.path.isfile(ffprobe_bin) or shutil.which(ffprobe_bin)):
             return None
 
@@ -343,7 +367,9 @@ class MediaProbe:
         return meta
 
     @classmethod
-    def _probe_audio_mutagen(cls, path: Path, file_size: int) -> MediaMetadata | None:
+    def _probe_audio_mutagen(
+        cls, path: Path, file_size: int, *, include_artwork: bool = True
+    ) -> MediaMetadata | None:
         """Inspects audio tags using Mutagen."""
         try:
             import mutagen
@@ -361,13 +387,17 @@ class MediaProbe:
                 channels=getattr(audio.info, "channels", 2),
                 audio_bitrate=getattr(audio.info, "bitrate", 0),
             )
-            cls._enrich_tags(path, meta)
+            (
+                cls._enrich_tags(path, meta)
+                if include_artwork
+                else cls._enrich_tags(path, meta, include_artwork=False)
+            )
             return meta
         except Exception:
             return None
 
     @classmethod
-    def _enrich_tags(cls, path: Path, meta: MediaMetadata) -> None:
+    def _enrich_tags(cls, path: Path, meta: MediaMetadata, *, include_artwork: bool = True) -> None:
         """Extracts artist, title, album, and embedded album art."""
         try:
             import mutagen
@@ -390,7 +420,7 @@ class MediaProbe:
                     meta.album = str(album_val[0])
 
             # Extract embedded album artwork
-            if meta.album_art_bytes is None:
+            if include_artwork and meta.album_art_bytes is None:
                 # ID3v2 APIC tag
                 for tag_name in f.tags:
                     if tag_name.startswith("APIC:"):

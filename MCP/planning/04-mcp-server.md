@@ -1,6 +1,6 @@
 # Phase 04 — MCP transport and complete tool surface
 
-Status: planned. Dependencies: phases 01–03 verified.
+Status: SDK and Inspector checks passed locally; desktop acceptance pending.
 
 ## Inputs
 
@@ -39,6 +39,10 @@ in phase 01 (the plan does not assume a specific version's CLI syntax).
 - No test can claim phase complete using only direct Python function calls.
 
 ## Completion notes
+
+2026-10-19: Official SDK callbacks expose fourteen typed tools. Actual SDK initialize/list/call/error/download/MP3/history/replay/overload/cancellation tests passed. Inspector 2.11.0 independently discovered 14 tools and called server_info. No live client registration was changed.
+
+Remaining original gate checklist:
 
 Pending: protocol/client/SDK versions, actual transcript evidence, tools list,
 stdout audit, local-download fixture results, and commits.

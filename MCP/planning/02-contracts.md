@@ -1,6 +1,6 @@
 # Phase 02 — Contracts, policy, and shared services
 
-Status: planned. Dependency: phase 01 verified.
+Status: implemented and locally tested; global acceptance pending.
 
 ## Inputs
 
@@ -43,6 +43,10 @@ Typed schemas, service/policy/store modules, migration fixture builder, and test
 - No worker lifecycle is claimed complete yet; phase 03 consumes these services.
 
 ## Completion notes
+
+2026-10-19 local evidence: Contract 1.0 and policy version 1 implemented. Core user_version remains 1; additive MCP extension version 1, consistent pre-extension backup, atomic receipts and pagination tested with real SQLite. Unknown extension versions fail closed.
+
+The original release-gate checklist below remains open where not covered above.
 
 Pending: frozen contract version, schema transition/floor, test evidence,
 transaction boundaries, unresolved decisions, and implementation commits.

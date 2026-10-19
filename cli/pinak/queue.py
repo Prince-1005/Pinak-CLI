@@ -340,6 +340,9 @@ def run_queue(
     *,
     on_event: Callable[[QueueJob, DownloadEvent], None] | None = None,
     limit: int | None = None,
+    stop_requested: Callable[[], bool] | None = None,
+    on_ready: Callable[[], None] | None = None,
+    validate_request: Callable[[DownloadRequest], None] | None = None,
 ) -> QueueSummary:
     if limit is not None and limit < 1:
         raise ValueError("Limit must be positive")
@@ -361,6 +364,8 @@ def run_queue(
                 logging.getLogger("pinak.queue").exception("Queue display listener failed")
 
     try:
+        if on_ready:
+            on_ready()
         with contextlib.closing(_connect()) as conn:
             if selected is not None:
                 conn.execute("CREATE TEMP TABLE queue_selected (id INTEGER PRIMARY KEY)")
@@ -371,11 +376,18 @@ def run_queue(
             with conn:
                 _recover_running(conn)
             while limit is None or processed < limit:
+                if stop_requested and stop_requested():
+                    interrupted = True
+                    break
                 job = _claim_next(conn, selected)
                 if job is None:
                     break
                 processed += 1
                 try:
+                    if stop_requested and stop_requested():
+                        raise KeyboardInterrupt
+                    if validate_request:
+                        validate_request(job.request)
                     publish(job, DownloadEvent("started"))
                     with queue_owns_history():
                         result = run_download(

@@ -1,6 +1,6 @@
 # Phase 08 — End-to-end acceptance and release preparation
 
-Status: planned. Dependencies: every earlier phase verified.
+Status: Implementation candidate; final CI/manual acceptance pending.
 
 ## Inputs
 
@@ -44,6 +44,10 @@ website checks. Preserve logs/artifacts with credentials and private URLs redact
   privacy from the AI provider is made.
 
 ## Completion notes
+
+2026-10-19: Local baseline checkpoint: 630 tests passed, coverage 77.12%. Later protocol/lifecycle additions passed focused tests. Strict metadata, clean core/MCP install, installed stdio download and advisory audit passed. IMPLEMENTATION_STATUS.md and ACCEPTANCE.md record limits; no package release/tag was created.
+
+Remaining original gate checklist:
 
 Pending: final commit SHA, CI URLs/results, wheel hashes, tested host versions,
 audit links, known limitations, release authorization/status, and maintenance owner.

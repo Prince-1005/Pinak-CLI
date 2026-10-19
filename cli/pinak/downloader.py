@@ -843,7 +843,9 @@ def handle_download(
             "quality": quality,
         }
 
-    if not ffmpeg_available():
+    from .engine import binary_provision_allowed
+
+    if not ffmpeg_available() and binary_provision_allowed():
         from .ffmpeg_setup import ensure_ffmpeg
 
         fetched = ensure_ffmpeg()

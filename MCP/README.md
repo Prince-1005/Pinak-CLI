@@ -1,6 +1,6 @@
 # Pinak-MCP implementation plan
 
-Status: **planning only; MCP is not implemented or configured yet.**
+Status: **implemented in source; release acceptance in progress.**
 
 Prepared 2026-10-19 against the existing Pinak engine and durable queue.
 
@@ -13,10 +13,11 @@ optional `mcp` extra of `pinak-cli`, sharing one release with its core engine.
 These names do not assert ownership or availability of a separate PyPI package
 or MCP Registry listing; check those separately if separate publication is wanted.
 
-This folder contains the implementation specification for GPT coding models,
-not a working server. Creating configuration examples here does not install
-dependencies, register a client, start downloads, or modify user configuration.
-No runtime code, versions, or release workflows were changed for this plan.
+The runtime lives in `cli/pinak/mcp_server/`. Start with the
+[connection and usage guide](USAGE.md); see the
+[status ledger](IMPLEMENTATION_STATUS.md) for verified checks and remaining gates.
+No live AI client has been registered and no package release has been published.
+The package version remains unchanged.
 
 ## Intended experience
 

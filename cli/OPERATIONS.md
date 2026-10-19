@@ -315,3 +315,29 @@ The Windows uninstall helper schedules package removal and only then removes
 selected application data on success. It does not remove downloaded media or
 arbitrary external log files. A scheduled helper is reported as pending work,
 not as proof that deletion already completed.
+## Optional local MCP adapter
+
+Source installation: `python -m pip install -e ".[mcp]"` from cli/. The executable
+is `pinak-mcp`; module launch is `python -m pinak.mcp_server`. `configure` prints
+generic stdio launch fields, `doctor` performs local readiness checks, `serve`
+starts the protocol, and `prepare-update` creates explicit local state backups.
+Ordinary CLI installations do not import or require the optional SDK.
+
+MCP and CLI share the same per-user queue/history DB and runner FileLock.
+`PINAK_DATA_DIR` explicitly overrides the storage directory for both processes;
+it is a trusted local launch setting, not an MCP tool argument. Policy comes from
+`PINAK_MCP_CONFIG` or the platform user config directory's mcp.json. With no
+policy file, downloads use ~/Downloads/Pinak. Output/read roots restrict download
+destinations and returned file information; record management uses the shared
+user queue. This adapter is not an operating-system sandbox.
+
+The worker belongs to one stdio session and stops on disconnect. Partial files
+remain; stale running rows are recovered only by the next exclusively locked
+runner. A new host does not automatically resume downloads. Mutation receipts
+default to seven days; use identical request keys/arguments to reconcile lost
+responses. They do not promise exactly-once download execution.
+
+No binary provisioning, package updates, network listener, desktop player or
+external AI account setup happens during initialization. Download sources still
+require outbound network access. See ../MCP/USAGE.md and IMPLEMENTATION_STATUS.md
+for setup, supported behavior, recovery and outstanding release acceptance.

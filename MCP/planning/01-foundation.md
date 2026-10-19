@@ -1,6 +1,6 @@
 # Phase 01 — Compatibility and package foundation
 
-Status: planned. Prerequisite: read all documents listed in MCP/README.md.
+Status: implemented locally; cross-platform release verification pending.
 
 ## Inputs
 
@@ -39,6 +39,10 @@ wheel build. Do not register a live client in this phase.
 - No version bump, release, backend service, or independent downloader introduced.
 
 ## Completion notes
+
+2026-10-19 local evidence: SDK 2.3.0 pinned, Python >=3.10 supported in dependency metadata, lazy entry point and optional extra implemented. Core-only clean wheel, lint/types, and real stdio tests passed. Full OS/Python evidence remains a CI gate.
+
+The original release-gate checklist below remains open where not covered above.
 
 Pending: implementation commit, selected SDK/version matrix, exact commands,
 exit results, unverified environments, and next phase readiness.

@@ -1,6 +1,6 @@
 # Phase 05 — Installation, diagnostics, and client onboarding
 
-Status: planned. Dependencies: phases 01–04 verified.
+Status: Disposable setup and clean-wheel checks passed; live host acceptance pending.
 
 ## Inputs
 
@@ -40,6 +40,10 @@ config writes in temporary directories. Then test a user-approved real client.
 - Normal CLI remains usable when MCP setup is absent or broken.
 
 ## Completion notes
+
+2026-10-19: Generic configure prints client-neutral stdio fields. Claude-format preview/apply/backup/merge/atomic-failure tests passed against disposable files. Core-only and MCP-extra clean wheel installs with actual protocol download passed. USAGE.md documents source setup; PyPI publication has not happened.
+
+Remaining original gate checklist:
 
 Pending: exact installer commands verified, client versions/OS, disposable and
 real-client setup results, documentation locations, and commits.

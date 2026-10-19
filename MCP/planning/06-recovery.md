@@ -1,6 +1,6 @@
 # Phase 06 — Failure recovery, resource limits, and hardening
 
-Status: planned. Dependencies: phases 01–05 verified.
+Status: Implemented; remaining stress/manual gates tracked.
 
 ## Inputs
 
@@ -39,6 +39,10 @@ killing an actual adapter/worker process and after a simulated interrupted DB wr
 - All genuinely missing manual evidence remains marked unverified in status.
 
 ## Completion notes
+
+2026-10-19: Corruption disclosure, storage error classification, receipt expiry/replay, bounded response/probe limits, cancellation reconciliation, overload and actual process cleanup tested. ACCEPTANCE.md maps scenarios 1–30 to evidence and missing checks.
+
+Remaining original gate checklist:
 
 Pending: scenario coverage, stress measurements, known limitations, per-OS cleanup
 evidence, unresolved external dependencies, and implementation commits.

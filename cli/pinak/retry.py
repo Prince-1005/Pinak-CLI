@@ -95,7 +95,17 @@ def sleep_with_interrupt(seconds: float) -> bool:
     Returns True when the full duration elapsed, False when cancelled.
     """
     try:
-        time.sleep(seconds)
+        from .engine import cancellation_requested, managed_stop_enabled
+
+        if not managed_stop_enabled():
+            time.sleep(seconds)
+            return True
+
+        deadline = time.monotonic() + seconds
+        while (remaining := deadline - time.monotonic()) > 0:
+            if cancellation_requested():
+                return False
+            time.sleep(min(0.2, remaining))
         return True
     except KeyboardInterrupt:
         return False

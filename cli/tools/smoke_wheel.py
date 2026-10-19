@@ -16,6 +16,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", nargs="?", default="release-dist")
     parser.add_argument("--check-playback-imports", action="store_true")
+    parser.add_argument("--check-mcp", action="store_true")
     args = parser.parse_args()
     directory = Path(args.directory).resolve()
     wheels = list(directory.glob("*.whl"))
@@ -95,6 +96,31 @@ def main() -> None:
             encoding="utf-8",
         )
         assert isinstance(json.loads(result.stdout), dict)
+        missing_extra = subprocess.run(
+            [str(python), "-m", "pinak.mcp_server", "serve"],
+            cwd=root,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        assert missing_extra.returncode == 2 and "pip install" in missing_extra.stderr
+        assert missing_extra.stdout == ""
+        if args.check_mcp:
+            subprocess.run(
+                [str(python), "-m", "pip", "install", str(wheels[0]) + "[mcp]"],
+                cwd=root,
+                env=env,
+                check=True,
+                timeout=300,
+            )
+            subprocess.run(
+                [str(python), str(Path(__file__).with_name("smoke_mcp.py").resolve())],
+                cwd=root,
+                env=env,
+                check=True,
+                timeout=90,
+            )
         subprocess.run(
             [str(python), "-m", "pip", "check"], cwd=root, env=env, check=True, timeout=30
         )

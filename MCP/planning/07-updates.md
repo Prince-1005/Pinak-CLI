@@ -1,6 +1,6 @@
 # Phase 07 — Updates, migration, and compatibility maintenance
 
-Status: planned. Dependencies: phases 01–06 verified.
+Status: Backup/compatibility checks passed; installer-pair/restore gates pending.
 
 ## Inputs
 
@@ -41,6 +41,10 @@ with seeded old jobs; verify jobs are neither discarded nor redownloaded implici
   human's release instruction.
 
 ## Completion notes
+
+2026-10-19: prepare-update refuses runner locks/active records and snapshots SQLite/settings without installing anything. Unicode seeded queue/history backup integrity and failure preservation passed. Core schema remains 1 with additive MCP extension 1. Published-version/pipx upgrade pairs and restore drills pending.
+
+Remaining original gate checklist:
 
 Pending: upgrade pairs tested, installer versions, readable schema floor,
 backup/restore evidence, skipped combinations, and commits.

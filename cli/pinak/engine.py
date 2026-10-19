@@ -164,6 +164,36 @@ _queue_owns_history: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "pinak_queue_owns_history", default=False
 )
 _log = logging.getLogger("pinak.engine")
+_stop_check: contextvars.ContextVar[Callable[[], bool] | None] = contextvars.ContextVar(
+    "pinak_stop_check", default=None
+)
+
+
+@contextlib.contextmanager
+def managed_downloads(stop: Callable[[], bool]) -> Iterator[None]:
+    token = _stop_check.set(stop)
+    try:
+        yield
+    finally:
+        _stop_check.reset(token)
+
+
+def cancellation_requested() -> bool:
+    callback = _stop_check.get()
+    return callback is not None and callback()
+
+
+def managed_stop_enabled() -> bool:
+    return _stop_check.get() is not None
+
+
+def check_cancelled() -> None:
+    if cancellation_requested():
+        raise KeyboardInterrupt("Managed download stop requested")
+
+
+def binary_provision_allowed() -> bool:
+    return _stop_check.get() is None
 
 
 @contextlib.contextmanager
@@ -209,6 +239,7 @@ def emit(event: DownloadEvent) -> None:
 
 def emit_message(*parts: object) -> bool:
     """Return True when a headless client consumed a display message."""
+    check_cancelled()
     if not in_engine():
         return False
     plain = " ".join(str(part) for part in parts)
@@ -221,6 +252,7 @@ def emit_message(*parts: object) -> bool:
 
 
 def emit_progress(data: dict[str, Any]) -> bool:
+    check_cancelled()
     if not in_engine():
         return False
     state = data.get("status")

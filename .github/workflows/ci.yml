@@ -34,8 +34,8 @@ jobs:
       - name: Install package + dev tools
         run: |
           python -m pip install --upgrade pip
-          pip install --require-hashes -r requirements-lock.txt
-          pip install --no-deps -e .
+          pip install --require-hashes -r requirements-mcp-lock.txt
+          pip install --no-deps -e ".[mcp]"
 
       - name: Ruff lint
         run: ruff check .
@@ -71,8 +71,8 @@ jobs:
       - name: Install audit tools
         run: |
           python -m pip install --upgrade pip
-          pip install --require-hashes -r requirements-lock.txt
-          pip install --no-deps -e .
+          pip install --require-hashes -r requirements-mcp-lock.txt
+          pip install --no-deps -e ".[mcp]"
 
       - name: Bandit (static security, fail on MEDIUM+)
         # Remaining low findings are benign idioms (no-shell subprocess,
@@ -150,7 +150,7 @@ jobs:
           python -m pip install --require-hashes -r requirements-lock.txt
           python -m build --outdir release-dist
           python -m twine check --strict release-dist/*
-          python tools/smoke_wheel.py release-dist --check-playback-imports
+          python tools/smoke_wheel.py release-dist --check-playback-imports --check-mcp
       - name: Verify container installation
         run: |
           docker build --tag pinak-install-check .

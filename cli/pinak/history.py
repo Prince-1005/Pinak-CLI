@@ -28,7 +28,9 @@ logger = logging.getLogger("pinak.history")
 APP_NAME = "pinak-cli"
 APP_AUTHOR = "pinak"
 
-data_dir = platformdirs.user_data_dir(APP_NAME, APP_AUTHOR)
+data_dir = os.path.abspath(
+    os.environ.get("PINAK_DATA_DIR") or platformdirs.user_data_dir(APP_NAME, APP_AUTHOR)
+)
 DB_FILE = os.path.join(data_dir, "history.db")
 LOCAL_HISTORY = ".pinak_history.json"
 LEGACY_DB_FILE = os.path.expanduser("~/.pinak_history.db")
