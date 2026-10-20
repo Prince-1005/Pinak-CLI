@@ -49,12 +49,12 @@ is recorded separately; this page describes the local stdio edition.
 
 Runtime code is in `cli/pinak/mcp_server/`; the SDK is an optional dependency of
 `pinak-cli[mcp]`. Ordinary CLI users do not need to install it. CLI and MCP share
-the user's existing local queue/history. Downloaded media stays on the user's
+the user's existing local queue, history, and Library. Downloaded media stays on the user's
 device and is not included in tool responses.
 
 ## Verified scope
 
-Windows Cursor 3.23.12 discovered all fourteen tools and passed actual local
+The earlier Windows Cursor 3.23.12 check discovered the original fourteen tools and passed actual local
 download, metadata, history, error, progress, stop and disconnect/reconnect checks.
 The temporary test registration was removed and original configuration restored.
 SDK client and Inspector 2.11.0 interoperability also passed.

@@ -19,12 +19,12 @@ checkout, Git installation, website media or source build is required. Python 3.
 is required; pip downloads the runtime dependencies separately. The wheel includes
 Pinak's shared CLI/engine and local MCP adapter, with SDK 2.3.0 in the optional extra.
 
-For the current 2.0.0 wheel, Windows PowerShell commands are:
+For Windows PowerShell, replace `WHEEL_FILENAME` with the wheel in your bundle:
 
 ```powershell
 python -m venv .venv-mcp
 .venv-mcp/Scripts/python.exe -m pip install --upgrade pip
-.venv-mcp/Scripts/python.exe -m pip install "./pinak_cli-2.0.0-py3-none-any.whl[mcp]"
+.venv-mcp/Scripts/python.exe -m pip install "./WHEEL_FILENAME[mcp]"
 .venv-mcp/Scripts/python.exe -m pinak.mcp_server doctor --json
 .venv-mcp/Scripts/python.exe -m pinak.mcp_server configure
 ```
@@ -62,7 +62,7 @@ Run `configure` with the **installed environment's Python**. It prints these fie
 Enter those fields in the client's local MCP settings or translate them into its
 documented config format. No shell activation script is needed. A client that
 accepts only HTTP/SSE URLs is incompatible with this version. Restart/reload the
-host if required by that application, then discover the fourteen Pinak tools.
+host if required by that application, then discover the thirty-three Pinak tools.
 
 For a host using Claude Desktop's mcpServers JSON format, preview explicitly with
 `pinak-mcp configure --client claude-desktop`. `--apply` merges Pinak's entry with
@@ -95,6 +95,17 @@ Examples:
 - “Stop this session's run and keep partial files so I can resume later.”
 - “Retry failed jobs, then start another run.”
 - “Remove job 12 from the queue; keep its downloaded files.”
+- “Show my recent download history and details for the newest entry.”
+- “Scan my approved Pinak downloads folder, find the audio called guitar, tag it Favorite, and show its bookmarks.”
+
+`history_list` and `history_show` expose saved attempt records. The Library tools
+catalog only explicitly chosen approved folders and successful downloaded files.
+They can search, tag, arrange ordered collections, bookmark times, relink a moved
+file, or forget a record without deleting media. They do not launch the local TUI
+player through the AI application; use `pinak library play <ID>` in a terminal.
+The Library has its own SQLite database in the same user data directory. Mutation
+request keys have atomic replay receipts there; `library_scan` may be repeated to
+refresh files and reports partial errors instead of hiding them.
 
 `queue_add` saves a job; `queue_start` executes a bounded snapshot, default 100
 jobs and maximum 1,000. Poll `queue_run_status`; acceptance is not download success.
@@ -121,7 +132,7 @@ deleting the database. Confirmed corruption is quarantined and disclosed; busy
 storage is reported as busy, never reset. Keep the quarantined file for recovery.
 
 Before upgrades: stop runs, close hosts, run `pinak-mcp prepare-update`, save its
-backup paths, then upgrade explicitly with your original installation method.
+backup paths for both history/queue and Library databases, then upgrade explicitly with your original installation method.
 Run doctor, inspect jobs/history, reconnect and resume explicitly. Read
 [update/rollback limits](MAINTENANCE.md#upgrade-and-restoration-rehearsal) before
 restoring a backup. Preserve an archive of the current database, stop every writer,

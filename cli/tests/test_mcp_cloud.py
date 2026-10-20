@@ -29,6 +29,7 @@ from pinak.mcp_cloud.app import create_app
 from pinak.mcp_cloud.egress import public_connection
 from pinak.mcp_cloud.registry import Registry
 from pinak.mcp_cloud.settings import Settings
+from pinak.mcp_server.tools import DEFINITIONS
 
 
 def settings(root: Path, **kwargs: object) -> Settings:
@@ -111,7 +112,7 @@ def test_remote_users_and_download_capability(tmp_path: Path) -> None:
         assert client.get("/mcp", headers={"Host": "evil.example"}).status_code == 403
         assert client.post("/mcp", headers={"Origin": "https://evil.example"}).status_code == 403
         discovered = rpc(client, alice, "tools/list", {})
-        assert len(discovered["tools"]) == 15
+        assert len(discovered["tools"]) == len(DEFINITIONS) + 1
         info = call(client, alice, "server_info")
         assert info["data"]["transport"] == "streamable-http", info
         assert call(client, alice, "_cloud_shutdown")["error"]["code"] == "UNKNOWN_TOOL"
@@ -142,6 +143,24 @@ def test_remote_users_and_download_capability(tmp_path: Path) -> None:
         assert denied["error"]["code"] == "PATH_DENIED"
         assert not call(client, bob, "queue_show", job_id=2)["ok"]
         assert not call(client, alice, "file_link", job_id=1)["ok"]
+
+        alice_file = registry.root("alice") / "downloads" / "alice.mp3"
+        bob_file = registry.root("bob") / "downloads" / "bob.mp3"
+        alice_file.write_bytes(b"alice media")
+        bob_file.write_bytes(b"bob media")
+        for token, root in ((alice, alice_file.parent), (bob, bob_file.parent)):
+            indexed = call(client, token, "library_scan", folder=str(root))
+            assert indexed["ok"] and indexed["data"]["indexed"] == 1
+        assert [item["title"] for item in call(client, alice, "library_list")["data"]["items"]] == [
+            "alice"
+        ]
+        assert [item["title"] for item in call(client, bob, "library_list")["data"]["items"]] == [
+            "bob"
+        ]
+        assert (
+            call(client, alice, "library_scan", folder=str(bob_file.parent))["error"]["code"]
+            == "PATH_DENIED"
+        )
 
         # A completed-file fixture exercises HTTP delivery, ranges and token revocation.
         output = registry.root("alice") / "downloads" / "sample.wav"
@@ -261,7 +280,13 @@ def test_actual_remote_download_reconnect_and_restart(
         with TestClient(create_app(config), base_url=config.public_url) as client:
             shown = call(client, token, "queue_show", job_id=job["data"]["job_id"])
             assert shown["data"]["status"] == "succeeded"
-            assert call(client, token, "history_list")["data"]["items"]
+            history_items = call(client, token, "history_list")["data"]["items"]
+            assert history_items
+            recorded_file = next(item for item in history_items if item["files_total"])
+            detail = call(client, token, "history_show", history_id=recorded_file["id"])
+            assert detail["ok"] and detail["data"]["files_total"] >= 1
+            catalog = call(client, token, "library_list")
+            assert catalog["ok"] and catalog["data"]["items"]
             assert client.get(route).content == delivered
     finally:
         fixture.shutdown()
@@ -296,7 +321,7 @@ def test_official_sdk_over_real_http(tmp_path: Path) -> None:
                 ClientSession(*streams) as session,
             ):
                 await session.initialize()
-                assert len((await session.list_tools()).tools) == 15
+                assert len((await session.list_tools()).tools) == len(DEFINITIONS) + 1
                 result = await session.call_tool("server_info", {})
                 assert result.structured_content["data"]["cloud_user"] == name
 

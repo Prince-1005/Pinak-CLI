@@ -41,7 +41,7 @@ Your client must support **Streamable HTTP with a custom Authorization header**:
 These are generic connection fields, not a universal client configuration file.
 Translate them to your application's documented settings. Keep the secret in the
 client's protected settings or secret facility; do not enter it into a chat.
-Discover fifteen tools. `server_info` identifies the authenticated cloud user.
+Discover thirty-four tools. `server_info` identifies the authenticated cloud user.
 Clients requiring browser OAuth sign-in or only accepting a URL without a header
 are not supported by this initial authentication mode. Local stdio setup remains
 available for those desktop applications that support it.
@@ -53,6 +53,8 @@ Example prompts:
 - “Check my run's status; do not add it again.”
 - “Stop my current run and keep partial files.”
 - “Create a download link for the first file in completed job 1.”
+- “Show my recent download history, then search my Pinak Library for guitar.”
+- “Scan my approved server download folder and save a bookmark at 01:30 on the matching audio item.”
 
 The AI must call `queue_start` after `queue_add`; enqueue alone does not download.
 Poll `queue_run_status` for progress. A call's timeout is not proof that a mutation
@@ -60,6 +62,12 @@ failed. Poll at most once every two seconds to leave room within the default
 request limit for other tools. If a request times out,
 reconcile using the same `request_key` and arguments. IDs and keys belong
 to each user's independent database; Bob's job 1 is not Alice's job 1.
+`history_list` and `history_show` expose saved attempt records. Library tools
+index and organize server-side media in that user's approved roots, with separate
+per-user catalog databases. They cannot inspect or play media on the AI user's
+laptop. Bookmark show returns a path and time; it does not open a remote player.
+Library tag, collection, bookmark, relink and forget edits use request keys for
+atomic replay. Forgetting a catalog record keeps the server file.
 
 ## Where downloads go
 

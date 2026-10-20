@@ -1,6 +1,6 @@
-# Public tool contract 1.0
+# Public tool contract 1.1
 
-These fourteen tools are implemented with the official SDK. Input schemas are
+These thirty-three tools are implemented with the official SDK. Input schemas are
 generated from `cli/pinak/mcp_server/models.py`; actual SDK discovery/call tests
 verify the protocol. Desktop-client acceptance remains a separate release gate.
 
@@ -55,6 +55,24 @@ results; IDs remain integers for queue jobs and opaque strings for runs.
   Never silently stop a CLI runner or another host's run.
 - `history_list(filter?, cursor?, limit=25)`: compact download history respecting
   approved read scope and redaction; distinguish history-disabled from no history.
+- `history_show(history_id, cursor?, limit=25)`: one record's status, source, options
+  and paginated file paths; reject a record with files outside approved roots.
+- `library_scan(folder)`: explicitly index supported files in an approved output/read
+  root. Report partial scan errors; never start a background or arbitrary scan.
+- `library_list(media_type?, cursor?, limit=25)`, `library_search(query?, tag?, cursor?,
+  limit=25)`, `library_show(media_id)`: paginated, root-scoped catalog reads.
+- `library_tag_add/remove(media_id, name, request_key)`: edit one item's tags.
+- `library_collection_create(name, request_key)`, `library_collection_list`,
+  `library_collection_show(collection_id)`, `library_collection_add/remove`, and
+  `library_collection_move`: manage ordered collections. These tools return
+  playlist paths; they do not launch a terminal player through MCP.
+- `library_bookmark_add(media_id, seconds, note?, request_key)`,
+  `library_bookmark_list(media_id)`, `library_bookmark_show(bookmark_id)`, and
+  `library_bookmark_remove(bookmark_id, request_key)`: manage saved audio/video
+  moments. Show returns a path and time; it does not begin playback.
+- `library_relink(media_id, path, request_key)`, `library_forget(media_id,
+  request_key)`: update a moved path or remove only the catalog record. Neither
+  deletes or moves a media file.
 - `media_info(path)`: local approved file metadata/duration using bounded probing,
   no arbitrary directory traversal or automatic GUI playback/artwork export.
 - `diagnostics()`: bounded local checks for SDK/core compatibility, database access,
@@ -69,9 +87,16 @@ Queue/history pages scan at most limit+1 records and omit entries outside the
 configured roots. A page can therefore be empty with has_more=true; advance its
 cursor. History entries without files remain visible. queue_show uses a one-based
 file-index cursor and truncates errors at 8,000 characters with error_truncated.
+Library list/search/collection pages use the same bounded-cursor pattern and
+may also return an empty visible page when stored items fall outside approved
+roots. History show uses a one-based file-index cursor.
 queue_retry(all_failed=true) returns a count rather than an unbounded ID array.
 Record-only mutations operate on the shared user queue; output/read roots limit
 downloads and returned file information, not independent queue ownership.
+Library mutations use atomic receipts in the separate Library SQLite database.
+Repeating the same request_key and arguments returns the original result;
+reusing a key with different arguments is rejected. Scanning is repeatable and
+has no receipt because files can change between scans.
 
 ## Readiness and capability fallbacks
 

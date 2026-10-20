@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from filelock import FileLock
 
-from pinak import history
+from pinak import history, library
 from pinak import queue as core
 from pinak.engine import DownloadRequest
 from pinak.mcp_server import setup, updates
@@ -22,6 +22,10 @@ def test_snapshot_preserves_jobs_history_and_settings(isolated_history_db, tmp_p
         DownloadRequest.capture("https://example.com/video", output_dir=str(root))
     )
     history.record_download("https://example.com/past")
+    local_file = root / "saved.mp3"
+    local_file.parent.mkdir(parents=True, exist_ok=True)
+    local_file.write_bytes(b"media")
+    library.add_files((str(local_file),))
     Store(Policy(default_output_dir=root))
     policy = tmp_path / "mcp.json"
     policy.write_text(json.dumps({"default_output_dir": str(root)}))
@@ -36,6 +40,9 @@ def test_snapshot_preserves_jobs_history_and_settings(isolated_history_db, tmp_p
             conn.execute("SELECT status FROM queue_jobs WHERE id=?", (job_id,)).fetchone()[0]
             == "queued"
         )
+    with sqlite3.connect(result["library_backup"]) as conn:
+        assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert conn.execute("SELECT COUNT(*) FROM media").fetchone()[0] == 1
     assert core.get_job(job_id).attempts == 0
 
 

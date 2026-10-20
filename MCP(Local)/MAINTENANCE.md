@@ -2,13 +2,13 @@
 
 ## Compatibility baseline
 
-- Package: current source 2.0.0, shared with CLI; these MCP changes are unreleased.
+- Package: current source 2.2.0, shared with CLI; publish separately after CI passes.
 - Python: 3.10–3.14, Windows/macOS/Linux CI; preserve ordinary CLI support.
 - Official SDK: 2.3.0, optional `mcp` extra. No Node dependency at user runtime.
 - Transport: local stdio. SDK client 2.3.0 and Inspector 2.11.0 interoperability
   tested; current SDK protocol is 2026-07-28. Do not infer every older protocol or
   desktop-client version is certified from that negotiation.
-- Tool contract: 1.0. Policy: config_schema_version=1, unknown fields rejected.
+- Tool contract: 1.1. Policy: config_schema_version=1, unknown fields rejected.
 - Database: core user_version=1; additive pinak_extensions.mcp=1. Pre-MCP source
   revision 73de91e766a8073afe356521534ca2239fe7c488 is the tested core reader floor.
 - Desktop acceptance: Windows Cursor 3.23.12 discovery/download/metadata/error/stop/
@@ -91,6 +91,17 @@ Job Object or POSIX process group. Never kill a process using a saved PID alone.
 Snapshots use SQLite's backup API into a private temporary file, verify integrity,
 flush, then atomically publish. An interrupted .tmp is not a usable .bak. An
 existing incomplete pre-migration backup blocks migration instead of being trusted.
+`prepare-update` now reports separate `database_backup` (queue/history) and
+`library_backup` paths when those databases exist. Preserve both before an upgrade;
+restoring one without the other can leave the catalog out of step with download
+records. Close CLI and MCP writers before restoring snapshots.
+
+The Library catalog migrates from schema 1 to schema 2 when first opened by 2.2.0.
+An older 2.1.0 installation cannot read that upgraded catalog. Before downgrading,
+stop all Pinak processes, preserve the current `library.db`, and restore the
+pre-upgrade Library snapshot alongside a compatible queue/history snapshot. Later
+Library edits will be absent from the restored snapshot; keep the newer database
+archive so they can be recovered by returning to 2.2.0.
 
 Keep fault fixtures local and deterministic: no dependence on public video sites,
 login credentials or downloaded copyrighted samples. Retain redacted evidence;

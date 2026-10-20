@@ -46,6 +46,15 @@ Each job keeps the options and preferences captured when it was added. Ctrl+C st
 
 Inside the interactive shell, the same actions are available as `/queue add <URL>`, `/queue import <file>`, `/queue list`, `/queue run`, and `/queue retry --failed`. Enter `/queue help` for options.
 
+For example, add two links while Pinak is open, then process them later:
+
+```text
+/queue add <first-media-url>
+/queue add <second-media-url>
+/queue list
+/queue run
+```
+
 ## Manage saved jobs
 
 ```text

@@ -34,8 +34,8 @@ features; use the supplied wheel. No new package version is implied.
 
 ## Capabilities and limits
 
-- Fifteen tools: the fourteen existing queue, history, metadata and diagnostic
-  tools plus `file_link(job_id, file_index=1)` for a completed file.
+- Thirty-four tools: the thirty-three Local queue, history, Library, metadata and
+  diagnostic tools plus `file_link(job_id, file_index=1)` for a completed file.
 - Downloads run on your server, not on the AI user's laptop. They continue when
   an HTTP client disconnects. Stop/restart of the service interrupts its workers;
   unfinished jobs remain saved and require an explicit new `queue_start`.

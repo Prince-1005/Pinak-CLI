@@ -132,5 +132,89 @@ class History(Page):
     filter: Literal["success", "failed", "canceled", "skipped", "audio", "media"] | None = None
 
 
+class HistoryShow(Page):
+    history_id: PositiveID
+
+
+class LibraryScan(StrictModel):
+    folder: str = Field(min_length=1, max_length=4096)
+
+
+class LibraryList(Page):
+    media_type: Literal["audio", "video", "picture"] | None = None
+
+
+class LibrarySearch(Page):
+    query: str = Field(default="", max_length=256)
+    tag: str | None = Field(default=None, min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def term(self) -> LibrarySearch:
+        if not self.query.strip() and not (self.tag or "").strip():
+            raise ValueError("Give a query or tag")
+        return self
+
+
+class LibraryRef(StrictModel):
+    media_id: PositiveID
+
+
+class LibraryEdit(LibraryRef):
+    request_key: RequestKey
+
+
+class LibraryTag(LibraryEdit):
+    name: str = Field(min_length=1, max_length=100)
+
+
+class LibraryRelink(LibraryEdit):
+    path: str = Field(min_length=1, max_length=4096)
+
+
+class CollectionCreate(StrictModel):
+    name: str = Field(min_length=1, max_length=100)
+    request_key: RequestKey
+
+
+class CollectionRef(StrictModel):
+    collection_id: PositiveID
+
+
+class CollectionPage(Page):
+    pass
+
+
+class CollectionShow(CollectionRef):
+    cursor: PositiveID | None = None
+    limit: Annotated[StrictInt, Field(ge=1, le=100)] = 25
+
+
+class CollectionEdit(CollectionRef):
+    media_id: PositiveID
+    request_key: RequestKey
+
+
+class CollectionMove(CollectionEdit):
+    before_id: PositiveID
+
+
+class BookmarkAdd(LibraryEdit):
+    seconds: float = Field(ge=0, allow_inf_nan=False)
+    note: str = Field(default="", max_length=500)
+
+
+class BookmarkRef(StrictModel):
+    bookmark_id: PositiveID
+
+
+class BookmarkPage(LibraryRef):
+    cursor: PositiveID | None = None
+    limit: Annotated[StrictInt, Field(ge=1, le=100)] = 25
+
+
+class BookmarkRemove(BookmarkRef):
+    request_key: RequestKey
+
+
 class MediaInfo(StrictModel):
     path: str = Field(min_length=1, max_length=4096)

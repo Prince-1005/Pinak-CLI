@@ -97,6 +97,20 @@ test('MCP setup documentation is discoverable through search', async ({ page }) 
   await expect(page.locator('.pagefind-ui__results')).toContainText('Cloud');
 });
 
+test('Library and queue examples link to the expanded MCP guidance', async ({ page }) => {
+  await page.goto('/docs/commands/');
+  await expect(page.locator('main')).toContainText('pinak queue show 1');
+  await expect(page.locator('main')).toContainText('pinak library scan');
+  await page.goto('/docs/library/');
+  await expect(page.locator('main')).toContainText('pinak library bookmark add');
+  await page.goto('/mcp/');
+  await expect(page.locator('#local')).toContainText('Library');
+  await expect(page.locator('#cloud')).toContainText('Library');
+  await page.goto('/docs/mcp/');
+  await expect(page.locator('main')).toContainText('history_show');
+  await expect(page.locator('main')).toContainText('library_scan');
+});
+
 test('future gallery growth paginates at 24 and handles no matches', async ({ page }) => {
   await page.route('**/showcase/', async route => {
     const response = await route.fetch(); const html = await response.text();

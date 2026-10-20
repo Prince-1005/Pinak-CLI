@@ -20,6 +20,8 @@ pinak library show 12
 
 The first command scans that folder and its subfolders, and remembers it for later `scan --all` runs. Pinak does not follow symbolic links. A later complete scan marks disappeared files as missing, while retaining their tags, bookmarks, and collection membership. If a scan reports errors, Pinak preserves the previous availability state for files it could not inspect.
 
+For example, after scanning a music folder, run `pinak library list`, take an ID from its output, and replace `12` in the commands below with that ID.
+
 ## Organize and play
 
 ```sh

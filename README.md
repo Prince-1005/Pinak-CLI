@@ -12,7 +12,7 @@
 > Pinak is an open-source educational project and terminal interface wrapper around [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) and [`FFmpeg`](https://ffmpeg.org/), designed for learning CLI architecture and personal media archiving.  
 > ⚠️ **Notice:** Downloading content may violate a platform's Terms of Service. Only download media that you own, that is freely licensed, or that you have explicit permission to keep. Respect copyright laws and **be excellent to creators!**
 
-Current source version: **2.1.0**. See the [release notes](cli/CHANGELOG.md),
+Current source version: **2.2.0**. See the [release notes](cli/CHANGELOG.md),
 [operating guide](cli/OPERATIONS.md), and [prior release readiness record](RELEASE_READINESS.md)
 for behavior and verification. GitHub releases are created manually;
 automatic release creation is disabled.

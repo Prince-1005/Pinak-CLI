@@ -57,5 +57,31 @@ Local playback and remote downloading are separate routes. Download remote media
 
 Use `pinak queue add <URL>` to save a job and `pinak queue run` to process saved jobs in the foreground. `pinak queue list`, `pinak queue import <file>`, and `pinak queue retry <ID|--failed>` manage the queue. See [audio, quality & batches](../downloads/) for restart behavior and limits.
 
+For example, save one job now, inspect it, and run it when ready:
+
+```sh
+pinak queue add "<your-media-url>" --quality 720p
+pinak queue list
+pinak queue show 1
+pinak queue run
+```
+
+Replace `1` with the ID returned by `queue add` or `queue list`.
+
 
 Inspect and manage saved jobs with `pinak queue show <ID>`, `pinak queue cancel <ID>`, or `pinak queue remove <ID> [ID ...]`. Bulk removal is atomic: an unknown or running ID leaves every named job in place. Use `pinak queue clean --completed` to remove succeeded/skipped records while keeping files and history. Each queue attempt is recorded in local download history when history recording is enabled. The interactive shell offers the same actions under `/queue`. Running jobs must be stopped with Ctrl+C in their runner before cancellation or removal.
+
+## Pinak Library
+
+New successful downloads are cataloged automatically. To include media already on your device, choose a folder with `pinak library scan <folder>`; Pinak does not scan other folders in the background. `list`, `search`, and `show` find items. [The Library guide](../library/) covers tags, collections, bookmarks, and resume playback.
+
+For example:
+
+```sh
+pinak library scan "path/to/media"
+pinak library search "guitar"
+pinak library show 1
+pinak library play 1
+```
+
+Use the ID returned by `search` or `list`. Inside Pinak, replace `pinak library` with `/library`.

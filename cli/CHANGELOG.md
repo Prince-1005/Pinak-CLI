@@ -7,6 +7,14 @@ Release notes are maintained manually; automatic release creation is disabled.
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-20
+
+### Added
+- Expose Pinak Library in both Local and user-hosted Cloud MCP with approved-root scans, catalog search, tags, ordered collections, bookmarks, relink, and forget operations. Library edits use atomic local replay receipts; MCP returns paths and bookmark times without launching terminal playback.
+- Add `history_show` to both MCP editions for detailed, root-scoped download records and paginated file paths; retain `history_list` for recent records.
+- Include a separate Library SQLite snapshot in Local MCP `prepare-update` when a catalog exists.
+- Add short queue and Library examples to CLI and website guides, and document the expanded MCP tools and Cloud's server-side Library scope.
+
 ## [2.1.0] - 2026-10-20
 
 ### Added

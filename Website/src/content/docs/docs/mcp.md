@@ -31,12 +31,19 @@ Ask your AI application:
 
 Supply a supported URL for media you own or have permission to download. `queue_add` saves the request; **it does not start a download**. `queue_start` accepts a run; success there does not mean the media has finished downloading. Inspect `queue_run_status` and then `queue_show`.
 
+You can also ask:
+
+> Show my recent download history. Then search my Pinak Library for “guitar” and show any bookmarks on the matching item.
+
+`history_list` returns recent records; `history_show` inspects one record. `library_scan` indexes only a folder inside the MCP edition’s approved roots, and Library search, tags, ordered collections, bookmarks, relink, and forget tools organize those indexed files. Local MCP sees approved files on your computer. Cloud MCP sees approved files on **your server**, not your laptop. MCP returns playback paths and bookmark times; use the Pinak CLI/player on a device with a terminal and media output to play them.
+
 ## Tools available in both modes
 
-- **Inspect:** `server_info`, `diagnostics`, `media_info`, `history_list`.
+- **Inspect:** `server_info`, `diagnostics`, `media_info`, `history_list`, `history_show`.
 - **Save and review:** `queue_add`, `queue_list`, `queue_show`.
 - **Run and track:** `queue_start`, `queue_run_status`, `queue_stop`.
 - **Maintain:** `queue_retry`, `queue_cancel`, `queue_remove`, `queue_clean_completed`.
+- **Library:** `library_scan`, `library_list`, `library_search`, `library_show`, tag, collection, bookmark, relink, and forget tools.
 
 `queue_cancel` prevents waiting jobs from running; use `queue_stop` for a run owned by the current adapter. Retry applies to failed jobs. Removing records or cleaning completed records keeps downloaded files and history. Local CLI and MCP share the user's queue; Cloud users have separate queues. Tool input schemas and returned errors are authoritative.
 

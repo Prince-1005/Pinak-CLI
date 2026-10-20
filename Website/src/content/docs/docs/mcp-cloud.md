@@ -62,13 +62,15 @@ Save the returned token privately. Create a different user for each person. In a
 - Header: `Authorization`.
 - Header value: `Bearer THE_USER_TOKEN`.
 
-Replace the domain and token. Clients must support custom bearer headers; OAuth-only and legacy SSE-only clients are outside this setup. The supplied `client.template.json` is a generic example, not a universal application configuration. Reconnect and discover fifteen tools.
+Replace the domain and token. Clients must support custom bearer headers; OAuth-only and legacy SSE-only clients are outside this setup. The supplied `client.template.json` is a generic example, not a universal application configuration. Reconnect and discover thirty-four tools.
 
 ## 5. Download, retrieve, and check persistence
 
 Ask the AI to queue an authorized public media URL, start the queue, and check its status. Poll no faster than once every two seconds under default limits. When complete, ask for `file_link` using the job ID and one-based file index.
 
 The returned HTTPS link retrieves the server's file. It expires after **300 seconds by default** and anyone holding it can use it before expiry. It does not contain the permanent bearer token. Request another link if needed.
+
+For example, ask: “Show my latest download history, then list and search my Pinak Library for the saved audio.” The AI can use `history_list`, `history_show`, `library_list`, and `library_search`. `library_scan` can index only folders inside **your server-side approved roots**; it cannot scan your laptop. Each token sees its own Library database. Bookmark tools return path and time for later playback; Cloud MCP does not open a player in the remote AI client.
 
 Disconnecting the AI client does not stop Cloud workers. Restarting the service interrupts active workers; unfinished records persist and require an explicit new `queue_start`. After the test run completes:
 

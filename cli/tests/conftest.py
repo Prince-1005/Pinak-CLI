@@ -17,9 +17,11 @@ for _k, _v in list(os.environ.items()):
 def isolated_history_db(tmp_path, monkeypatch):
     """Point history.DB_FILE at a temp SQLite file."""
     import pinak.history as history_mod
+    import pinak.library as library_mod
 
     db_file = str(tmp_path / "history_test.db")
     monkeypatch.setattr(history_mod, "DB_FILE", db_file)
+    monkeypatch.setattr(library_mod, "DB_FILE", tmp_path / "library.db")
     history_mod.init_db()
     return db_file
 

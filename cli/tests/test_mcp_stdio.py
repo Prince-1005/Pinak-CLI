@@ -17,6 +17,9 @@ StdioServerParameters, stdio_client = stdio.StdioServerParameters, stdio.stdio_c
 def test_real_stdio_discovery_calls_and_clean_exit(tmp_path):
     policy = tmp_path / "policy.json"
     policy.write_text(json.dumps({"default_output_dir": str(tmp_path / "downloads")}))
+    local_file = tmp_path / "downloads" / "demo.mp3"
+    local_file.parent.mkdir()
+    local_file.write_bytes(b"local media fixture")
     env = {**os.environ, "PINAK_MCP_CONFIG": str(policy), "PINAK_DATA_DIR": str(tmp_path / "data")}
 
     async def exercise():
@@ -42,7 +45,21 @@ def test_real_stdio_discovery_calls_and_clean_exit(tmp_path):
                     "queue_run_status",
                     "media_info",
                     "diagnostics",
+                    "library_scan",
+                    "library_list",
+                    "library_show",
+                    "history_show",
                 } <= names
+                scanned = await session.call_tool(
+                    "library_scan", {"folder": str(local_file.parent)}
+                )
+                assert scanned.structured_content["data"]["indexed"] == 1
+                items = (await session.call_tool("library_list", {})).structured_content["data"][
+                    "items"
+                ]
+                assert len(items) == 1
+                shown_media = await session.call_tool("library_show", {"media_id": items[0]["id"]})
+                assert shown_media.structured_content["data"]["title"] == "demo"
                 added = await session.call_tool(
                     "queue_add",
                     {"url": "https://example.com/video?token=secret", "request_key": "add"},

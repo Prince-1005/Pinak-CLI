@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
+import json
 import math
 import os
 import sqlite3
 import stat
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from . import history
 from .media.picker.scanner import SUPPORTED_EXTENSIONS
@@ -28,6 +32,10 @@ class LibraryItem:
     position: float
 
 
+class LibraryReceiptConflict(ValueError):
+    """A request key was reused for a different Library edit."""
+
+
 def _key(path: Path) -> str:
     return os.path.normcase(str(path.resolve()))
 
@@ -40,7 +48,7 @@ def _connect() -> sqlite3.Connection:
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA busy_timeout = 10000")
         version = int(conn.execute("PRAGMA user_version").fetchone()[0])
-        if version > 1:
+        if version > 2:
             raise RuntimeError(f"Library schema {version} is newer than this Pinak version")
         if version < 1:
             with conn:
@@ -84,6 +92,17 @@ def _connect() -> sqlite3.Connection:
                         created_at REAL NOT NULL
                     );
                     PRAGMA user_version = 1;
+                """)
+        if version < 2:
+            with conn:
+                conn.executescript("""
+                    CREATE TABLE IF NOT EXISTS mcp_receipts (
+                        tool TEXT NOT NULL, request_key TEXT NOT NULL,
+                        arguments_hash TEXT NOT NULL, result_json TEXT NOT NULL,
+                        created_at REAL NOT NULL,
+                        PRIMARY KEY(tool, request_key)
+                    );
+                    PRAGMA user_version = 2;
                 """)
         try:
             # Search remains available through LIKE when SQLite lacks FTS5.
@@ -144,6 +163,42 @@ def _row(row: sqlite3.Row) -> LibraryItem:
         available=bool(row["available"]),
         position=float(row["position"]),
     )
+
+
+def mcp_mutate(
+    tool: str,
+    request_key: str,
+    arguments: dict[str, Any],
+    action: Callable[[sqlite3.Connection], dict[str, Any]],
+    *,
+    retention_days: int = 7,
+) -> dict[str, Any]:
+    """Commit a Library edit and its replay receipt in the same SQLite transaction."""
+    payload = json.dumps(arguments, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha256(payload.encode()).hexdigest()
+    with contextlib.closing(_connect()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute(
+            "DELETE FROM mcp_receipts WHERE created_at < ?",
+            (time.time() - retention_days * 86400,),
+        )
+        row = conn.execute(
+            "SELECT arguments_hash,result_json FROM mcp_receipts WHERE tool=? AND request_key=?",
+            (tool, request_key),
+        ).fetchone()
+        if row is not None:
+            if row["arguments_hash"] != digest:
+                raise LibraryReceiptConflict(
+                    "This request_key was used with different Library arguments"
+                )
+            return json.loads(row["result_json"])
+        result = action(conn)
+        conn.execute(
+            "INSERT INTO mcp_receipts(tool,request_key,arguments_hash,result_json,created_at) "
+            "VALUES (?,?,?,?,?)",
+            (tool, request_key, digest, json.dumps(result, separators=(",", ":")), time.time()),
+        )
+        return result
 
 
 def _name(value: str) -> tuple[str, str]:
@@ -307,32 +362,42 @@ def get_by_path(path: str | Path) -> LibraryItem | None:
     return _row(row) if row else None
 
 
-def list_items(limit: int = 100, *, media_type: str | None = None) -> list[LibraryItem]:
+def list_items(
+    limit: int = 100, *, media_type: str | None = None, before_id: int | None = None
+) -> list[LibraryItem]:
     if not 1 <= limit <= 500:
         raise ValueError("Limit must be between 1 and 500")
     if media_type and media_type not in {"audio", "video", "picture"}:
         raise ValueError("Type must be audio, video, or picture")
+    if before_id is not None and before_id < 1:
+        raise ValueError("Cursor must be positive")
     with contextlib.closing(_connect()) as conn:
         rows = conn.execute(
-            "SELECT * FROM media WHERE (? IS NULL OR media_type=?) ORDER BY id DESC LIMIT ?",
-            (media_type, media_type, limit),
+            "SELECT * FROM media WHERE (? IS NULL OR media_type=?) "
+            "AND id < ? ORDER BY id DESC LIMIT ?",
+            (media_type, media_type, before_id or 9223372036854775807, limit),
         ).fetchall()
     return [_row(row) for row in rows]
 
 
-def search(query: str, *, tag: str | None = None, limit: int = 100) -> list[LibraryItem]:
+def search(
+    query: str, *, tag: str | None = None, limit: int = 100, before_id: int | None = None
+) -> list[LibraryItem]:
     if not query.strip() and not tag:
         raise ValueError("Give a search term or tag")
     if not 1 <= limit <= 500:
         raise ValueError("Limit must be between 1 and 500")
+    if before_id is not None and before_id < 1:
+        raise ValueError("Cursor must be positive")
     with contextlib.closing(_connect()) as conn:
         tag_key = tag.strip().casefold() if tag else None
         if not query.strip():
             rows = conn.execute(
                 "SELECT m.* FROM media m WHERE (? IS NULL OR EXISTS "
                 "(SELECT 1 FROM media_tags mt JOIN tags t ON t.id=mt.tag_id "
-                "WHERE mt.media_id=m.id AND t.name_key=?)) ORDER BY m.id DESC LIMIT ?",
-                (tag_key, tag_key, limit),
+                "WHERE mt.media_id=m.id AND t.name_key=?)) "
+                "AND m.id < ? ORDER BY m.id DESC LIMIT ?",
+                (tag_key, tag_key, before_id or 9223372036854775807, limit),
             ).fetchall()
         else:
             phrase = '"' + query.strip().replace('"', '""') + '"'
@@ -344,8 +409,15 @@ def search(query: str, *, tag: str | None = None, limit: int = 100) -> list[Libr
                     "WHERE mt.media_id=m.id AND t.name LIKE ? ESCAPE '\\')) "
                     "AND (? IS NULL OR EXISTS (SELECT 1 FROM media_tags mt "
                     "JOIN tags t ON t.id=mt.tag_id WHERE mt.media_id=m.id AND t.name_key=?)) "
-                    "ORDER BY m.id DESC LIMIT ?",
-                    (phrase, _like(query), tag_key, tag_key, limit),
+                    "AND m.id < ? ORDER BY m.id DESC LIMIT ?",
+                    (
+                        phrase,
+                        _like(query),
+                        tag_key,
+                        tag_key,
+                        before_id or 9223372036854775807,
+                        limit,
+                    ),
                 ).fetchall()
             except sqlite3.OperationalError:
                 # The catalog remains searchable on SQLite builds without FTS5.
@@ -356,8 +428,16 @@ def search(query: str, *, tag: str | None = None, limit: int = 100) -> list[Libr
                     "WHERE mt.media_id=m.id AND t.name LIKE ? ESCAPE '\\')) "
                     "AND (? IS NULL OR EXISTS (SELECT 1 FROM media_tags mt "
                     "JOIN tags t ON t.id=mt.tag_id WHERE mt.media_id=m.id AND t.name_key=?)) "
-                    "ORDER BY m.id DESC LIMIT ?",
-                    (_like(query), _like(query), _like(query), tag_key, tag_key, limit),
+                    "AND m.id < ? ORDER BY m.id DESC LIMIT ?",
+                    (
+                        _like(query),
+                        _like(query),
+                        _like(query),
+                        tag_key,
+                        tag_key,
+                        before_id or 9223372036854775807,
+                        limit,
+                    ),
                 ).fetchall()
     return [_row(row) for row in rows]
 
