@@ -47,7 +47,9 @@ async def exercise(url: str, alice: str, bob: str, *, existing: bool = False) ->
             ClientSession(*streams) as session,
         ):
             await session.initialize()
-            assert len((await session.list_tools()).tools) == 15
+            names = {tool.name for tool in (await session.list_tools()).tools}
+            assert len(names) == 34
+            assert {"history_show", "library_scan", "library_show", "file_link"} <= names
             info = await session.call_tool("server_info", {})
             assert info.structured_content["data"]["cloud_user"] == username
             if username == "alice":
@@ -93,7 +95,7 @@ def check_container(container: str, url: str) -> None:
 
     anyio.run(check_persistence)
     print(
-        "Cloud image: non-root service, remote SDK, 15 tools, user isolation and restart persistence passed"
+        "Cloud image: non-root service, remote SDK, 34 tools, user isolation and restart persistence passed"
     )
 
 

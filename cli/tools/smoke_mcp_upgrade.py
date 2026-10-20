@@ -40,7 +40,8 @@ async def main():
     async with stdio_client(StdioServerParameters(command=sys.executable, args=['-m','pinak.mcp_server','serve'], env=dict(os.environ))) as (r,w), ClientSession(r,w,read_timeout_seconds=15) as session:
         result = await session.initialize()
         assert result.server_info.name == 'Pinak-MCP'
-        assert len((await session.list_tools()).tools) == 14
+        names = {tool.name for tool in (await session.list_tools()).tools}
+        assert len(names) == 33 and {'history_show', 'library_scan', 'library_show'} <= names
         shown = await session.call_tool('queue_show', {'job_id':1})
         data = shown.structured_content['data']
         assert data['status'] == 'queued' and data['attempts'] == 0
