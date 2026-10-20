@@ -155,7 +155,8 @@ def test_history_detail_redaction_and_root_scope(service, tmp_path: Path) -> Non
     second_page = tools.call("history_show", {"history_id": record_id, "limit": 1, "cursor": 2})
     assert second_page["data"]["files"] == [str(allowed_second)]
     assert second_page["data"]["next_cursor"] is None
-    assert "private" not in str(detail)
+    assert "token=private" not in detail["data"]["url"]
+    assert "[redacted]" in detail["data"]["url"]
     assert (
         tools.call("history_show", {"history_id": record_id + 100})["error"]["code"]
         == "HISTORY_NOT_FOUND"
