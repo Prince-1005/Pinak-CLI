@@ -11,17 +11,15 @@ import tarfile
 import threading
 import time
 import wave
+from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import anyio
-import httpx2
 import psutil
 import pytest
 import uvicorn
 from filelock import Timeout
-from mcp import ClientSession
-from mcp.client.streamable_http import streamable_http_client
 from starlette.testclient import TestClient
 
 from pinak.mcp_cloud import egress
@@ -30,6 +28,7 @@ from pinak.mcp_cloud.egress import public_connection
 from pinak.mcp_cloud.registry import Registry
 from pinak.mcp_cloud.settings import Settings
 from pinak.mcp_server.tools import DEFINITIONS
+from tools.smoke_cloud_container import exercise as exercise_cloud_smoke
 
 
 def settings(root: Path, **kwargs: object) -> Settings:
@@ -295,43 +294,35 @@ def test_actual_remote_download_reconnect_and_restart(
 
 
 def test_official_sdk_over_real_http(tmp_path: Path) -> None:
-    sock = socket.socket()
-    sock.bind(("127.0.0.1", 0))
-    port = sock.getsockname()[1]
-    config = Settings(
-        data_dir=tmp_path, public_url=f"http://127.0.0.1:{port}", allow_insecure_loopback=True
-    )
-    registry = Registry(config)
+    registry = Registry(settings(tmp_path))
     alice, bob = registry.create("alice"), registry.create("bob")
-    server = uvicorn.Server(
-        uvicorn.Config(create_app(config), log_level="critical", access_log=False)
-    )
-    thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]}, daemon=True)
-    thread.start()
-    deadline = time.monotonic() + 10
-    while not server.started and time.monotonic() < deadline:
-        time.sleep(0.05)
-    assert server.started
-
-    async def exercise() -> None:
-        for token, name in ((alice, "alice"), (bob, "bob")):
-            async with (
-                httpx2.AsyncClient(headers={"Authorization": f"Bearer {token}"}) as http,
-                streamable_http_client(config.public_url + "/mcp", http_client=http) as streams,
-                ClientSession(*streams) as session,
-            ):
-                await session.initialize()
-                assert len((await session.list_tools()).tools) == len(DEFINITIONS) + 1
-                result = await session.call_tool("server_info", {})
-                assert result.structured_content["data"]["cloud_user"] == name
-
-    try:
-        anyio.run(exercise)
-    finally:
-        server.should_exit = True
-        thread.join(timeout=30)
-        sock.close()
-    assert not thread.is_alive(), "Gateway failed to shut down cleanly"
+    # Exercise the same client checks used by container CI, then recreate the
+    # gateway against the saved data to verify the restart path as well.
+    for existing in (False, True):
+        sock = socket.socket()
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+        config = Settings(
+            data_dir=tmp_path, public_url=f"http://127.0.0.1:{port}", allow_insecure_loopback=True
+        )
+        server = uvicorn.Server(
+            uvicorn.Config(create_app(config), log_level="critical", access_log=False)
+        )
+        thread = threading.Thread(target=server.run, kwargs={"sockets": [sock]}, daemon=True)
+        thread.start()
+        try:
+            deadline = time.monotonic() + 10
+            while not server.started and time.monotonic() < deadline:
+                time.sleep(0.05)
+            assert server.started
+            anyio.run(
+                partial(exercise_cloud_smoke, existing=existing), config.public_url, alice, bob
+            )
+        finally:
+            server.should_exit = True
+            thread.join(timeout=30)
+            sock.close()
+        assert not thread.is_alive(), "Gateway failed to shut down cleanly"
 
 
 def test_http_rate_and_body_limits(tmp_path: Path) -> None:

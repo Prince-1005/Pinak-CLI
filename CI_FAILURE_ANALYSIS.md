@@ -116,3 +116,24 @@ Storage quotas remain soft: fresh admission does not reserve disk space, and
 active downloads are checked by the existing periodic monitor. Recursive disk
 scans now occur for each new admission, trading that scan cost for current
 capacity information. This change does not impose a filesystem-level quota.
+
+## Follow-up: cloud container discovery assertion
+
+[Job 121238164119 in run 40216337018](https://github.com/Prince-1005/Pinak-CLI/actions/runs/40216337018/job/121238164119)
+passed playback initialization, the clean wheel check, upgrade/downgrade checks,
+the CLI container check, and the cloud image build. It then failed in
+`tools/smoke_cloud_container.py` at `assert len(names) == 34`.
+
+The cloud server correctly exposes 35 tools: the 34 shared definitions plus
+`file_link`. The smoke script had retained the old count and success message.
+It now compares the complete discovered name set with the shared definitions
+plus `file_link`, reports missing/unexpected names, rejects duplicates, and
+derives the displayed count from that contract.
+
+The existing real-HTTP SDK regression now invokes this exact smoke routine
+instead of maintaining a separate discovery assertion. It recreates the gateway
+against the same data directory and runs the persistence path as well. This
+reproduced the original CI assertion before the script fix and passed after it,
+including user isolation, credentials, saved jobs, and receipt replay across
+gateway restart. Local Docker Desktop remains unavailable, so actual container
+UID, Compose, and volume checks still require the next CI run.

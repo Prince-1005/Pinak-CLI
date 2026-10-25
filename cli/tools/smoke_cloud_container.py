@@ -6,6 +6,7 @@ import argparse
 import json
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.request
@@ -17,6 +18,12 @@ import anyio
 import httpx2
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
+
+# CI invokes this file directly without installing Pinak in the host environment.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from pinak.mcp_server.tools import DEFINITIONS
+
+EXPECTED_TOOLS = {*DEFINITIONS, "file_link"}
 
 
 def docker(*arguments: str) -> str:
@@ -47,9 +54,13 @@ async def exercise(url: str, alice: str, bob: str, *, existing: bool = False) ->
             ClientSession(*streams) as session,
         ):
             await session.initialize()
-            names = {tool.name for tool in (await session.list_tools()).tools}
-            assert len(names) == 34
-            assert {"history_show", "library_scan", "library_show", "file_link"} <= names
+            tools = (await session.list_tools()).tools
+            names = {tool.name for tool in tools}
+            assert names == EXPECTED_TOOLS, {
+                "missing": sorted(EXPECTED_TOOLS - names),
+                "unexpected": sorted(names - EXPECTED_TOOLS),
+            }
+            assert len(tools) == len(names), "Duplicate tool names in discovery"
             info = await session.call_tool("server_info", {})
             assert info.structured_content["data"]["cloud_user"] == username
             if username == "alice":
@@ -95,7 +106,7 @@ def check_container(container: str, url: str) -> None:
 
     anyio.run(check_persistence)
     print(
-        "Cloud image: non-root service, remote SDK, 34 tools, user isolation and restart persistence passed"
+        f"Cloud image: non-root service, remote SDK, {len(EXPECTED_TOOLS)} tools, user isolation and restart persistence passed"
     )
 
 
