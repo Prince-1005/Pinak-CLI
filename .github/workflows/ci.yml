@@ -151,7 +151,13 @@ jobs:
       - name: Install Linux playback prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libportaudio2 python3-tk
+          sudo apt-get install -y --no-install-recommends libportaudio2 python3-tk pulseaudio
+      - name: Start headless audio server for playback import checks
+        run: |
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=ci
+          pactl set-default-sink ci
+          pactl info
       - name: Build and verify a clean installation
         run: |
           python -m pip install --require-hashes -r requirements-lock.txt

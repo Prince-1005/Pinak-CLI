@@ -351,8 +351,9 @@ def test_http_rate_and_body_limits(tmp_path: Path) -> None:
         assert response.status_code == 429
 
 
-def test_quota_admission_preserves_replay_and_inspection(tmp_path: Path) -> None:
-    config = settings(tmp_path, max_jobs=1, storage_bytes=1024**2)
+@pytest.mark.parametrize("max_jobs", [1, 2])
+def test_quota_admission_preserves_replay_and_inspection(tmp_path: Path, max_jobs: int) -> None:
+    config = settings(tmp_path, max_jobs=max_jobs, storage_bytes=1024**2)
     registry = Registry(config)
     token = registry.create("alice")
     with TestClient(create_app(config), base_url=config.public_url) as client:
@@ -360,13 +361,25 @@ def test_quota_admission_preserves_replay_and_inspection(tmp_path: Path) -> None
         first = call(client, token, "queue_add", **args)
         assert first["ok"]
         assert call(client, token, "queue_add", **args) == first
-        full = call(client, token, "queue_add", url="https://example.com/b.wav", request_key="two")
-        assert full["error"]["code"] == "JOB_LIMIT"
+        if max_jobs == 1:
+            full = call(
+                client, token, "queue_add", url="https://example.com/b.wav", request_key="two"
+            )
+            assert full["error"]["code"] == "JOB_LIMIT", full
         output = registry.root("alice") / "downloads" / "full.bin"
         output.write_bytes(b"x" * 1024**2)
         assert call(client, token, "queue_add", **args) == first
         denied = call(client, token, "queue_start", request_key="full-start")
-        assert denied["error"]["code"] == "STORAGE_LIMIT"
+        assert denied["ok"] is False, denied
+        assert denied["error"]["code"] == "STORAGE_LIMIT", denied
+        if max_jobs == 2:
+            # A new save must also see the full directory despite the earlier
+            # empty sample; replay of the existing save above remains allowed.
+            denied = call(
+                client, token, "queue_add", url="https://example.com/b.wav", request_key="two"
+            )
+            assert denied["ok"] is False, denied
+            assert denied["error"]["code"] == "STORAGE_LIMIT", denied
         assert call(client, token, "queue_show", job_id=1)["ok"]
         assert call(client, token, "queue_remove", job_ids=[1], request_key="remove")["ok"]
 

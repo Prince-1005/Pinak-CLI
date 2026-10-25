@@ -101,7 +101,13 @@ class CloudTools(Tools):
                     return self.failure(
                         "JOB_LIMIT", "Saved-job limit reached; remove inactive records."
                     )
-            if name in {"queue_add", "queue_start"} and self.get_storage_usage() >= self.byte_limit:
+            # Admission must observe writes since the previous call. The monitor's
+            # cached sample can be up to five seconds old; replayed receipts above
+            # still bypass admission so retries remain idempotent at capacity.
+            if (
+                name in {"queue_add", "queue_start"}
+                and self.get_storage_usage(force=True) >= self.byte_limit
+            ):
                 return self.failure(
                     "STORAGE_LIMIT", "Download storage limit reached; contact the operator."
                 )
