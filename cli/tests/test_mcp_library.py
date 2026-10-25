@@ -231,12 +231,21 @@ def test_library_collection_list_filters_private_roots_and_preserves_empty(servi
     with library._connect() as conn:
         cursor = conn.execute("INSERT INTO collections(name, name_key) VALUES ('Secret', 'secret')")
         priv_coll_id = cursor.lastrowid
-        conn.execute("INSERT INTO collection_items(collection_id, media_id, position) VALUES (?, ?, 0)", (priv_coll_id, priv_id))
+        conn.execute(
+            "INSERT INTO collection_items(collection_id, media_id, position) VALUES (?, ?, 0)",
+            (priv_coll_id, priv_id),
+        )
 
         cursor = conn.execute("INSERT INTO collections(name, name_key) VALUES ('Mixed', 'mixed')")
         mixed_coll_id = cursor.lastrowid
-        conn.execute("INSERT INTO collection_items(collection_id, media_id, position) VALUES (?, ?, 0)", (mixed_coll_id, app_id))
-        conn.execute("INSERT INTO collection_items(collection_id, media_id, position) VALUES (?, ?, 1)", (mixed_coll_id, priv_id))
+        conn.execute(
+            "INSERT INTO collection_items(collection_id, media_id, position) VALUES (?, ?, 0)",
+            (mixed_coll_id, app_id),
+        )
+        conn.execute(
+            "INSERT INTO collection_items(collection_id, media_id, position) VALUES (?, ?, 1)",
+            (mixed_coll_id, priv_id),
+        )
 
         cursor = conn.execute("INSERT INTO collections(name, name_key) VALUES ('Empty', 'empty')")
         empty_coll_id = cursor.lastrowid
@@ -249,5 +258,3 @@ def test_library_collection_list_filters_private_roots_and_preserves_empty(servi
     assert res_by_id[mixed_coll_id]["item_count"] == 1
     assert empty_coll_id in res_by_id
     assert res_by_id[empty_coll_id]["item_count"] == 0
-
-

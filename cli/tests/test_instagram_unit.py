@@ -240,4 +240,3 @@ def test_download_carousel_parallel_does_not_touch_unrelated_videos(tmp_path, mo
     assert len(outcomes) == 1
     assert tagged_files == [slide_file.resolve()]
     assert unrelated.resolve() not in tagged_files
-

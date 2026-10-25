@@ -154,4 +154,3 @@ def test_trusted_which_ignores_cwd_and_relative_path(tmp_path, monkeypatch):
     good.chmod(0o755)
     monkeypatch.setenv("PATH", str(safe_dir))
     assert utils.trusted_which("good.exe") == str(good)
-

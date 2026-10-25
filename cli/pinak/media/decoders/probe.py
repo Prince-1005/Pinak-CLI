@@ -214,9 +214,7 @@ class MediaProbe:
         return None
 
     @classmethod
-    def _probe_duration_with_ffmpeg(
-        cls, path: Path, *, allow_provision: bool = True
-    ) -> float:
+    def _probe_duration_with_ffmpeg(cls, path: Path, *, allow_provision: bool = True) -> float:
         """Extracts container duration using ffmpeg -hide_banner -i when ffprobe is missing."""
         ffmpeg_bin = cls._find_ffmpeg(allow_provision=allow_provision)
         if not ffmpeg_bin:

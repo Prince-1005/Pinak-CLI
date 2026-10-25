@@ -668,9 +668,7 @@ def download_media_content(
         if bad_files:
             msg = f"Integrity check failed for {len(bad_files)} file(s): {bad_files}"
             logger.errors.append(msg)
-            get_logger("pinak.downloader").warning(
-                "%s (url=%s)", msg, safe_url_for_log(post_url)
-            )
+            get_logger("pinak.downloader").warning("%s (url=%s)", msg, safe_url_for_log(post_url))
             _console_print(f"[yellow][!] Warning: {msg}[/]")
         new_files = valid_files
         success = bool(new_files) and not logger.errors

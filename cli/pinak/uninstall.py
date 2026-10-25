@@ -48,13 +48,14 @@ def _purge_targets(include_cache: bool = True) -> list[str]:
     custom_data = _custom_data_directory()
     if custom_data is not None:
         data_targets = [custom_data / filename for filename in _DATA_FILES]
-    elif Path(data_dir).absolute() == Path(
-        platformdirs.user_data_dir("pinak-cli", "pinak")
-    ).absolute():
+    elif (
+        Path(data_dir).absolute()
+        == Path(platformdirs.user_data_dir("pinak-cli", "pinak")).absolute()
+    ):
         data_targets = [Path(data_dir)]
     else:
         data_targets = []
-    targets = [config_dir, *data_targets, legacy_db_file, command_history_file]
+    targets: list[str | Path] = [config_dir, *data_targets, legacy_db_file, command_history_file]
     if include_cache:
         targets.append(platformdirs.user_cache_dir("pinak-cli", "pinak"))
     safe = []

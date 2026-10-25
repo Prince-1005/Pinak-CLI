@@ -20,7 +20,7 @@ test('installation tabs, keyboard navigation and copied command feedback', async
   expect(await page.evaluate(() => (window as unknown as { copied: string }).copied)).toBe('pipx install pinak-cli');
 });
 test('gallery filtering, search, dialog escape, zoom and focus restoration', async ({ page }) => {
-  await page.goto('/showcase/'); await expect(page.locator('[data-media-card]:visible')).toHaveCount(5);
+  await page.goto('/showcase/'); await expect(page.locator('[data-media-card]:visible')).toHaveCount(6);
   await page.getByRole('button', { name: 'Videos', exact: true }).click(); await expect(page.locator('[data-media-card]:visible')).toHaveCount(2);
   await page.locator('#gallery-search').fill('soundtrack'); await expect(page.locator('[data-media-card]:visible')).toHaveCount(1);
   await page.locator('[data-media-card]:visible button').click(); await expect(page.locator('#media-viewer')).toBeVisible();
@@ -119,7 +119,7 @@ test('future gallery growth paginates at 24 and handles no matches', async ({ pa
     await route.fulfill({ response, body: html.replace(card!, card!.repeat(25)) });
   });
   await page.goto('/showcase/'); await expect(page.locator('[data-media-card]:visible')).toHaveCount(24);
-  await page.locator('#gallery-next').click(); await expect(page.locator('[data-media-card]:visible')).toHaveCount(5);
+  await page.locator('#gallery-next').click(); await expect(page.locator('[data-media-card]:visible')).toHaveCount(6);
   await expect(page.locator('#gallery-page')).toHaveText('Page 2 of 2');
   await page.locator('#gallery-search').fill('nothing-matches-this'); await expect(page.locator('#gallery-empty')).toBeVisible();
 });

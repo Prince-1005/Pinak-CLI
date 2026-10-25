@@ -29,7 +29,9 @@ MAX_SIBLING_ENTRIES = 2_048
 MAX_SIBLING_TRACKS = 32
 
 
-def _run_bounded_stdout(cmd: list[str], *, timeout: float, max_bytes: int) -> subprocess.CompletedProcess[bytes]:
+def _run_bounded_stdout(
+    cmd: list[str], *, timeout: float, max_bytes: int
+) -> subprocess.CompletedProcess[bytes]:
     """Capture FFmpeg output with both a deadline and an in-memory byte ceiling."""
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     started = time.monotonic()
@@ -156,7 +158,9 @@ class SubtitleParser:
             with path.open("rb") as source:
                 raw = source.read(MAX_SUBTITLE_BYTES + 1)
             if len(raw) > MAX_SUBTITLE_BYTES:
-                logger.warning("Subtitle file exceeds the %d-byte limit: %s", MAX_SUBTITLE_BYTES, path)
+                logger.warning(
+                    "Subtitle file exceeds the %d-byte limit: %s", MAX_SUBTITLE_BYTES, path
+                )
                 return None
             content = raw.decode("utf-8", errors="replace")
         except Exception as e:
@@ -199,7 +203,9 @@ class SubtitleParser:
         try:
             candidates = list(islice(parent.iterdir(), MAX_SIBLING_ENTRIES + 1))
             if len(candidates) > MAX_SIBLING_ENTRIES:
-                logger.warning("Subtitle search limited to %d siblings: %s", MAX_SIBLING_ENTRIES, parent)
+                logger.warning(
+                    "Subtitle search limited to %d siblings: %s", MAX_SIBLING_ENTRIES, parent
+                )
                 candidates.pop()
             for item in sorted(candidates):
                 if item.is_file() and item.suffix.lower() in cls.SUPPORTED_SUB_EXTS:

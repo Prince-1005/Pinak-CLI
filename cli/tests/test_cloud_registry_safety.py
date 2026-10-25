@@ -55,7 +55,9 @@ def test_old_cloud_links_are_invalidated_during_identity_migration(tmp_path: Pat
             "relative_path TEXT NOT NULL, expires REAL NOT NULL, "
             "size INTEGER NOT NULL, modified INTEGER NOT NULL)"
         )
-        db.execute("INSERT INTO links VALUES (?, 'alice', 'clip.mp3', 9999999999, 5, 1)", (digest("old"),))
+        db.execute(
+            "INSERT INTO links VALUES (?, 'alice', 'clip.mp3', 9999999999, 5, 1)", (digest("old"),)
+        )
     registry = Registry(_settings(root))
     with registry.connect() as db:
         assert db.execute("SELECT version FROM cloud_schema").fetchone()[0] == 2

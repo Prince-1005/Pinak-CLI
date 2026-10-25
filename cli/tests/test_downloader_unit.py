@@ -473,12 +473,15 @@ def test_handle_download_any_command_direct_media(monkeypatch, tmp_path):
 
 def test_socket_timeout_honors_strictest_configured_cap(monkeypatch):
     monkeypatch.setattr(
-        dl_mod, "active_setting", lambda key, default=None: 15.0 if key == "connect_timeout" else 45.0
+        dl_mod,
+        "active_setting",
+        lambda key, default=None: 15.0 if key == "connect_timeout" else 45.0,
     )
     assert dl_mod._socket_timeout() == 15.0
 
     monkeypatch.setattr(
-        dl_mod, "active_setting", lambda key, default=None: 60.0 if key == "connect_timeout" else 20.0
+        dl_mod,
+        "active_setting",
+        lambda key, default=None: 60.0 if key == "connect_timeout" else 20.0,
     )
     assert dl_mod._socket_timeout() == 20.0
-

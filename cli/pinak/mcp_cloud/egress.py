@@ -15,9 +15,7 @@ async def public_connection(
     if port not in {80, 443}:
         raise ValueError("Unsupported destination port")
     loop = asyncio.get_running_loop()
-    rows = await asyncio.wait_for(
-        loop.getaddrinfo(host, port, type=socket.SOCK_STREAM), timeout=10
-    )
+    rows = await asyncio.wait_for(loop.getaddrinfo(host, port, type=socket.SOCK_STREAM), timeout=10)
     if not rows or any(
         not ipaddress.ip_address(row[4][0]).is_global
         or ipaddress.ip_address(row[4][0]).is_multicast

@@ -266,6 +266,7 @@ def _download_carousel_parallel(ydl_opts, entries, output_dir, filename_suffix, 
     worker_opts = {k: v for k, v in ydl_opts.items() if k != "progress_hooks"}
     if in_engine():
         worker_opts["progress_hooks"] = [_yt_dlp_hook]
+
     def _work(item):
         index, entry = item
         _say(f"\n[*] Processing slide {index}/{total}...", locked=True)

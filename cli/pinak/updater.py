@@ -106,12 +106,17 @@ def _update_status_path() -> Path:
 def _status_worker_live(prior: dict[str, object]) -> bool:
     state = prior.get("state")
     if state == "pending":
-        return time.time() - float(prior.get("time", 0)) < 10
+        t = prior.get("time", 0)
+        return isinstance(t, (int, float, str)) and time.time() - float(t) < 10
     if state != "waiting":
         return False
     try:
-        pid = int(prior["pid"])
-        started = float(prior["process_started"])
+        pid_obj = prior.get("pid")
+        started_obj = prior.get("process_started")
+        if pid_obj is None or started_obj is None:
+            return False
+        pid = int(str(pid_obj))
+        started = float(str(started_obj))
         return abs(psutil.Process(pid).create_time() - started) < 1
     except (KeyError, TypeError, ValueError, psutil.Error, OSError):
         return False

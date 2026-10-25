@@ -165,9 +165,9 @@ def test_windows_schedule_and_update_result(monkeypatch, tmp_path):
     status = tmp_path / "update-result.json"
     monkeypatch.setattr(updater_mod, "CONFIG_FILE", str(tmp_path / "config.json"))
     monkeypatch.setattr(
-        updater_mod.psutil, "Process", lambda pid: SimpleNamespace(
-            parent=lambda: None, create_time=lambda: 1000.0
-        )
+        updater_mod.psutil,
+        "Process",
+        lambda pid: SimpleNamespace(parent=lambda: None, create_time=lambda: 1000.0),
     )
     launched = []
 
@@ -213,9 +213,9 @@ def test_windows_schedule_falls_back_when_helper_cannot_start(monkeypatch, tmp_p
     status = tmp_path / "update-result.json"
     monkeypatch.setattr(updater_mod, "CONFIG_FILE", str(tmp_path / "config.json"))
     monkeypatch.setattr(
-        updater_mod.psutil, "Process", lambda pid: SimpleNamespace(
-            parent=lambda: None, create_time=lambda: 1000.0
-        )
+        updater_mod.psutil,
+        "Process",
+        lambda pid: SimpleNamespace(parent=lambda: None, create_time=lambda: 1000.0),
     )
 
     def fail(*args, **kwargs):

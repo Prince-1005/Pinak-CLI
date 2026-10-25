@@ -60,8 +60,13 @@ def main() -> None:
                 assert initialized.server_info.name == "Pinak-MCP"
                 tools = await session.list_tools()
                 names = {tool.name for tool in tools.tools}
-                assert len(names) == 33
-                assert {"history_show", "library_scan", "library_show"} <= names
+                assert len(names) == 34
+                assert {
+                    "history_show",
+                    "library_scan",
+                    "library_show",
+                    "library_storage_report",
+                } <= names
                 added = await session.call_tool(
                     "queue_add",
                     {

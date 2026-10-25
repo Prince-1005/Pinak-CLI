@@ -334,4 +334,3 @@ def test_media_probe_no_provisioning_never_invokes_provisioning(tmp_path: Path, 
 
     meta = MediaProbe.probe(fake_video, allow_provision=False)
     assert meta.media_type == "video"
-

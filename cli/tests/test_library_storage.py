@@ -106,9 +106,7 @@ def test_mcp_collection_list_hides_private_catalog_entries(tmp_path, monkeypatch
     try:
         result = tools.call("library_collection_list", {})
         assert result["ok"]
-        assert result["data"]["items"] == [
-            {"id": mixed, "name": "Mixed", "item_count": 1}
-        ]
+        assert result["data"]["items"] == [{"id": mixed, "name": "Mixed", "item_count": 1}]
     finally:
         tools.close()
 
@@ -128,9 +126,7 @@ def test_storage_scopes_parent_root_and_pages_collections(tmp_path, monkeypatch)
         library.collection_add(group, item.id)
 
     first = library_storage.report(allowed_roots=[approved], include_capacity=False, limit=3)
-    assert first["by_root"] == [
-        {"root": str(approved), "items": 1, "catalog_logical_bytes": 5}
-    ]
+    assert first["by_root"] == [{"root": str(approved), "items": 1, "catalog_logical_bytes": 5}]
     assert len(first["collections"]) == 3
     assert first["collection_next_cursor"] == 3
     second = library_storage.report(

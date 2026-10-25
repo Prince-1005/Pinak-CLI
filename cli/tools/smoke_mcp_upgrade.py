@@ -41,7 +41,7 @@ async def main():
         result = await session.initialize()
         assert result.server_info.name == 'Pinak-MCP'
         names = {tool.name for tool in (await session.list_tools()).tools}
-        assert len(names) == 33 and {'history_show', 'library_scan', 'library_show'} <= names
+        assert len(names) == 34 and {'history_show', 'library_scan', 'library_show', 'library_storage_report'} <= names
         shown = await session.call_tool('queue_show', {'job_id':1})
         data = shown.structured_content['data']
         assert data['status'] == 'queued' and data['attempts'] == 0

@@ -32,9 +32,7 @@ def safe_url_for_log(value: object) -> str:
         if parsed.port is not None:
             host += f":{parsed.port}"
         return safe_text(
-            urlunsplit(
-                (parsed.scheme, host, parsed.path, "[redacted]" if parsed.query else "", "")
-            )
+            urlunsplit((parsed.scheme, host, parsed.path, "[redacted]" if parsed.query else "", ""))
         )
     except ValueError:
         return "[redacted URL]"

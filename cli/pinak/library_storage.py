@@ -6,6 +6,7 @@ import contextlib
 import shutil
 import stat
 import time
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -43,7 +44,7 @@ def report(
         if collection_id is not None:
             library._collection(conn, collection_id)
 
-    def media_rows(*, by_size: bool = False):
+    def media_rows(*, by_size: bool = False) -> Iterator[Any]:
         with contextlib.closing(library._connect()) as conn:
             if collection_id is not None:
                 if by_size:
@@ -66,7 +67,7 @@ def report(
                 else:
                     yield from conn.execute("SELECT m.* FROM media m ORDER BY m.id")
 
-    def memberships():
+    def memberships() -> Iterator[Any]:
         with contextlib.closing(library._connect()) as conn:
             sql = (
                 "SELECT m.path,m.size_bytes,c.id,c.name FROM collection_items ci "
@@ -74,7 +75,9 @@ def report(
                 "JOIN collections c ON c.id=ci.collection_id"
             )
             if collection_id is not None:
-                sql += " WHERE m.id IN (SELECT media_id FROM collection_items WHERE collection_id=?)"
+                sql += (
+                    " WHERE m.id IN (SELECT media_id FROM collection_items WHERE collection_id=?)"
+                )
                 rows = conn.execute(sql + " ORDER BY c.id", (collection_id,))
             else:
                 rows = conn.execute(sql + " ORDER BY c.id")

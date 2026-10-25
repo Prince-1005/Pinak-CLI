@@ -20,9 +20,7 @@ from .utils import normalize_quality
 
 def parse_trim_range(value: str) -> tuple[int, int]:
     """Validate a MM:SS or HH:MM:SS clip with a positive duration."""
-    if len(value) > 64 or not re.fullmatch(
-        r"\d+(?::\d{1,2}){1,2}-\d+(?::\d{1,2}){1,2}", value
-    ):
+    if len(value) > 64 or not re.fullmatch(r"\d+(?::\d{1,2}){1,2}-\d+(?::\d{1,2}){1,2}", value):
         raise ValueError("Trim range must look like 01:15-02:30")
 
     def seconds(part: str) -> int:

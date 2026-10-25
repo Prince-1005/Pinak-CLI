@@ -1,14 +1,13 @@
 """Unit tests for the Subtitle engine (model, parser, renderer)."""
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
-
 from PIL import Image
 
-from pinak.media.subtitles.model import SubtitleCue, SubtitleTrack
 from pinak.media.subtitles import parser as subtitle_parser
+from pinak.media.subtitles.model import SubtitleCue, SubtitleTrack
 from pinak.media.subtitles.parser import SubtitleParser
 from pinak.media.subtitles.renderer import SubtitleRenderer
 
@@ -40,8 +39,7 @@ def test_subtitle_track_get_active_cues():
 def test_long_subtitle_remains_visible_after_many_short_overlaps():
     long = SubtitleCue(index=1, start_sec=0, end_sec=100, text="Long caption")
     short = [
-        SubtitleCue(index=i + 2, start_sec=i + 1, end_sec=i + 1.1, text="Short")
-        for i in range(13)
+        SubtitleCue(index=i + 2, start_sec=i + 1, end_sec=i + 1.1, text="Short") for i in range(13)
     ]
     track = SubtitleTrack(track_id=1, cues=[long, *short])
     assert track.get_active_text(30) == "Long caption"
@@ -276,4 +274,3 @@ def test_subtitle_metadata_ansi_and_osc_sanitized():
     assert "\x1b" not in track.label
     assert "\x07" not in track.label
     assert track.label == "Malicious Track"
-

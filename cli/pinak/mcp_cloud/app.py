@@ -9,6 +9,7 @@ import mimetypes
 import re
 import time
 from collections import deque
+from collections.abc import AsyncIterator
 from contextvars import ContextVar
 from typing import Any
 from urllib.parse import quote, urlsplit
@@ -212,7 +213,7 @@ def create_app(settings: Settings) -> Any:
             handle.close()
             return Response(status_code=status_code, headers=headers, media_type=media_type)
 
-        async def chunks():
+        async def chunks() -> AsyncIterator[bytes]:
             try:
                 handle.seek(start)
                 remaining = length
@@ -299,9 +300,9 @@ def create_app(settings: Settings) -> Any:
                 try:
                     await asyncio.wait_for(file_streams.acquire(), timeout=0.1)
                 except asyncio.TimeoutError:
-                    await JSONResponse(
-                        {"error": "Too many file transfers"}, status_code=429
-                    )(scope, receive, send)
+                    await JSONResponse({"error": "Too many file transfers"}, status_code=429)(
+                        scope, receive, send
+                    )
                     return
                 try:
                     await routes(scope, receive, send)
