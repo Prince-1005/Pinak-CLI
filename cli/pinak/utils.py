@@ -110,6 +110,8 @@ def _ensure_static_ffmpeg_paths() -> None:
 def _resolve_binary(
     names: tuple[str, ...],
     config_override: str | None = None,
+    *,
+    allow_provision: bool = True,
 ) -> str:
     """Resolve a binary path with the following precedence:
 
@@ -140,11 +142,12 @@ def _resolve_binary(
             if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
                 return candidate
     # Try static-ffmpeg if installed
-    _ensure_static_ffmpeg_paths()
-    for name in names:
-        found = trusted_which(name)
-        if found:
-            return found
+    if allow_provision:
+        _ensure_static_ffmpeg_paths()
+        for name in names:
+            found = trusted_which(name)
+            if found:
+                return found
     # An unresolved bare executable could still be implicitly executed from CWD
     # by Windows or an external dependency. Return a controlled missing path.
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "_unavailable", names[0])
@@ -163,7 +166,7 @@ def _configured_binary_override(key: str) -> str | None:
     return None
 
 
-def get_ffmpeg_path() -> str:
+def get_ffmpeg_path(*, allow_provision: bool = True) -> str:
     """Return the best ffmpeg binary path.
 
     Precedence: config override → system PATH → bundled → "ffmpeg".
@@ -174,17 +177,17 @@ def get_ffmpeg_path() -> str:
         names: tuple[str, ...] = ("ffmpeg.exe", "ffmpeg")
     else:
         names = ("ffmpeg", "ffmpeg.exe")
-    return _resolve_binary(names, config_override=override)
+    return _resolve_binary(names, config_override=override, allow_provision=allow_provision)
 
 
-def get_ffprobe_path() -> str:
+def get_ffprobe_path(*, allow_provision: bool = True) -> str:
     """Return the best ffprobe binary path (same precedence as ffmpeg)."""
     override = _configured_binary_override("ffprobe_path")
     if sys.platform.startswith("win"):
         names = ("ffprobe.exe", "ffprobe")
     else:
         names = ("ffprobe", "ffprobe.exe")
-    return _resolve_binary(names, config_override=override)
+    return _resolve_binary(names, config_override=override, allow_provision=allow_provision)
 
 
 def ffmpeg_available() -> bool:

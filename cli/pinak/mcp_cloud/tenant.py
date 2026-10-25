@@ -49,6 +49,17 @@ class CloudTools(Tools):
         self.job_limit = int(os.environ["PINAK_CLOUD_MAX_JOBS"])
         self.lock = threading.RLock()
         self.cloud_closed = False
+        self._cached_usage: tuple[float, int] = (0.0, 0)
+        self._usage_cache_ttl: float = 5.0
+
+    def get_storage_usage(self, force: bool = False) -> int:
+        now = time.monotonic()
+        last_time, last_bytes = self._cached_usage
+        if not force and (now - last_time < self._usage_cache_ttl):
+            return last_bytes
+        used = directory_bytes(self.policy.default_output_dir)
+        self._cached_usage = (now, used)
+        return used
 
     def close(self) -> None:
         with self.lock:
@@ -92,7 +103,7 @@ class CloudTools(Tools):
                     )
             if (
                 name in {"queue_add", "queue_start"}
-                and directory_bytes(self.policy.default_output_dir) >= self.byte_limit
+                and self.get_storage_usage() >= self.byte_limit
             ):
                 return self.failure(
                     "STORAGE_LIMIT", "Download storage limit reached; contact the operator."
@@ -108,11 +119,9 @@ async def serve() -> None:
 
     async def monitor() -> None:
         while True:
-            await anyio.sleep(1)
+            await anyio.sleep(5)
             try:
-                used = await anyio.to_thread.run_sync(
-                    directory_bytes, service.policy.default_output_dir
-                )
+                used = await anyio.to_thread.run_sync(service.get_storage_usage, True)
                 if used >= service.byte_limit:
                     # Do not terminate unrelated processes or delete files to reclaim space.
                     for run_id in list(service.controller._children):

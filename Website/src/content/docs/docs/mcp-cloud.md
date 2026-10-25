@@ -62,7 +62,7 @@ Save the returned token privately. Create a different user for each person. In a
 - Header: `Authorization`.
 - Header value: `Bearer THE_USER_TOKEN`.
 
-Replace the domain and token. Clients must support custom bearer headers; OAuth-only and legacy SSE-only clients are outside this setup. The supplied `client.template.json` is a generic example, not a universal application configuration. Reconnect and discover thirty-four tools.
+Replace the domain and token. Clients must support custom bearer headers; OAuth-only and legacy SSE-only clients are outside this setup. The supplied `client.template.json` is a generic example, not a universal application configuration. Reconnect and discover thirty-five tools.
 
 ## 5. Download, retrieve, and check persistence
 

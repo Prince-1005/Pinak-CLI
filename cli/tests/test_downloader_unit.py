@@ -145,18 +145,21 @@ def test_classify_generic_error():
 def test_resilience_opts_enable_resume(monkeypatch):
     monkeypatch.setitem(dl_mod.config, "retry_count", 4)
     monkeypatch.setitem(dl_mod.config, "read_timeout", 45.0)
+    monkeypatch.setitem(dl_mod.config, "connect_timeout", 60.0)
     opts = dl_mod._resilience_opts()
     assert opts["continuedl"] is True
     assert opts["retries"] == 4
     assert opts["fragment_retries"] == 4
     assert opts["socket_timeout"] == 45.0
+    monkeypatch.setitem(dl_mod.config, "connect_timeout", 8.0)
+    assert dl_mod._resilience_opts()["socket_timeout"] == 8.0
 
 
 def test_timeout_helpers_fallback(monkeypatch):
     monkeypatch.setitem(dl_mod.config, "read_timeout", "bogus")
     monkeypatch.setitem(dl_mod.config, "connect_timeout", "bogus")
     monkeypatch.setitem(dl_mod.config, "retry_count", "bogus")
-    assert dl_mod._socket_timeout() == 30.0
+    assert dl_mod._socket_timeout() == 10.0
     assert dl_mod._connect_timeout() == 10.0
     assert dl_mod._retry_count() == 3
 
@@ -466,3 +469,16 @@ def test_handle_download_any_command_direct_media(monkeypatch, tmp_path):
         is_any_command=True,
     )
     assert result["success"] is True
+
+
+def test_socket_timeout_honors_strictest_configured_cap(monkeypatch):
+    monkeypatch.setattr(
+        dl_mod, "active_setting", lambda key, default=None: 15.0 if key == "connect_timeout" else 45.0
+    )
+    assert dl_mod._socket_timeout() == 15.0
+
+    monkeypatch.setattr(
+        dl_mod, "active_setting", lambda key, default=None: 60.0 if key == "connect_timeout" else 20.0
+    )
+    assert dl_mod._socket_timeout() == 20.0
+

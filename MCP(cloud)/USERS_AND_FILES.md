@@ -41,7 +41,7 @@ Your client must support **Streamable HTTP with a custom Authorization header**:
 These are generic connection fields, not a universal client configuration file.
 Translate them to your application's documented settings. Keep the secret in the
 client's protected settings or secret facility; do not enter it into a chat.
-Discover thirty-four tools. `server_info` identifies the authenticated cloud user.
+Discover thirty-five tools. `server_info` identifies the authenticated cloud user.
 Clients requiring browser OAuth sign-in or only accepting a URL without a header
 are not supported by this initial authentication mode. Local stdio setup remains
 available for those desktop applications that support it.

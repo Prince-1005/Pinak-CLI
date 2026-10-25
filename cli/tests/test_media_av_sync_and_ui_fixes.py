@@ -259,7 +259,9 @@ def test_probe_and_subproc_invalid_utf8_continuation_resilience(tmp_path: Path):
     # Simulate a process outputting non-UTF-8 bytes (invalid continuation byte)
     invalid_bytes = b"Video Stream Info: \x80\xff\xfe corrupted tag data Duration: 00:01:23.45"
 
-    with patch("shutil.which", return_value="fake_ffmpeg"), patch("subprocess.run") as mock_run:
+    with patch.object(MediaProbe, "_find_ffmpeg", return_value="fake_ffmpeg"), patch(
+        "subprocess.run"
+    ) as mock_run:
         mock_run.return_value = subprocess.CompletedProcess(
             args=["ffmpeg"],
             returncode=0,

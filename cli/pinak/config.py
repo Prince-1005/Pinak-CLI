@@ -45,10 +45,12 @@ class PinakSettings(BaseSettings):
         default=3, ge=1, le=10, description="Number of retries for failed downloads"
     )
     connect_timeout: float = Field(
-        default=10.0, ge=1.0, le=120.0, description="Connection timeout in seconds"
+        default=10.0, ge=1.0, le=120.0,
+        description="yt-dlp socket timeout cap in seconds (also applies while reading)",
     )
     read_timeout: float = Field(
-        default=30.0, ge=5.0, le=600.0, description="Read/download timeout in seconds"
+        default=30.0, ge=5.0, le=600.0,
+        description="Read/download socket timeout cap, also limited by connect_timeout",
     )
     ffmpeg_path: str = Field(
         default="", description="Custom ffmpeg binary path (empty = auto-detect)"

@@ -72,7 +72,7 @@ def clean(value: Any) -> Any:
         return None  # malformed media metadata must remain valid JSON
     if isinstance(value, str):
         value = safe_text(value)
-        value = re.sub(r"https?://[^\s<>\"']+", redact_url, value)
+        value = re.sub(r"https?://[^\s<>\"']+", redact_url, value, flags=re.IGNORECASE)
         value = re.sub(
             r"(?i)(authorization|password|token|api[_-]?key|cookie)(\s*[:=]\s*)[^\s,;]+",
             r"\1\2[redacted]",

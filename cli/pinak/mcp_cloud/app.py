@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
+import mimetypes
+import re
 import time
 from collections import deque
 from contextvars import ContextVar
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import anyio
 import mcp.types as types
@@ -18,8 +21,9 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import Field, StrictInt, ValidationError
 from starlette.applications import Starlette
+from starlette.background import BackgroundTask
 from starlette.requests import Request
-from starlette.responses import FileResponse, JSONResponse
+from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
 from starlette.types import Receive, Scope, Send
 
@@ -45,6 +49,8 @@ def create_app(settings: Settings) -> Any:
     egress = EgressProxy()
     pool = Pool(registry, "")
     limits: dict[str, deque[float]] = {}
+    file_calls: deque[float] = deque()
+    file_streams = asyncio.Semaphore(16)
 
     async def list_tools(context: Any, params: Any) -> types.ListToolsResult:
         entries = dict(DEFINITIONS)
@@ -167,17 +173,64 @@ def create_app(settings: Settings) -> Any:
         return JSONResponse({"status": "ok"})
 
     async def download(request: Request) -> Any:
-        path = await anyio.to_thread.run_sync(registry.resolve_link, request.path_params["token"])
-        if path is None:
+        opened = await anyio.to_thread.run_sync(registry.open_link, request.path_params["token"])
+        if opened is None:
             return JSONResponse({"error": "File link invalid or expired"}, status_code=404)
-        return FileResponse(
-            path,
-            filename=path.name,
-            headers={
-                "Cache-Control": "no-store",
-                "Referrer-Policy": "no-referrer",
-                "X-Content-Type-Options": "nosniff",
-            },
+        handle, size, name = opened
+        start, end = 0, size - 1
+        status_code = 200
+        requested = request.headers.get("range")
+        if requested:
+            match = re.fullmatch(r"bytes=(\d*)-(\d*)", requested.strip())
+            if not match or not size or not any(match.groups()):
+                handle.close()
+                return Response(status_code=416, headers={"Content-Range": f"bytes */{size}"})
+            left, right = match.groups()
+            if left:
+                start = int(left)
+                end = min(int(right), size - 1) if right else size - 1
+            else:
+                start = max(0, size - int(right))
+            if start >= size or end < start or (not left and int(right) == 0):
+                handle.close()
+                return Response(status_code=416, headers={"Content-Range": f"bytes */{size}"})
+            status_code = 206
+
+        length = max(0, end - start + 1)
+        headers = {
+            "Cache-Control": "no-store",
+            "Referrer-Policy": "no-referrer",
+            "X-Content-Type-Options": "nosniff",
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(length),
+            "Content-Disposition": f"attachment; filename*=utf-8''{quote(name)}",
+        }
+        if status_code == 206:
+            headers["Content-Range"] = f"bytes {start}-{end}/{size}"
+        media_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+        if request.method == "HEAD":
+            handle.close()
+            return Response(status_code=status_code, headers=headers, media_type=media_type)
+
+        async def chunks():
+            try:
+                handle.seek(start)
+                remaining = length
+                while remaining:
+                    data = await anyio.to_thread.run_sync(handle.read, min(65536, remaining))
+                    if not data:
+                        break
+                    remaining -= len(data)
+                    yield data
+            finally:
+                handle.close()
+
+        return StreamingResponse(
+            chunks(),
+            status_code=status_code,
+            headers=headers,
+            media_type=media_type,
+            background=BackgroundTask(handle.close),
         )
 
     routes = Starlette(
@@ -231,6 +284,29 @@ def create_app(settings: Settings) -> Any:
                     await manager.handle_request(scope, receive, send)
                 finally:
                     principal.reset(marker)
+            elif scope["path"].startswith("/files/"):
+                now = time.monotonic()
+                while file_calls and file_calls[0] <= now - 60:
+                    file_calls.popleft()
+                if len(file_calls) >= settings.calls_per_minute * min(settings.max_users, 4):
+                    await JSONResponse(
+                        {"error": "File request limit"},
+                        status_code=429,
+                        headers={"Retry-After": "60"},
+                    )(scope, receive, send)
+                    return
+                file_calls.append(now)
+                try:
+                    await asyncio.wait_for(file_streams.acquire(), timeout=0.1)
+                except asyncio.TimeoutError:
+                    await JSONResponse(
+                        {"error": "Too many file transfers"}, status_code=429
+                    )(scope, receive, send)
+                    return
+                try:
+                    await routes(scope, receive, send)
+                finally:
+                    file_streams.release()
             else:
                 await routes(scope, receive, send)
 

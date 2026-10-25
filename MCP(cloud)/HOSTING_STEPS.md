@@ -98,7 +98,7 @@ Enter these values in its remote MCP settings:
 - Header name: `Authorization`.
 - Header value: `Bearer THE_USER_TOKEN`.
 
-Reload/reconnect and discover 34 tools. The client must support custom bearer
+Reload/reconnect and discover 35 tools. The client must support custom bearer
 headers. An application requiring only browser OAuth sign-in is not compatible
 with this initial authentication mode. Client configuration file shapes vary;
 `client.template.json` shows generic fields, not a universal client config.

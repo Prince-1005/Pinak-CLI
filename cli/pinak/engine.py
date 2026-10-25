@@ -18,6 +18,25 @@ from .config import config, validate_settings
 from .utils import normalize_quality
 
 
+def parse_trim_range(value: str) -> tuple[int, int]:
+    """Validate a MM:SS or HH:MM:SS clip with a positive duration."""
+    if len(value) > 64 or not re.fullmatch(
+        r"\d+(?::\d{1,2}){1,2}-\d+(?::\d{1,2}){1,2}", value
+    ):
+        raise ValueError("Trim range must look like 01:15-02:30")
+
+    def seconds(part: str) -> int:
+        fields = [int(piece) for piece in part.split(":")]
+        if fields[-1] >= 60 or (len(fields) == 3 and fields[-2] >= 60):
+            raise ValueError("Trim minutes and seconds must be below 60")
+        return sum(field * 60**power for power, field in enumerate(reversed(fields)))
+
+    start, end = (seconds(part) for part in value.split("-"))
+    if end <= start:
+        raise ValueError("Trim end must be after trim start")
+    return start, end
+
+
 @dataclass(frozen=True)
 class DownloadRequest:
     url: str
@@ -66,10 +85,8 @@ class DownloadRequest:
         if output_dir is not None and not output_dir.strip():
             raise ValueError("Output directory is required")
         path = os.path.abspath(output_dir or settings["output_dir"])
-        if trim_range is not None and not re.fullmatch(
-            r"\d+(?::\d{1,2}){1,2}-\d+(?::\d{1,2}){1,2}", trim_range
-        ):
-            raise ValueError("Trim range must look like 01:15-02:30")
+        if trim_range is not None:
+            parse_trim_range(trim_range)
         return cls(
             url=url,
             output_dir=path,
@@ -105,6 +122,8 @@ class DownloadRequest:
             raise ValueError("Saved download request has an unsupported schema")
         payload = {**payload, "subtitle_languages": tuple(payload["subtitle_languages"])}
         request = cls(**payload)
+        if request.trim_range is not None:
+            parse_trim_range(request.trim_range)
         parsed = urlsplit(request.url)
         if (
             parsed.scheme not in {"https", "http"}

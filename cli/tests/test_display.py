@@ -186,5 +186,8 @@ def test_banner_has_distinct_letter_colors(monkeypatch):
     panels_mod.print_banner()
     rendered = output.getvalue()
     assert "PINAK-CLI" in rendered
+    from pinak import __version__
+
+    assert f"v{__version__}" in rendered.splitlines()[-1]
     for color in ("31m", "33m", "32m", "36m", "35m"):
         assert color in rendered

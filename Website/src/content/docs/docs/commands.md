@@ -27,6 +27,7 @@ URLs must start with `http://` or `https://`. Supported sources depend on yt-dlp
 - `--install-ffmpeg`: provision static FFmpeg.
 - `--config-path`: print the active configuration path.
 - `--version`, `-V`: show the installed version.
+- `pinak version`: show the running Pinak CLI version without starting the shell.
 - `--help`: show current CLI help.
 
 ## Inspect a plan
@@ -36,6 +37,10 @@ pinak "<your-media-url>" --dry-run --json
 ```
 
 Dry-run describes local options and platform inference. It is not a guarantee of live source availability, resolved formats, or final file size.
+
+Inside the interactive shell, `/version` prints the running Pinak CLI version. The same version appears at the lower-right edge of the Pinak logo.
+
+On Windows, `/update` updates yt-dlp immediately and queues a Pinak package update for after the current Pinak process exits. Use `/exit`, let the update finish, then launch Pinak again to see the result and the current version. If the helper cannot start, Pinak shows a command for the same Python installation environment.
 
 ## Scripting
 
@@ -73,7 +78,7 @@ Inspect and manage saved jobs with `pinak queue show <ID>`, `pinak queue cancel 
 
 ## Pinak Library
 
-New successful downloads are cataloged automatically. To include media already on your device, choose a folder with `pinak library scan <folder>`; Pinak does not scan other folders in the background. `list`, `search`, and `show` find items. [The Library guide](../library/) covers tags, collections, bookmarks, and resume playback.
+New successful downloads are cataloged automatically. To include media already on your device, choose a folder with `pinak library scan <folder>`; Pinak does not scan other folders in the background. `list`, `search`, and `show` find items. `pinak library storage` inspects disk usage and collection totals. [The Library guide](../library/) covers tags, collections, bookmarks, storage reports, and resume playback.
 
 For example:
 
@@ -81,6 +86,7 @@ For example:
 pinak library scan "path/to/media"
 pinak library search "guitar"
 pinak library show 1
+pinak library storage
 pinak library play 1
 ```
 

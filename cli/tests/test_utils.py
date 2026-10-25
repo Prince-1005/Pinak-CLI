@@ -127,3 +127,31 @@ def test_resolve_binary_from_candidate_dirs(monkeypatch, tmp_path):
 
     resolved = utils._resolve_binary(("ffmpeg.exe", "ffmpeg"))
     assert resolved == str(fake_ffmpeg)
+
+
+def test_trusted_which_ignores_cwd_and_relative_path(tmp_path, monkeypatch):
+    cwd = tmp_path / "work"
+    cwd.mkdir()
+    decoy = cwd / "decoy.exe"
+    decoy.write_text("decoy", encoding="utf-8")
+    decoy.chmod(0o755)
+
+    rel_dir = cwd / "sub"
+    rel_dir.mkdir()
+    rel_decoy = rel_dir / "rel_decoy.exe"
+    rel_decoy.write_text("rel", encoding="utf-8")
+    rel_decoy.chmod(0o755)
+
+    monkeypatch.chdir(cwd)
+    monkeypatch.setenv("PATH", f".{os.pathsep}sub{os.pathsep}{str(cwd)}")
+    assert utils.trusted_which("decoy.exe") is None
+    assert utils.trusted_which("rel_decoy.exe") is None
+
+    safe_dir = tmp_path / "safe_bin"
+    safe_dir.mkdir()
+    good = safe_dir / "good.exe"
+    good.write_text("good", encoding="utf-8")
+    good.chmod(0o755)
+    monkeypatch.setenv("PATH", str(safe_dir))
+    assert utils.trusted_which("good.exe") == str(good)
+

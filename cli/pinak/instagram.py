@@ -266,8 +266,6 @@ def _download_carousel_parallel(ydl_opts, entries, output_dir, filename_suffix, 
     worker_opts = {k: v for k, v in ydl_opts.items() if k != "progress_hooks"}
     if in_engine():
         worker_opts["progress_hooks"] = [_yt_dlp_hook]
-    before = get_file_snapshot(str(output_dir))
-
     def _work(item):
         index, entry = item
         _say(f"\n[*] Processing slide {index}/{total}...", locked=True)
@@ -296,12 +294,20 @@ def _download_carousel_parallel(ydl_opts, entries, output_dir, filename_suffix, 
         ]
         outcomes = [future.result() for future in futures]
 
-    # Single metadata pass: per-entry snapshots would otherwise see (and
-    # re-tag) sibling threads' files.
-    for f in changed_files(before, get_file_snapshot(str(output_dir))):
-        f_path = Path(f)
-        if f_path.suffix.lower() in (".mp4", ".mkv", ".webm", ".avi", ".m4v"):
-            embed_metadata_in_video(f_path, metadata)
+    # Only the per-entry verified outputs belong to this carousel. A directory
+    # snapshot can include unrelated files written by another process.
+    output_root = Path(output_dir).resolve()
+    tagged: set[Path] = set()
+    for outcome in outcomes:
+        for f in outcome.get("files", []):
+            f_path = Path(f).resolve()
+            if (
+                f_path.is_relative_to(output_root)
+                and f_path not in tagged
+                and f_path.suffix.lower() in (".mp4", ".mkv", ".webm", ".avi", ".m4v")
+            ):
+                embed_metadata_in_video(f_path, metadata)
+                tagged.add(f_path)
     return outcomes
 
 

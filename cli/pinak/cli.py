@@ -20,6 +20,7 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
 from prompt_toolkit.styles import Style
 from rich.console import Console
+from rich.markup import escape
 
 from . import downloader, updater
 from .commands.info import (
@@ -159,6 +160,11 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
         save_config()
         console.print()  # Add empty line for neatness instead of clearing
     print_welcome_screen()
+    update_result = updater.take_update_result()
+    if update_result:
+        style = "green" if update_result["state"] == "succeeded" else "red"
+        marker = "[+]" if update_result["state"] == "succeeded" else "[X]"
+        console.print(f"[{style}]{marker} {escape(update_result['message'])}[/]")
     commands_meta = {
         "/help": "Show this help menu",
         "/clear": "Clear the screen and redraw the Pinak logo and control panel",
@@ -186,6 +192,7 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
         "/delete_his": "Delete history: all, index (e.g. 3), or range (e.g. 2-4)",
         "/ffmpeg": "Download a static FFmpeg build automatically",
         "/update": "Update yt-dlp and Pinak itself to the latest versions",
+        "/version": "Show the version of the running Pinak CLI",
         "/username": "Change and save your username",
         "/greeting": "Change and save your greeting statement",
         "/media": "Launch interactive TUI media player & browser (videos, music, photos)",
@@ -389,6 +396,8 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                     for package, message in results.items():
                         if message.startswith("Updated ") or "already the latest" in message:
                             console.print(f"[green][+] {message}[/]")
+                        elif "queued" in message:
+                            console.print(f"[yellow][*] {message}[/]")
                         else:
                             console.print(f"[red][X] {package}: {message}[/]")
                     # "→" only appears on a real pinak version bump.
@@ -400,6 +409,12 @@ def repl_loop():  # pragma: no cover - interactive TTY loop, exercised manually
                         )
                 except Exception as e:
                     console.print(f"[red][X] Update error: {e}[/]")
+                continue
+
+            if lower_cmd in ("/version", "version"):
+                from . import __version__
+
+                console.print(f"[cyan]Pinak CLI v{__version__}[/]")
                 continue
 
             if lower_cmd == "/delete_his" or lower_cmd.startswith("/delete_his "):
@@ -968,6 +983,12 @@ def main(
     ),
 ):
     """Download a URL or start Pinak's interactive shell. Use `pinak queue --help` for saved jobs."""
+    if url in ("version", "/version"):
+        from . import __version__
+
+        console.print(f"Pinak CLI v{__version__}")
+        raise typer.Exit()
+
     init_config()
     init_db()
     initialize_session()

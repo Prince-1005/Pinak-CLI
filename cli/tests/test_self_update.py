@@ -71,6 +71,7 @@ def test_check_quiet_when_current(monkeypatch):
 
 
 def test_perform_update_reports_bump_and_latest(monkeypatch):
+    monkeypatch.setattr(updater_mod.sys, "platform", "linux")
     seen = {
         "yt-dlp": ["2020.0.0", "2026.1.1"],
         "pinak-cli": ["1.0.0", "1.0.0"],
@@ -94,6 +95,7 @@ def test_perform_update_reports_bump_and_latest(monkeypatch):
 
 
 def test_perform_update_pip_failure_keeps_flag(monkeypatch):
+    monkeypatch.setattr(updater_mod.sys, "platform", "linux")
     monkeypatch.setattr(updater_mod, "_package_version", lambda pkg: "1.0.0")
     monkeypatch.setattr(
         "pinak.subproc.run_cmd",
@@ -107,6 +109,7 @@ def test_perform_update_pip_failure_keeps_flag(monkeypatch):
 
 
 def test_perform_update_exception_reported(monkeypatch):
+    monkeypatch.setattr(updater_mod.sys, "platform", "linux")
     monkeypatch.setattr(updater_mod, "_package_version", lambda pkg: "1.0.0")
 
     def _boom(*a, **k):
@@ -118,66 +121,111 @@ def test_perform_update_exception_reported(monkeypatch):
     assert "Update error" in results["pinak-cli"]
 
 
-def test_perform_update_winerror32_actionable_message(monkeypatch):
+def test_perform_update_defers_pinak_on_windows(monkeypatch):
+    monkeypatch.setattr(updater_mod.sys, "platform", "win32")
     monkeypatch.setattr(updater_mod, "_package_version", lambda pkg: "1.0.0")
+    monkeypatch.setattr(updater_mod, "_fetch_latest_version", lambda pkg: "9.9.9")
+    monkeypatch.setattr(
+        updater_mod, "_schedule_windows_pinak_update", lambda: "Pinak update is queued."
+    )
+    calls = []
+
+    def _run(cmd, **kwargs):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0, stderr="", stdout="")
+
     monkeypatch.setattr(
         "pinak.subproc.run_cmd",
-        lambda *a, **k: SimpleNamespace(
-            returncode=1,
-            stderr="ERROR: Could not install: [WinError 32] The process cannot access the file because it is being used by another process: pinak.exe",
-            stdout="",
-        ),
+        _run,
     )
     results = updater_mod.perform_update()
-    assert "binary is currently in use on Windows" in results["pinak-cli"]
-    assert "pip install --upgrade pinak-cli" in results["pinak-cli"]
+    assert results["pinak-cli"] == "Pinak update is queued."
+    assert len(calls) == 1 and calls[0][-1] == "yt-dlp"
 
 
-def test_perform_update_renames_binary_on_windows(monkeypatch, tmp_path):
-    fake_exe = tmp_path / "pinak.exe"
-    fake_exe.write_text("dummy", encoding="utf-8")
+def test_perform_update_skips_current_pinak_on_windows(monkeypatch):
     monkeypatch.setattr(updater_mod.sys, "platform", "win32")
-    monkeypatch.setattr(updater_mod, "_find_pinak_binary", lambda: fake_exe)
-    monkeypatch.setattr(updater_mod, "_package_version", lambda pkg: "1.0.0")
-
-    seen_during_cmd = []
-
-    def _mock_run(cmd, **kwargs):
-        seen_during_cmd.append(fake_exe.exists())
-        return SimpleNamespace(returncode=0, stderr="", stdout="")
-
-    monkeypatch.setattr("pinak.subproc.run_cmd", _mock_run)
-    updater_mod.perform_update()
-    # While running command for pinak-cli, fake_exe was temporarily renamed to .old
-    assert False in seen_during_cmd
-    # After success, .old target was cleaned up
-    assert fake_exe.exists()
-    assert not (tmp_path / "pinak.exe.old").exists()
+    monkeypatch.setattr(updater_mod, "_package_version", lambda pkg: "2.3.0")
+    monkeypatch.setattr(updater_mod, "_fetch_latest_version", lambda pkg: "2.3.0")
+    monkeypatch.setattr(
+        updater_mod,
+        "_schedule_windows_pinak_update",
+        lambda: (_ for _ in ()).throw(AssertionError("should not queue")),
+    )
+    monkeypatch.setattr(
+        "pinak.subproc.run_cmd",
+        lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout=""),
+    )
+    assert "already the latest" in updater_mod.perform_update()["pinak-cli"]
 
 
-def test_perform_update_renames_and_unlinks_when_new_binary_written(monkeypatch, tmp_path):
-    fake_exe = tmp_path / "pinak.exe"
-    fake_exe.write_text("old_content", encoding="utf-8")
-    monkeypatch.setattr(updater_mod.sys, "platform", "win32")
-    monkeypatch.setattr(updater_mod, "_find_pinak_binary", lambda: fake_exe)
-    monkeypatch.setattr(updater_mod, "_package_version", lambda pkg: "1.0.0")
+def test_windows_schedule_and_update_result(monkeypatch, tmp_path):
+    from pinak.update_worker import write_status
 
-    def _mock_run(cmd, **kwargs):
-        fake_exe.write_text("new_content", encoding="utf-8")
-        return SimpleNamespace(returncode=0, stderr="", stdout="")
+    status = tmp_path / "update-result.json"
+    monkeypatch.setattr(updater_mod, "CONFIG_FILE", str(tmp_path / "config.json"))
+    monkeypatch.setattr(
+        updater_mod.psutil, "Process", lambda pid: SimpleNamespace(
+            parent=lambda: None, create_time=lambda: 1000.0
+        )
+    )
+    launched = []
 
-    monkeypatch.setattr("pinak.subproc.run_cmd", _mock_run)
-    updater_mod.perform_update()
-    assert fake_exe.read_text(encoding="utf-8") == "new_content"
-    assert not (tmp_path / "pinak.exe.old").exists()
+    def fake_popen(cmd, **kwargs):
+        launched.append((cmd, kwargs))
+        write_status(status, "waiting", "Ready")
+        return SimpleNamespace(poll=lambda: None)
+
+    monkeypatch.setattr(
+        updater_mod.subprocess,
+        "Popen",
+        fake_popen,
+    )
+    message = updater_mod._schedule_windows_pinak_update()
+    assert "queued" in message and len(launched) == 1
+    assert launched[0][0][1:3] == ["-m", "pinak.update_worker"]
+    assert json.loads(status.read_text())["state"] == "waiting"
+    assert updater_mod.take_update_result() is None and status.exists()
+    assert "already queued" in updater_mod._schedule_windows_pinak_update()
+    assert len(launched) == 1
+    write_status(status, "succeeded", "Installed version: 9.9.9.")
+    assert updater_mod.take_update_result() == {
+        "state": "succeeded",
+        "message": "Installed version: 9.9.9.",
+    }
+    assert not status.exists()
 
 
-def test_find_pinak_binary(monkeypatch, tmp_path):
-    monkeypatch.setattr(updater_mod.shutil, "which", lambda name: str(tmp_path / name))
-    (tmp_path / "pinak.exe").write_text("x", encoding="utf-8")
-    found = updater_mod._find_pinak_binary()
-    assert found is not None
-    assert found.name == "pinak.exe"
+def test_stale_deferred_update_status_does_not_block_retry(monkeypatch):
+    monkeypatch.setattr(updater_mod.time, "time", lambda: 100.0)
+    assert not updater_mod._status_worker_live({"state": "pending", "time": 1.0})
+    monkeypatch.setattr(
+        updater_mod.psutil,
+        "Process",
+        lambda pid: (_ for _ in ()).throw(updater_mod.psutil.NoSuchProcess(pid)),
+    )
+    assert not updater_mod._status_worker_live(
+        {"state": "waiting", "pid": 999999, "process_started": 1.0}
+    )
+
+
+def test_windows_schedule_falls_back_when_helper_cannot_start(monkeypatch, tmp_path):
+    status = tmp_path / "update-result.json"
+    monkeypatch.setattr(updater_mod, "CONFIG_FILE", str(tmp_path / "config.json"))
+    monkeypatch.setattr(
+        updater_mod.psutil, "Process", lambda pid: SimpleNamespace(
+            parent=lambda: None, create_time=lambda: 1000.0
+        )
+    )
+
+    def fail(*args, **kwargs):
+        raise OSError("launcher blocked")
+
+    monkeypatch.setattr(updater_mod.subprocess, "Popen", fail)
+    message = updater_mod._schedule_windows_pinak_update()
+    assert "Could not start" in message
+    assert "-m pip install --upgrade pinak-cli" in message
+    assert json.loads(status.read_text())["state"] == "failed"
 
 
 def test_run_single_prints_pinak_notice(monkeypatch, capsys):

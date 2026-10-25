@@ -61,3 +61,23 @@ def test_config_and_redaction(tmp_path):
     assert load_policy(config).default_output_dir == tmp_path
     value = clean("https://user:password@example.com/video?token=secret#private password=secret")
     assert "secret" not in value and "user:" not in value and "#private" not in value
+    upper = clean("HTTPS://user:secret@example.com/video?session=private")
+    assert "user:" not in upper and "secret" not in upper and "private" not in upper
+
+
+def test_metadata_probe_with_provisioning_disabled_never_fetches(tmp_path, monkeypatch):
+    from pinak import utils
+    from pinak.media.decoders.probe import MediaProbe
+
+    media = tmp_path / "unrecognized.mp4"
+    media.write_bytes(b"not-a-real-container")
+    monkeypatch.setattr(MediaProbe, "_probe_with_ffprobe", lambda *args, **kwargs: None)
+    monkeypatch.setattr(MediaProbe, "_enrich_tags", lambda *args, **kwargs: None)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Metadata inspection must not provision binaries")
+
+    monkeypatch.setattr("pinak.ffmpeg_setup.ensure_ffmpeg", forbidden)
+    monkeypatch.setattr(utils, "_ensure_static_ffmpeg_paths", forbidden)
+    result = MediaProbe.probe(media, allow_provision=False, include_artwork=False)
+    assert result.duration_seconds == 0.0

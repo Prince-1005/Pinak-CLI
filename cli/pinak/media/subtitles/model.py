@@ -6,6 +6,8 @@ import bisect
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ...text_safety import safe_text
+
 
 @dataclass
 class SubtitleCue:
@@ -33,14 +35,25 @@ class SubtitleTrack:
     file_path: Path | None = None
 
     def __post_init__(self) -> None:
+        self.title = safe_text(self.title)
         # Keep cues sorted by start_sec for fast binary search
         self.cues.sort(key=lambda c: c.start_sec)
         self._start_times = [c.start_sec for c in self.cues]
+        self._max_end_times = self._prefix_max_ends()
+
+    def _prefix_max_ends(self) -> list[float]:
+        maximum = float("-inf")
+        result = []
+        for cue in self.cues:
+            maximum = max(maximum, cue.end_sec)
+            result.append(maximum)
+        return result
 
     def add_cue(self, cue: SubtitleCue) -> None:
         self.cues.append(cue)
         self.cues.sort(key=lambda c: c.start_sec)
         self._start_times = [c.start_sec for c in self.cues]
+        self._max_end_times = self._prefix_max_ends()
 
     def get_active_cues(self, pts: float) -> list[SubtitleCue]:
         """Finds all active cues at the given PTS timestamp."""
@@ -51,13 +64,15 @@ class SubtitleTrack:
         idx = bisect.bisect_right(self._start_times, pts)
         active: list[SubtitleCue] = []
 
-        # Check preceding cues that may still be active (spanning across current pts)
-        check_start = max(0, idx - 10)
-        for i in range(check_start, min(len(self.cues), idx + 2)):
+        # Prefix maxima let us stop as soon as no earlier cue can still overlap.
+        for i in range(idx - 1, -1, -1):
+            if self._max_end_times[i] < pts:
+                break
             cue = self.cues[i]
             if cue.is_active(pts):
                 active.append(cue)
 
+        active.reverse()
         return active
 
     def get_cue_at(self, pts: float) -> SubtitleCue | None:

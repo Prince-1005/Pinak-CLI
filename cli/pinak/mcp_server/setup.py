@@ -7,7 +7,6 @@ import json
 import logging
 import logging.handlers
 import os
-import shutil
 import sqlite3
 import subprocess
 import sys
@@ -49,8 +48,11 @@ def diagnose(policy: Policy | None = None) -> dict[str, Any]:
             'Install this release with python -m pip install "pinak-cli[mcp]" in the same interpreter.'
         )
     binaries = {}
-    for name, path in (("ffmpeg", get_ffmpeg_path()), ("ffprobe", get_ffprobe_path())):
-        found = bool(Path(path).is_file() or shutil.which(path))
+    for name, path in (
+        ("ffmpeg", get_ffmpeg_path(allow_provision=False)),
+        ("ffprobe", get_ffprobe_path(allow_provision=False)),
+    ):
+        found = Path(path).is_file()
         usable = False
         if found:
             try:

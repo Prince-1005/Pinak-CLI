@@ -2,8 +2,11 @@
 
 import os
 
+import pytest
+
 import pinak.downloader as dl_mod
 import pinak.instagram as ig_mod
+from pinak.engine import DownloadRequest, parse_trim_range
 from tests.test_downloader_e2e import FakeYoutubeDL
 
 
@@ -46,6 +49,25 @@ def test_trim_range_flow(tmp_path, monkeypatch):
     result = dl_mod.download_instagram_content("https://x.com/v", outdir, trim_range="00:01-00:05")
     assert result["success"] is True
     assert result["trim_range"] == "00:01-00:05"
+
+
+@pytest.mark.parametrize("value", ["00:99-01:20", "02:00-01:00", "bad", "01:20-01:20"])
+def test_invalid_trim_fails_without_downloading(value, tmp_path, monkeypatch):
+    with pytest.raises(ValueError):
+        parse_trim_range(value)
+    with pytest.raises(ValueError):
+        DownloadRequest.capture("https://example.com/media", trim_range=value)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Invalid trim must not start yt-dlp")
+
+    monkeypatch.setattr(dl_mod.yt_dlp, "YoutubeDL", forbidden)
+    destination = tmp_path / "no-full-download"
+    result = dl_mod.download_media_content(
+        "https://example.com/media", str(destination), trim_range=value
+    )
+    assert result["success"] is False and result["files"] == []
+    assert not destination.exists()
 
 
 def test_cancel_flow_keeps_partials(tmp_path, monkeypatch):

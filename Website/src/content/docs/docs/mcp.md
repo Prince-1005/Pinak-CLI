@@ -43,7 +43,7 @@ You can also ask:
 - **Save and review:** `queue_add`, `queue_list`, `queue_show`.
 - **Run and track:** `queue_start`, `queue_run_status`, `queue_stop`.
 - **Maintain:** `queue_retry`, `queue_cancel`, `queue_remove`, `queue_clean_completed`.
-- **Library:** `library_scan`, `library_list`, `library_search`, `library_show`, tag, collection, bookmark, relink, and forget tools.
+- **Library:** `library_scan`, `library_list`, `library_search`, `library_show`, `library_storage_report`, tag, collection, bookmark, relink, and forget tools.
 
 `queue_cancel` prevents waiting jobs from running; use `queue_stop` for a run owned by the current adapter. Retry applies to failed jobs. Removing records or cleaning completed records keeps downloaded files and history. Local CLI and MCP share the user's queue; Cloud users have separate queues. Tool input schemas and returned errors are authoritative.
 

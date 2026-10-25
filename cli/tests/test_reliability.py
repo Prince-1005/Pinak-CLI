@@ -75,6 +75,15 @@ def test_parallel_carousel_downloads_all_slides(tmp_path, monkeypatch):
     outdir.mkdir()
     _FakeWorkerYDL.outdir = str(outdir)
     monkeypatch.setattr(ig_mod.yt_dlp, "YoutubeDL", _FakeWorkerYDL)
+    original_process = _FakeWorkerYDL.process_video_result
+
+    def process_with_unrelated_file(self, entry, download=True):
+        result = original_process(self, entry, download=download)
+        if entry["id"] == "s1":
+            (outdir / "unrelated.mp4").write_bytes(b"other process")
+        return result
+
+    monkeypatch.setattr(_FakeWorkerYDL, "process_video_result", process_with_unrelated_file)
     embedded = []
     monkeypatch.setattr(ig_mod, "embed_metadata_in_video", lambda p, m: embedded.append(str(p)))
 
@@ -87,8 +96,9 @@ def test_parallel_carousel_downloads_all_slides(tmp_path, monkeypatch):
     )
 
     produced = sorted(p.name for p in outdir.iterdir() if p.suffix == ".mp4")
-    assert produced == ["s1.mp4", "s2.mp4", "s3.mp4"]
+    assert produced == ["s1.mp4", "s2.mp4", "s3.mp4", "unrelated.mp4"]
     assert len(embedded) == 3
+    assert str(outdir / "unrelated.mp4") not in embedded
 
 
 def test_sequential_fallback_without_opts(tmp_path, monkeypatch):

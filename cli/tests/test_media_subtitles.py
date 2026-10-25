@@ -1,10 +1,14 @@
 """Unit tests for the Subtitle engine (model, parser, renderer)."""
 
 from pathlib import Path
+import sys
+
+import pytest
 
 from PIL import Image
 
 from pinak.media.subtitles.model import SubtitleCue, SubtitleTrack
+from pinak.media.subtitles import parser as subtitle_parser
 from pinak.media.subtitles.parser import SubtitleParser
 from pinak.media.subtitles.renderer import SubtitleRenderer
 
@@ -31,6 +35,28 @@ def test_subtitle_track_get_active_cues():
     assert track.get_active_text(3.5) == "First Line"
     assert track.get_active_text(5.0) == "First Line\nSecond Line"
     assert track.get_active_text(14.0) == "Third Line"
+
+
+def test_long_subtitle_remains_visible_after_many_short_overlaps():
+    long = SubtitleCue(index=1, start_sec=0, end_sec=100, text="Long caption")
+    short = [
+        SubtitleCue(index=i + 2, start_sec=i + 1, end_sec=i + 1.1, text="Short")
+        for i in range(13)
+    ]
+    track = SubtitleTrack(track_id=1, cues=[long, *short])
+    assert track.get_active_text(30) == "Long caption"
+
+
+def test_subtitle_input_and_process_output_have_byte_limits(tmp_path, monkeypatch):
+    monkeypatch.setattr(subtitle_parser, "MAX_SUBTITLE_BYTES", 32)
+    oversized = tmp_path / "movie.srt"
+    oversized.write_bytes(b"x" * 33)
+    assert SubtitleParser.parse_file(oversized) is None
+
+    with pytest.raises(ValueError, match="byte limit"):
+        subtitle_parser._run_bounded_stdout(
+            [sys.executable, "-c", "print('x' * 2048)"], timeout=3, max_bytes=100
+        )
 
 
 def test_subtitle_parser_timestamps():
@@ -121,7 +147,6 @@ def test_extract_embedded_subtitles_continue_on_failure(monkeypatch, tmp_path):
     """Verifies that extract_embedded_subtitles continues searching when stream 0 fails (FALLBACK-04)."""
     import subprocess
 
-    monkeypatch.setattr("pinak.media.subtitles.parser.shutil.which", lambda cmd: "/usr/bin/ffmpeg")
     monkeypatch.setattr("pinak.media.subtitles.parser.ensure_ffmpeg", lambda: "/usr/bin/ffmpeg")
 
     calls = []
@@ -141,7 +166,7 @@ def test_extract_embedded_subtitles_continue_on_failure(monkeypatch, tmp_path):
             return subprocess.CompletedProcess(cmd, 0, stdout=srt_content, stderr=b"")
         return subprocess.CompletedProcess(cmd, 1, stdout=b"", stderr=b"")
 
-    monkeypatch.setattr("subprocess.run", fake_run)
+    monkeypatch.setattr("pinak.media.subtitles.parser._run_bounded_stdout", fake_run)
     media_file = tmp_path / "video.mkv"
     media_file.write_bytes(b"dummy")
 
@@ -160,7 +185,7 @@ def test_embedded_tracks_use_language_metadata(monkeypatch, tmp_path):
 
     media = tmp_path / "video.mp4"
     media.write_bytes(b"dummy")
-    monkeypatch.setattr("pinak.media.subtitles.parser.shutil.which", lambda cmd: "ffmpeg")
+    monkeypatch.setattr("pinak.media.subtitles.parser.ensure_ffmpeg", lambda: "ffmpeg")
 
     def run(cmd, **kwargs):
         if "-show_entries" in cmd:
@@ -172,7 +197,7 @@ def test_embedded_tracks_use_language_metadata(monkeypatch, tmp_path):
             cmd, 0, stdout=b"1\n00:00:00,000 --> 00:00:02,000\nCaption\n"
         )
 
-    monkeypatch.setattr("pinak.media.subtitles.parser.subprocess.run", run)
+    monkeypatch.setattr("pinak.media.subtitles.parser._run_bounded_stdout", run)
     tracks = SubtitleParser.extract_embedded_subtitles(media)
     assert [track.label for track in tracks] == ["Hindi", "English"]
     assert [track.language for track in tracks] == ["hin", "eng"]
@@ -243,3 +268,12 @@ def test_real_multilanguage_container_and_player_cycle(tmp_path, monkeypatch):
     assert session.active_sub_idx == -1
     session._handle_action_key("c", 80, 24)
     assert session.active_sub_idx == 0
+
+
+def test_subtitle_metadata_ansi_and_osc_sanitized():
+    malicious_title = "\x1b[2J\x1b]0;evil\x07Malicious Track"
+    track = SubtitleTrack(track_id=1, title=malicious_title)
+    assert "\x1b" not in track.label
+    assert "\x07" not in track.label
+    assert track.label == "Malicious Track"
+

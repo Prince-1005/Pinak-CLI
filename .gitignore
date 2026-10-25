@@ -1,38 +1,63 @@
 # Local downloaded media (user data, not repository source)
 /downloads/
 /cli/downloads/
+media_cache/
+/cli/media_cache/
 
-# Python bytecode and generated package metadata
+# Python bytecode, distributions, and package metadata
 __pycache__/
 *.py[cod]
+*$py.class
 *.egg-info/
 *.egg
-
-# Rebuildable distributions and intermediate build directories
+.eggs/
+*.whl
 dist/
 build/
+/cli/dist/
+/cli/build/
 /cli/release-dist/
 /cli/mcp-release-dist/
 /cli/benchmark-results/
 /cli/mcp-install/
 
-# Local virtual environments, including the audit compatibility environment
+# Node.js and website build artifacts, caches, and test results
+node_modules/
+/Website/node_modules/
+/Website/dist/
+/Website/.astro/
+/Website/.cache/
+/Website/public/generated/
+/Website/src/generated/
+/Website/test-results/
+/Website/playwright-report/
+/Website/.originals/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local virtual environments
 .venv/
-.venv-mcp/
-.venv-audit*/
+.venv*/
 venv/
 env/
 ENV/
 
-# Local Pinak preferences, history, and SQLite sidecars
+# Local credentials and environment files
+.env
+.env.*
+*.env
+
+# Local Pinak preferences, history, updater, and runtime state
 .pinak_config.json
 .pinak_history.json
 .pinak_history.db
 .pinak_history.db-*
 .pinak_cli_history
-
-# Local credentials and environment variables
-.env
+update-result.json
+update_worker.lock
+.pinak_updater.lock
 
 # Test, coverage, type-check, lint, and property-test caches
 .coverage
@@ -43,11 +68,14 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 .hypothesis/
+.tox/
+.nox/
 
 # Generated audit logs and wheel dependency snapshots
 .audit-*
+*.audit
+/cli/.audit-*
 /unnecessary_files/
-
 phases
 
 # Local MCP implementation plans and superseded progress/session reports
@@ -65,15 +93,41 @@ phases
 /MCP(cloud)/backups/
 /MCP(cloud)/dist/
 
-# OS and editor files
+# OS, editor, and temporary scratch files
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
 *.swp
 *.swo
+*~
+*.tmp
+*.temp
+*.bak
+*.backup
 .vscode/
 .idea/
+*.sublime-project
+*.sublime-workspace
 
+# Local audit reports, scratch notes, and work-in-progress specs
+AUDIT_*.md
+*AUDIT*.md
 AUDIT_REMEDIATION.md
 FINAL_PUSH_AND_INSTALL_AUDIT_2026-10-17.md
 PROJECT_AUDIT_2026-10-17.md
 SYSTEM_VULNERABILITY_AND_BUG_AUDIT.md
+DEEP_SYSTEM_AUDIT_2026-10-25.md
+RELEASE_READINESS.md
+PROJECT_NEXT_STEPS.md
+/Remaining Feature/
+/cli/ex.txt
+/cli/ex*.txt
+ex.txt
+scratch/
+.scratch/
+tmp/
+.tmp/

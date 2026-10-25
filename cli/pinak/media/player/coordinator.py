@@ -802,7 +802,9 @@ class MediaSession:
                 )
                 else "OFF"
             )
-            sub_str = f" │ CC: {sub_lbl}" if getattr(self, "subtitle_tracks", None) else ""
+            sub_str = (
+                f" │ CC: {safe_text(sub_lbl)}" if getattr(self, "subtitle_tracks", None) else ""
+            )
             l2_left = (
                 f"   [Res: {prof_lbl} | {self.renderer.mode_name.upper()}]{sub_str} │ {orig_str}"
             )

@@ -19,7 +19,14 @@ from rich.progress import (
 from rich.table import Table
 
 from .config import config as config  # Public compatibility for callers/tests patching settings.
-from .engine import SilentProgress, active_setting, emit_message, emit_progress, in_engine
+from .engine import (
+    SilentProgress,
+    active_setting,
+    emit_message,
+    emit_progress,
+    in_engine,
+    parse_trim_range,
+)
 from .exceptions import (
     DownloadFailedError,
     FFmpegNotFoundError,
@@ -37,7 +44,7 @@ from .logging_setup import get_logger
 from .notify import notify, print_instagram_notice
 from .retry import backoff_delay, is_rate_limited, is_retryable, sleep_with_interrupt
 from .subtitle_preferences import normalize_subtitle_languages
-from .text_safety import safe_rich, safe_text
+from .text_safety import safe_rich, safe_text, safe_url_for_log
 from .utils import (
     GREEN,
     RED,
@@ -83,7 +90,11 @@ def _progress_factory(*args, **kwargs):
 
 
 def _socket_timeout() -> float:
-    """Separate connect/read timeouts: yt-dlp gets the read timeout."""
+    """yt-dlp exposes one socket deadline, so honor the stricter configured cap."""
+    return min(_connect_timeout(), _read_timeout())
+
+
+def _read_timeout() -> float:
     try:
         return float(active_setting("read_timeout", 30))
     except (TypeError, ValueError):
@@ -369,6 +380,22 @@ def download_media_content(
     """Download media from any supported platform using yt-dlp."""
     global is_downloading
 
+    if trim_range:
+        try:
+            start_sec, end_sec = parse_trim_range(trim_range)
+        except ValueError as exc:
+            return {
+                "success": False,
+                "partial": False,
+                "url": post_url,
+                "audio": extract_audio,
+                "quality": quality,
+                "info": {},
+                "files": [],
+                "errors": [str(exc)],
+                "trim_range": trim_range,
+            }
+
     import urllib.parse
 
     parsed_url = urllib.parse.urlparse(post_url)
@@ -419,23 +446,23 @@ def download_media_content(
 
     if trim_range:
         try:
-            start_str, end_str = trim_range.split("-")
-
-            def pt(t_str):
-                s = 0
-                for p in t_str.split(":"):
-                    s = s * 60 + float(p)
-                return s
-
-            start_sec = pt(start_str)
-            end_sec = pt(end_str)
             ydl_opts["download_ranges"] = yt_dlp.utils.download_range_func(
                 None, [[start_sec, end_sec]]
             )
             suffix += f" (Trim {trim_range.replace(':', '.')})"
             ydl_opts["outtmpl"] = f"{target_dir}/%(title)s{suffix}.%(ext)s"
         except Exception as e:
-            _console_print(f"[yellow][!] Error parsing trim range: {e}. Downloading full file.[/]")
+            return {
+                "success": False,
+                "partial": False,
+                "url": post_url,
+                "audio": extract_audio,
+                "quality": chosen_quality,
+                "info": {},
+                "files": [],
+                "errors": [f"Could not configure trim: {e}"],
+                "trim_range": trim_range,
+            }
 
     has_ffmpeg = ffmpeg_available()
 
@@ -641,7 +668,9 @@ def download_media_content(
         if bad_files:
             msg = f"Integrity check failed for {len(bad_files)} file(s): {bad_files}"
             logger.errors.append(msg)
-            get_logger("pinak.downloader").warning("%s (url=%s)", msg, post_url)
+            get_logger("pinak.downloader").warning(
+                "%s (url=%s)", msg, safe_url_for_log(post_url)
+            )
             _console_print(f"[yellow][!] Warning: {msg}[/]")
         new_files = valid_files
         success = bool(new_files) and not logger.errors

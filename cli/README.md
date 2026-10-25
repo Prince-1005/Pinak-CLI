@@ -1,4 +1,4 @@
-# Pinak CLI 2.2.0
+# Pinak CLI 2.3.0
 
 See [CLI_README.md](CLI_README.md) for usage and
 [OPERATIONS.md](OPERATIONS.md) for current configuration, playback, recovery,

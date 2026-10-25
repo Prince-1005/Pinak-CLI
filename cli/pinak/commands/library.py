@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shlex
 import sqlite3
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -13,7 +15,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from .. import library
+from .. import library, library_storage
 from ..text_safety import safe_rich, safe_text
 
 console = Console()
@@ -42,6 +44,15 @@ def _parser(prog: str) -> argparse.ArgumentParser:
     relink.add_argument("path")
     forget = actions.add_parser("forget", help="Remove an item from the catalog, keeping its file")
     forget.add_argument("id", type=int)
+    storage = actions.add_parser("storage", help="Report catalog sizes and selected file status")
+    storage.add_argument("--root")
+    storage.add_argument("--collection", type=int)
+    storage.add_argument("--refresh", action="store_true")
+    storage.add_argument("--limit", type=int, default=25)
+    storage.add_argument("--cursor", type=int, default=0)
+    storage.add_argument("--root-cursor", type=int, default=0)
+    storage.add_argument("--collection-cursor", type=int, default=0)
+    storage.add_argument("--json", action="store_true")
 
     tag = actions.add_parser("tag", help="Add or remove an item tag").add_subparsers(
         dest="operation", required=True
@@ -163,6 +174,58 @@ def main(argv: Sequence[str], *, prog: str = "pinak library") -> int:
         elif args.action == "forget":
             library.forget(args.id)
             console.print(f"Forgot item #{args.id}. Its media file was kept.")
+        elif args.action == "storage":
+            result = library_storage.report(
+                refresh=args.refresh,
+                root=args.root,
+                collection_id=args.collection,
+                limit=args.limit,
+                cursor=args.cursor,
+                root_cursor=args.root_cursor,
+                collection_cursor=args.collection_cursor,
+            )
+            if args.json:
+                sys.stdout.write(json.dumps(result, ensure_ascii=False) + "\n")
+            else:
+                console.print(
+                    f"{result['items']} catalog item(s), "
+                    f"{result['catalog_logical_bytes']} recorded logical bytes "
+                    f"({result['measurement']})."
+                )
+                if args.refresh:
+                    console.print(
+                        f"{result['current_available_bytes']} current bytes; "
+                        f"{result['missing']} missing, {result['unreadable']} unreadable, "
+                        f"{result['not_regular_file']} non-file."
+                    )
+                for kind, values in sorted(result["by_type"].items()):
+                    console.print(
+                        f"{kind}: {values['items']} item(s), "
+                        f"{values['catalog_logical_bytes']} recorded bytes"
+                    )
+                for group in result["collections"]:
+                    console.print(
+                        f"Collection #{group['id']} {safe_rich(group['name'])}: "
+                        f"{group['catalog_logical_bytes']} recorded bytes"
+                    )
+                console.print("Collection totals overlap and must not be added together.")
+                for capacity in result["capacity"]:
+                    if "status" in capacity:
+                        console.print(f"{safe_rich(capacity['root'])}: capacity unavailable")
+                    else:
+                        console.print(
+                            f"{safe_rich(capacity['root'])}: {capacity['free_bytes']} free of "
+                            f"{capacity['total_bytes']} shared filesystem bytes"
+                        )
+                for item in result["largest"]:
+                    console.print(
+                        f"#{item['id']} {item['catalog_bytes']} B "
+                        f"{safe_rich(item['path'])} ({item['status']})"
+                    )
+            if args.refresh and (
+                result["missing"] or result["unreadable"] or result["not_regular_file"]
+            ):
+                return 1
         elif args.action == "tag":
             if args.operation == "add":
                 library.tag_add(args.id, args.name)

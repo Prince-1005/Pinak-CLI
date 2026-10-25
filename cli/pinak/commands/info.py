@@ -77,6 +77,7 @@ def print_help() -> None:
 
     help_items = [
         ("/help", "Show this help menu"),
+        ("/version", "Show the version of the running Pinak CLI"),
         ("/doctor", "Check Python, yt-dlp, FFmpeg, internet, and output folder"),
         ("/config", "Show saved preferences"),
         ("/stats", "Show download analytics and insights"),

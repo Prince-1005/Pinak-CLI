@@ -7,6 +7,34 @@ Release notes are maintained manually; automatic release creation is disabled.
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-10-25
+
+### Added
+- Add `pinak library storage` CLI command and `library_storage_report` MCP tool for reporting disk usage, file counts, and breakdown across approved root locations and collections, with `--refresh` cache updating and cursor-based pagination.
+- Add `/version` interactive command and `pinak version` CLI command for displaying version, environment, and runtime details.
+- Add deferred Windows self-update worker staging with rollback wheel backups, cross-process lock files, and worker PID liveness validation.
+- Implement comprehensive safety bounds for subtitle extraction and parsing: 8 MB byte limit, 10,000 cue limit, bounded external process output, and max sibling track quotas.
+- Accelerate subtitle cue overlap lookups using prefix-maxima window scanning (`_prefix_max_ends`) for linear-time retrieval.
+
+### Security
+- Enforce trusted executable path resolution (`trusted_which` and `ensure_ffmpeg`) for subtitle extraction and uninstaller binaries.
+- Protect custom data directories during uninstallation by restricting file purging to known database files (`_DATA_FILES`) and only deleting directory if empty.
+- Sanitize ANSI escape sequences, including OSC and CSI controls, from subtitle track labels and media header displays.
+- Redact credentials and query strings case-insensitively (`re.IGNORECASE`) in policy validation and URL log sanitization (`safe_url_for_log`).
+- Protect Cloud MCP file downloads against symlink TOCTOU race conditions using pinned file descriptors (`open_link`), `O_NOFOLLOW`, and `st_dev`/`st_ino` verification.
+- Enforce file download concurrency limits (`asyncio.Semaphore(16)`) and sliding-window rate limits in Cloud MCP.
+- Wrap egress proxy connections in strict timeouts using `asyncio.wait_for`.
+
+### Fixed
+- Scope `library_collection_list` to approved roots, omit collections containing only unapproved files, and preserve empty collections (`item_count: 0`).
+- Scope `library_storage` root names strictly to approved roots, order consistently, and page collections and roots cleanly without raw SQL interpolation.
+- Consistently propagate `allow_provision=False` to `_find_ffmpeg` and `get_ffmpeg_path` to avoid unexpected provisioning.
+- Cache tenant storage calculations with a 5-second TTL and increase storage monitor polling interval to reduce filesystem overhead.
+- Validate updater worker process liveness using process creation time (`psutil.Process(pid).create_time()`) to avoid PID collision errors.
+- Derive Instagram carousel download outcome targets only from successful slide output paths.
+- Validate trim ranges during initial request capture (`parse_trim_range`) and return structured error responses rather than silently falling back to full-length media downloads.
+- Cap yt-dlp `socket_timeout` using `min(_connect_timeout(), _read_timeout())` to avoid stalled network connections.
+
 ## [2.2.0] - 2026-10-20
 
 ### Added

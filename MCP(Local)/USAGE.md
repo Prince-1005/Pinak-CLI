@@ -62,7 +62,7 @@ Run `configure` with the **installed environment's Python**. It prints these fie
 Enter those fields in the client's local MCP settings or translate them into its
 documented config format. No shell activation script is needed. A client that
 accepts only HTTP/SSE URLs is incompatible with this version. Restart/reload the
-host if required by that application, then discover the thirty-three Pinak tools.
+host if required by that application, then discover the thirty-four Pinak tools.
 
 For a host using Claude Desktop's mcpServers JSON format, preview explicitly with
 `pinak-mcp configure --client claude-desktop`. `--apply` merges Pinak's entry with

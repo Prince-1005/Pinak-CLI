@@ -48,9 +48,9 @@ Install FFmpeg/FFprobe explicitly for conversion, merging, and metadata inspecti
 
 Enter these in your application's local MCP settings, then reload/reconnect. Configuration formats vary between clients. No shell activation script is required. A remote-URL-only client cannot launch this edition.
 
-Discover thirty-three tools, then ask the AI to queue a URL, start the queue, and inspect its status. Adding alone does not start downloading. The default download location is your user's `Downloads/Pinak` folder. CLI and Local MCP share the existing per-user queue, history, and Library.
+Discover thirty-four tools, then ask the AI to queue a URL, start the queue, and inspect its status. Adding alone does not start downloading. The default download location is your user's `Downloads/Pinak` folder. CLI and Local MCP share the existing per-user queue, history, and Library.
 
-For example, ask: “Show my recent Pinak history, then scan my approved Downloads/Pinak folder and find the audio I downloaded yesterday.” The AI can call `history_list`, `history_show`, `library_scan`, and `library_search`. Library scans and returned paths stay inside the output/read roots in your MCP policy. `library_bookmark_show` returns a saved time; it does not start the terminal player inside an AI chat. To play locally, use `pinak library play <ID>`.
+For example, ask: “Show my recent Pinak history, then scan my approved Downloads/Pinak folder and find the audio I downloaded yesterday.” The AI can call `history_list`, `history_show`, `library_scan`, `library_search`, and `library_storage_report`. Library scans and returned paths stay inside the output/read roots in your MCP policy. `library_bookmark_show` returns a saved time; it does not start the terminal player inside an AI chat. To play locally, use `pinak library play <ID>`.
 
 ## 4. Configure storage and update safely
 

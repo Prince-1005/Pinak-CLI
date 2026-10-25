@@ -1,6 +1,6 @@
 # Public tool contract 1.1
 
-These thirty-three tools are implemented with the official SDK. Input schemas are
+These thirty-four tools are implemented with the official SDK. Input schemas are
 generated from `cli/pinak/mcp_server/models.py`; actual SDK discovery/call tests
 verify the protocol. Desktop-client acceptance remains a separate release gate.
 
@@ -61,6 +61,9 @@ results; IDs remain integers for queue jobs and opaque strings for runs.
   root. Report partial scan errors; never start a background or arbitrary scan.
 - `library_list(media_type?, cursor?, limit=25)`, `library_search(query?, tag?, cursor?,
   limit=25)`, `library_show(media_id)`: paginated, root-scoped catalog reads.
+- `library_storage_report(root?, collection_id?, cursor?, limit=25)`:
+  cached logical size totals for approved catalog paths, with overlapping
+  collection totals labelled. It does not stat files or reveal host capacity.
 - `library_tag_add/remove(media_id, name, request_key)`: edit one item's tags.
 - `library_collection_create(name, request_key)`, `library_collection_list`,
   `library_collection_show(collection_id)`, `library_collection_add/remove`, and

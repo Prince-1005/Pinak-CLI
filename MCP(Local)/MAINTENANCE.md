@@ -2,7 +2,7 @@
 
 ## Compatibility baseline
 
-- Package: current source 2.2.0, shared with CLI; publish separately after CI passes.
+- Package: current source 2.3.0, shared with CLI; publish separately after CI passes.
 - Python: 3.10–3.14, Windows/macOS/Linux CI; preserve ordinary CLI support.
 - Official SDK: 2.3.0, optional `mcp` extra. No Node dependency at user runtime.
 - Transport: local stdio. SDK client 2.3.0 and Inspector 2.11.0 interoperability

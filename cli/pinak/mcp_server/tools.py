@@ -12,7 +12,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from .. import __version__, history, library
+from .. import __version__, history, library, library_storage
 from .. import queue as core
 from ..engine import DownloadRequest
 from . import CONTRACT_VERSION, SERVER_NAME, models
@@ -73,6 +73,11 @@ DEFINITIONS: dict[str, tuple[type[models.StrictModel], str, bool]] = {
     "library_list": (models.LibraryList, "Page through local Library items.", True),
     "library_search": (models.LibrarySearch, "Search Library titles, paths and tags.", True),
     "library_show": (models.LibraryRef, "Inspect a Library item, tags and bookmarks.", True),
+    "library_storage_report": (
+        models.LibraryStorage,
+        "Report cached logical sizes for approved Library items; collection totals overlap.",
+        True,
+    ),
     "library_tag_add": (models.LibraryTag, "Tag one Library item.", False),
     "library_tag_remove": (models.LibraryTag, "Remove a tag from one item.", False),
     "library_collection_create": (models.CollectionCreate, "Create an ordered collection.", False),
@@ -549,6 +554,21 @@ class Tools:
             ).fetchone()[0]
         return {**self._library_data(item), "tags": library.tags(item.id), "bookmarks_count": count}
 
+    def library_storage_report(self, model: models.LibraryStorage) -> dict[str, Any]:
+        roots = [*(self.policy.output_roots or []), *self.policy.read_roots]
+        if model.root is not None:
+            read_path(model.root, self.policy)
+        return library_storage.report(
+            root=model.root,
+            collection_id=model.collection_id,
+            cursor=model.cursor or 0,
+            root_cursor=model.root_cursor,
+            collection_cursor=model.collection_cursor,
+            limit=model.limit,
+            allowed_roots=roots,
+            include_capacity=False,
+        )
+
     def library_tag_add(self, model: models.LibraryTag) -> dict[str, Any]:
         label, key = library._name(model.name)
 
@@ -595,17 +615,36 @@ class Tools:
         return self._library_edit("library_collection_create", model, action)
 
     def library_collection_list(self, model: models.CollectionPage) -> dict[str, Any]:
+        roots = [*(self.policy.output_roots or []), *self.policy.read_roots]
+        visible: list[dict[str, Any]] = []
+        next_id = model.cursor or 9223372036854775807
         with contextlib.closing(library._connect()) as conn:
-            rows = conn.execute(
-                "SELECT c.id,c.name,COUNT(ci.media_id) AS item_count FROM collections c "
-                "LEFT JOIN collection_items ci ON ci.collection_id=c.id "
-                "WHERE c.id < ? GROUP BY c.id ORDER BY c.id DESC LIMIT ?",
-                (model.cursor or 9223372036854775807, model.limit + 1),
-            ).fetchall()
+            while len(visible) <= model.limit:
+                rows = conn.execute(
+                    "SELECT id,name FROM collections WHERE id < ? ORDER BY id DESC LIMIT 100",
+                    (next_id,),
+                ).fetchall()
+                if not rows:
+                    break
+                for row in rows:
+                    next_id = int(row["id"])
+                    items = conn.execute(
+                        "SELECT m.path FROM collection_items ci "
+                        "JOIN media m ON m.id=ci.media_id WHERE ci.collection_id=?",
+                        (next_id,),
+                    ).fetchall()
+                    total_items = len(items)
+                    permitted_count = sum(permitted(Path(item[0]), roots) for item in items)
+                    if total_items == 0 or permitted_count > 0:
+                        visible.append(
+                            {"id": next_id, "name": row["name"], "item_count": permitted_count}
+                        )
+                    if len(visible) > model.limit:
+                        break
         return {
-            "items": [dict(row) for row in rows[: model.limit]],
-            "has_more": len(rows) > model.limit,
-            "next_cursor": rows[model.limit - 1]["id"] if len(rows) > model.limit else None,
+            "items": visible[: model.limit],
+            "has_more": len(visible) > model.limit,
+            "next_cursor": visible[model.limit - 1]["id"] if len(visible) > model.limit else None,
         }
 
     def library_collection_show(self, model: models.CollectionShow) -> dict[str, Any]:

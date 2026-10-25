@@ -9,33 +9,33 @@ import pinak.uninstall as uninst_mod
 
 
 def test_detect_uninstall_cmd_uv(monkeypatch):
-    monkeypatch.setattr(uninst_mod.shutil, "which", lambda cmd: "/bin/uv" if cmd == "uv" else None)
+    monkeypatch.setattr(uninst_mod, "trusted_which", lambda cmd: "/bin/uv" if cmd == "uv" else None)
 
     def mock_run(cmd, *a, **k):
-        if cmd == ["uv", "tool", "list"]:
+        if cmd == ["/bin/uv", "tool", "list"]:
             return types.SimpleNamespace(returncode=0, stdout="pinak-cli v1.1.1\n")
         return types.SimpleNamespace(returncode=1, stdout="")
 
     monkeypatch.setattr(uninst_mod.subprocess, "run", mock_run)
-    assert uninst_mod.detect_uninstall_cmd() == ["uv", "tool", "uninstall", "pinak-cli"]
+    assert uninst_mod.detect_uninstall_cmd() == ["/bin/uv", "tool", "uninstall", "pinak-cli"]
 
 
 def test_detect_uninstall_cmd_pipx(monkeypatch):
     monkeypatch.setattr(
-        uninst_mod.shutil, "which", lambda cmd: "/bin/pipx" if cmd == "pipx" else None
+        uninst_mod, "trusted_which", lambda cmd: "/bin/pipx" if cmd == "pipx" else None
     )
 
     def mock_run(cmd, *a, **k):
-        if cmd == ["pipx", "list", "--short"]:
+        if cmd == ["/bin/pipx", "list", "--short"]:
             return types.SimpleNamespace(returncode=0, stdout="pinak-cli 1.1.1\n")
         return types.SimpleNamespace(returncode=1, stdout="")
 
     monkeypatch.setattr(uninst_mod.subprocess, "run", mock_run)
-    assert uninst_mod.detect_uninstall_cmd() == ["pipx", "uninstall", "pinak-cli"]
+    assert uninst_mod.detect_uninstall_cmd() == ["/bin/pipx", "uninstall", "pinak-cli"]
 
 
 def test_detect_uninstall_cmd_fallback_pip(monkeypatch):
-    monkeypatch.setattr(uninst_mod.shutil, "which", lambda cmd: None)
+    monkeypatch.setattr(uninst_mod, "trusted_which", lambda cmd: None)
     cmd = uninst_mod.detect_uninstall_cmd()
     assert cmd[-3:] == ["pip", "uninstall", "-y"] or cmd[-1] == "pinak-cli"
 
@@ -66,6 +66,23 @@ def test_purge_user_data(tmp_path, monkeypatch):
     assert not legacy_db.exists()
 
 
+def test_custom_data_directory_keeps_unrelated_files(tmp_path, monkeypatch):
+    custom = tmp_path / "shared"
+    custom.mkdir()
+    (custom / "history.db").write_bytes(b"pinak")
+    unrelated = custom / "notes.txt"
+    unrelated.write_text("keep", encoding="utf-8")
+    monkeypatch.setattr(uninst_mod, "data_dir", str(custom))
+    monkeypatch.setattr(uninst_mod, "config_dir", str(tmp_path / "missing-config"))
+    monkeypatch.setattr(uninst_mod, "legacy_db_file", str(tmp_path / "missing-legacy"))
+    monkeypatch.setattr(uninst_mod, "command_history_file", str(tmp_path / "missing-history"))
+    removed = uninst_mod.purge_user_data(include_cache=False)
+    assert str(custom / "history.db") in removed
+    assert not (custom / "history.db").exists()
+    assert unrelated.read_text(encoding="utf-8") == "keep"
+    assert custom.is_dir()
+
+
 def test_execute_uninstallation_posix(monkeypatch):
     monkeypatch.setattr(uninst_mod.sys, "platform", "linux")
 
@@ -78,6 +95,7 @@ def test_execute_uninstallation_posix(monkeypatch):
 
 def test_execute_uninstallation_windows(monkeypatch):
     monkeypatch.setattr(uninst_mod.sys, "platform", "win32")
+    monkeypatch.setattr(uninst_mod, "_powershell_path", lambda: "C:/Windows/powershell.exe")
     monkeypatch.setattr(uninst_mod.subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
     monkeypatch.setattr(uninst_mod.subprocess, "DETACHED_PROCESS", 0x00000008, raising=False)
     popen_called = []
@@ -98,7 +116,7 @@ def test_execute_uninstallation_windows(monkeypatch):
     ]
     assert uninst_mod.execute_uninstallation(cmd_with_spaces) is True
     assert len(popen_called) == 1
-    assert popen_called[0][0] == "powershell"
+    assert popen_called[0][0] == "C:/Windows/powershell.exe"
     script = popen_called[0][3]
     assert "& 'C:\\Program Files\\Python311\\python.exe'" in script
 

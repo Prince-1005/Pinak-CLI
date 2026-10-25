@@ -39,6 +39,17 @@ pinak library play 12 --from-start
 
 A collection is an ordered playlist of cataloged files. Playback skips missing files. Audio and video playback saves progress periodically and when paused or closed. Near the end of a track, progress resets so the next play starts at the beginning. `--from-start` overrides saved progress for that playback.
 
+## Check catalog storage
+
+```sh
+pinak library storage
+pinak library storage --refresh
+pinak library storage --root "path/to/your/media" --refresh --json
+pinak library storage --collection 1
+```
+
+The default report uses file sizes recorded when items were cataloged. `--refresh` stats cataloged paths without scanning new folders or changing the catalog, and reports missing or unreadable paths separately. Collection totals can overlap, so they should not be added together. Filesystem capacity is shared space, and the report does not measure physical disk allocation. The MCP `library_storage_report` tool returns only cached totals for approved paths and omits host capacity.
+
 ## Save a moment
 
 ```sh

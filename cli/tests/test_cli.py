@@ -70,6 +70,45 @@ def test_version_flag():
     assert __version__ in result.output
 
 
+def test_version_command():
+    from pinak import __version__
+
+    result = runner.invoke(app, ["version"])
+    assert result.exit_code == 0
+    assert f"Pinak CLI v{__version__}" in result.output
+
+
+def test_interactive_version_command(monkeypatch):
+    from io import StringIO
+
+    from rich.console import Console
+
+    from pinak import __version__
+    from pinak import cli as cli_mod
+
+    output = StringIO()
+    prompts = iter(["/version", "/exit"])
+    monkeypatch.setitem(cli_mod.config, "username", "Tester")
+    monkeypatch.setattr(cli_mod, "console", Console(file=output, force_terminal=False))
+    monkeypatch.setattr(cli_mod, "PromptSession", lambda **kwargs: SimplePrompt(prompts))
+    monkeypatch.setattr(cli_mod, "print_banner", lambda: None)
+    monkeypatch.setattr(cli_mod, "print_welcome_screen", lambda: None)
+    monkeypatch.setattr(cli_mod, "print_exit_screen", lambda **kwargs: None)
+    monkeypatch.setattr(cli_mod, "print_separator", lambda: None)
+    monkeypatch.setattr(cli_mod.updater, "start_background_update_check", lambda: None)
+    monkeypatch.setattr(cli_mod.updater, "take_update_result", lambda: None)
+    cli_mod.repl_loop()
+    assert f"Pinak CLI v{__version__}" in output.getvalue()
+
+
+class SimplePrompt:
+    def __init__(self, commands):
+        self.commands = commands
+
+    def prompt(self, *args, **kwargs):
+        return next(self.commands)
+
+
 def test_failed_download_exits_nonzero(monkeypatch):
     def fake_fail(url, **kwargs):
         return {"success": False, "url": url, "files": [], "errors": ["boom"]}

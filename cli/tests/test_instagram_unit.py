@@ -1,4 +1,4 @@
-"""Unit tests for instagram helpers: metadata, thumbnails, retry, errors."""
+from pathlib import Path
 
 import pytest
 
@@ -213,3 +213,31 @@ def test_download_instagram_media_extract_failure(monkeypatch, tmp_path):
 
     with pytest.raises(InstagramError):
         ig_mod.download_instagram_media("https://www.instagram.com/p/abc/", str(tmp_path))
+
+
+def test_download_carousel_parallel_does_not_touch_unrelated_videos(tmp_path, monkeypatch):
+    out_dir = tmp_path / "downloads"
+    out_dir.mkdir()
+    unrelated = out_dir / "unrelated.mp4"
+    unrelated.write_bytes(b"not-part-of-carousel")
+
+    slide_file = out_dir / "slide1.mp4"
+    slide_file.write_bytes(b"slide-content")
+
+    tagged_files = []
+    monkeypatch.setattr(
+        ig_mod, "embed_metadata_in_video", lambda p, meta: tagged_files.append(Path(p).resolve())
+    )
+    monkeypatch.setattr(
+        ig_mod,
+        "_download_entry",
+        lambda ydl, entry, out_d, idx, suff, meta, **kwargs: {"files": [str(slide_file)]},
+    )
+
+    outcomes = ig_mod._download_carousel_parallel(
+        {}, [{"id": "1"}], str(out_dir), "", {"title": "Test"}
+    )
+    assert len(outcomes) == 1
+    assert tagged_files == [slide_file.resolve()]
+    assert unrelated.resolve() not in tagged_files
+

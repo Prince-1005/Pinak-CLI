@@ -7,7 +7,6 @@ import logging
 import math
 import os
 import re
-import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -86,7 +85,9 @@ class MediaProbe:
         )
         if ffprobe_meta is not None:
             if ffprobe_meta.duration_seconds <= 0.0:
-                ffprobe_meta.duration_seconds = cls._probe_duration_with_ffmpeg(path)
+                ffprobe_meta.duration_seconds = cls._probe_duration_with_ffmpeg(
+                    path, allow_provision=allow_provision
+                )
             (
                 cls._enrich_tags(path, ffprobe_meta)
                 if include_artwork
@@ -112,7 +113,7 @@ class MediaProbe:
                 return audio_meta
 
         # Default fallback container with ffmpeg duration probe
-        ffmpeg_dur = cls._probe_duration_with_ffmpeg(path)
+        ffmpeg_dur = cls._probe_duration_with_ffmpeg(path, allow_provision=allow_provision)
         media_type: Literal["picture", "video", "audio"] = (
             cast(Literal["picture", "video", "audio"], magic_type)
             if magic_type in ("picture", "video", "audio")
@@ -196,21 +197,28 @@ class MediaProbe:
         return meta
 
     @classmethod
-    def _find_ffmpeg(cls) -> str | None:
+    def _find_ffmpeg(cls, *, allow_provision: bool = True) -> str | None:
         try:
-            from ...ffmpeg_setup import ensure_ffmpeg
+            if allow_provision:
+                from ...ffmpeg_setup import ensure_ffmpeg
 
-            fetched = ensure_ffmpeg()
-            if fetched and (os.path.exists(fetched) or shutil.which(fetched)):
+                fetched = ensure_ffmpeg()
+            else:
+                from ...utils import get_ffmpeg_path
+
+                fetched = get_ffmpeg_path(allow_provision=False)
+            if fetched and os.path.isfile(fetched):
                 return fetched
         except Exception:
             pass
         return None
 
     @classmethod
-    def _probe_duration_with_ffmpeg(cls, path: Path) -> float:
+    def _probe_duration_with_ffmpeg(
+        cls, path: Path, *, allow_provision: bool = True
+    ) -> float:
         """Extracts container duration using ffmpeg -hide_banner -i when ffprobe is missing."""
-        ffmpeg_bin = cls._find_ffmpeg()
+        ffmpeg_bin = cls._find_ffmpeg(allow_provision=allow_provision)
         if not ffmpeg_bin:
             return 0.0
         try:
@@ -241,8 +249,8 @@ class MediaProbe:
         else:
             from ...utils import get_ffprobe_path
 
-            ffprobe_bin = get_ffprobe_path()
-        if not ffprobe_bin or not (os.path.isfile(ffprobe_bin) or shutil.which(ffprobe_bin)):
+            ffprobe_bin = get_ffprobe_path(allow_provision=False)
+        if not ffprobe_bin or not os.path.isfile(ffprobe_bin):
             return None
 
         cmd = [

@@ -1,4 +1,4 @@
-# 🔱 PINAK CLI 2.2.0 — Media Content Downloader
+# 🔱 PINAK CLI 2.3.0 — Media Content Downloader
 
 PINAK CLI is a powerful, highly aesthetic command-line media downloader wrapper around `yt-dlp` and `ffmpeg`. It features a rich, interactive REPL shell with auto-completions, suggestions, customized banners, diagnostic tools, and automatic download tracking.
 
@@ -132,10 +132,13 @@ any time with:
 /update
 ```
 
-This runs `pip install --upgrade yt-dlp` and `pip install --upgrade
-pinak-cli`, tells you exactly what changed (`Updated … 1.0.0 → 1.1.0` vs
-`already the latest`), and — if Pinak itself was upgraded — asks you to
-restart the CLI (`/exit`, then run `pinak` again) so the new version loads.
+This upgrades yt-dlp in the current Python environment. On Windows, Pinak queues
+its own upgrade until you exit with `/exit`, because Windows may lock the running
+`pinak.exe`. Wait for the helper to finish, then launch `pinak` again; the result
+appears on that next launch. If helper startup fails, use the displayed command
+after exiting Pinak. On macOS and Linux, Pinak upgrades immediately and asks you
+to restart the CLI if its version changed. Use `/version` inside Pinak, or
+`pinak version` from your terminal, to see the running version.
 
 ---
 
@@ -162,6 +165,7 @@ When running the interactive REPL shell (`pinak`), the following commands are av
 | `/open` | Open the downloads directory in File Explorer |
 | `/platform [q]` | List supported platforms or search filter them |
 | `/update` | Update yt-dlp and Pinak CLI to the latest versions |
+| `/version` | Show the running Pinak CLI version |
 | `/ffmpeg` | Download a static FFmpeg build automatically |
 | `/exit` | Terminate the interactive REPL shell |
 

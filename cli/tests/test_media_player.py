@@ -712,6 +712,15 @@ def test_coordinator_video_repeat_mode_cycling(tmp_path: Path):
     # Header and footer checks for video: [r] Repeat must be present
     hdr = session._build_responsive_header(130, "movie.mp4")
     assert "Rep: OFF" in hdr
+    from pinak.media.subtitles.model import SubtitleTrack
+
+    session.subtitle_tracks = [SubtitleTrack(track_id=1, title="CC\x1b[2Junsafe")]
+    session.active_sub_idx = 0
+    safe_header = session._build_responsive_header(130, "movie.mp4")
+    assert "CC: CCunsafe" in safe_header
+    assert "\x1b[2Junsafe" not in safe_header
+    session.subtitle_tracks = []
+    session.active_sub_idx = -1
     ftr = session._build_responsive_footer(130)
     assert "[r] Repeat" in ftr
 

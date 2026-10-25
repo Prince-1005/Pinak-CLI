@@ -5,9 +5,12 @@ from __future__ import annotations
 import json
 import logging
 import re
-import shutil
 import subprocess
+import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
+from itertools import islice
 from pathlib import Path
 
 from ...ffmpeg_setup import ensure_ffmpeg
@@ -20,6 +23,43 @@ from ...utils import get_ffprobe_path
 from .model import SubtitleCue, SubtitleTrack
 
 logger = logging.getLogger("pinak.media.subtitles")
+MAX_SUBTITLE_BYTES = 8 * 1024 * 1024
+MAX_SUBTITLE_CUES = 10_000
+MAX_SIBLING_ENTRIES = 2_048
+MAX_SIBLING_TRACKS = 32
+
+
+def _run_bounded_stdout(cmd: list[str], *, timeout: float, max_bytes: int) -> subprocess.CompletedProcess[bytes]:
+    """Capture FFmpeg output with both a deadline and an in-memory byte ceiling."""
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    started = time.monotonic()
+
+    def collect() -> bytes:
+        assert process.stdout is not None
+        output = bytearray()
+        while chunk := process.stdout.read(65536):
+            if len(output) + len(chunk) > max_bytes:
+                raise ValueError("Subtitle process output exceeded its byte limit")
+            output.extend(chunk)
+        return bytes(output)
+
+    try:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            pending = pool.submit(collect)
+            try:
+                output = pending.result(timeout=timeout)
+                code = process.wait(timeout=max(0.01, timeout - (time.monotonic() - started)))
+            except (FutureTimeout, ValueError, subprocess.TimeoutExpired):
+                process.kill()
+                process.wait(timeout=2)
+                raise
+        return subprocess.CompletedProcess(cmd, code, stdout=output)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=2)
+        if process.stdout is not None:
+            process.stdout.close()
 
 
 class SubtitleParser:
@@ -93,6 +133,8 @@ class SubtitleParser:
                     )
                 )
                 cue_idx += 1
+                if len(cues) >= MAX_SUBTITLE_CUES:
+                    break
 
         return cues
 
@@ -111,7 +153,12 @@ class SubtitleParser:
             return None
 
         try:
-            content = path.read_text(encoding="utf-8", errors="replace")
+            with path.open("rb") as source:
+                raw = source.read(MAX_SUBTITLE_BYTES + 1)
+            if len(raw) > MAX_SUBTITLE_BYTES:
+                logger.warning("Subtitle file exceeds the %d-byte limit: %s", MAX_SUBTITLE_BYTES, path)
+                return None
+            content = raw.decode("utf-8", errors="replace")
         except Exception as e:
             logger.warning(f"Failed to read subtitle file {path}: {e}")
             return None
@@ -150,7 +197,11 @@ class SubtitleParser:
         track_id = 1
 
         try:
-            for item in sorted(parent.iterdir()):
+            candidates = list(islice(parent.iterdir(), MAX_SIBLING_ENTRIES + 1))
+            if len(candidates) > MAX_SIBLING_ENTRIES:
+                logger.warning("Subtitle search limited to %d siblings: %s", MAX_SIBLING_ENTRIES, parent)
+                candidates.pop()
+            for item in sorted(candidates):
                 if item.is_file() and item.suffix.lower() in cls.SUPPORTED_SUB_EXTS:
                     # Match if subtitle starts with same stem or shares base name
                     sub_stem = item.stem.lower()
@@ -163,6 +214,8 @@ class SubtitleParser:
                         if track and track.cues:
                             tracks.append(track)
                             track_id += 1
+                            if len(tracks) >= MAX_SIBLING_TRACKS:
+                                break
         except Exception as e:
             logger.warning(f"Error scanning sibling subtitles for {media}: {e}")
 
@@ -180,7 +233,7 @@ class SubtitleParser:
         if not media.is_file():
             return []
 
-        ffmpeg_bin = shutil.which("ffmpeg") or ensure_ffmpeg()
+        ffmpeg_bin = ensure_ffmpeg()
         if not ffmpeg_bin:
             return []
 
@@ -190,7 +243,7 @@ class SubtitleParser:
         if is_cancelled is not None and is_cancelled():
             return []
         try:
-            probe = subprocess.run(
+            probe = _run_bounded_stdout(
                 [
                     get_ffprobe_path(),
                     "-v",
@@ -203,9 +256,8 @@ class SubtitleParser:
                     "json",
                     str(media),
                 ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
                 timeout=4.0,
+                max_bytes=65536,
             )
             if probe.returncode == 0:
                 stream_tags = json.loads(probe.stdout).get("streams", [])
@@ -227,9 +279,7 @@ class SubtitleParser:
                 "pipe:1",
             ]
             try:
-                res = subprocess.run(
-                    cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=4.0
-                )
+                res = _run_bounded_stdout(cmd, timeout=4.0, max_bytes=MAX_SUBTITLE_BYTES)
                 if res.returncode == 0 and res.stdout:
                     srt_text = res.stdout.decode("utf-8", errors="replace")
                     cues = cls.parse_srt(srt_text)

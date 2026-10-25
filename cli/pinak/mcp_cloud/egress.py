@@ -15,7 +15,9 @@ async def public_connection(
     if port not in {80, 443}:
         raise ValueError("Unsupported destination port")
     loop = asyncio.get_running_loop()
-    rows = await loop.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    rows = await asyncio.wait_for(
+        loop.getaddrinfo(host, port, type=socket.SOCK_STREAM), timeout=10
+    )
     if not rows or any(
         not ipaddress.ip_address(row[4][0]).is_global
         or ipaddress.ip_address(row[4][0]).is_multicast
@@ -28,7 +30,7 @@ async def public_connection(
         sock.setblocking(False)
         try:
             await asyncio.wait_for(loop.sock_connect(sock, address), timeout=10)
-            return await asyncio.open_connection(sock=sock)
+            return await asyncio.wait_for(asyncio.open_connection(sock=sock), timeout=10)
         except OSError as exc:
             last = exc
             sock.close()
@@ -77,7 +79,7 @@ class EgressProxy:
                     raise ValueError("Invalid tunnel")
                 remote, upstream = await public_connection(parsed.hostname, 443)
                 writer.write(b"HTTP/1.1 200 Connection Established\r\n\r\n")
-                await writer.drain()
+                await asyncio.wait_for(writer.drain(), timeout=30)
             else:
                 parsed = urlsplit(target)
                 if (
@@ -102,14 +104,14 @@ class EgressProxy:
                 upstream.write(
                     ("\r\n".join([*forwarded, "Connection: close", "", ""])).encode("latin-1")
                 )
-                await upstream.drain()
+                await asyncio.wait_for(upstream.drain(), timeout=30)
 
             async def relay(
                 source: asyncio.StreamReader, destination: asyncio.StreamWriter
             ) -> None:
                 while data := await asyncio.wait_for(source.read(65536), 120):
                     destination.write(data)
-                    await destination.drain()
+                    await asyncio.wait_for(destination.drain(), timeout=30)
 
             tasks = [
                 asyncio.create_task(relay(reader, upstream)),

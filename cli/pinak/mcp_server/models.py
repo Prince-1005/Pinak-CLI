@@ -159,6 +159,13 @@ class LibraryRef(StrictModel):
     media_id: PositiveID
 
 
+class LibraryStorage(Page):
+    root: str | None = Field(default=None, min_length=1, max_length=4096)
+    collection_id: PositiveID | None = None
+    root_cursor: Annotated[StrictInt, Field(ge=0)] = 0
+    collection_cursor: Annotated[StrictInt, Field(ge=0)] = 0
+
+
 class LibraryEdit(LibraryRef):
     request_key: RequestKey
 

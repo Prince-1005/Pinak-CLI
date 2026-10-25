@@ -11,6 +11,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
+from .. import __version__
 from ..config import config
 from ..subproc import run_cmd
 from ..utils import CYAN, RESET
@@ -54,10 +55,12 @@ def print_banner() -> None:
     banner.append("|", style="bold yellow")
     banner.append("=======>", style="bold cyan")
     banner.append("\n     \\   )\n      \\ /\n       )\n", style="bold yellow")
+    banner.append("  Your Content Downloader\n", style="bold cyan")
     panel = Panel.fit(
         banner,
         title="[bold yellow]PINAK-CLI 🔱[/]",
-        subtitle="[bold cyan]Your Content Downloader[/]",
+        subtitle=f"[dim]v{__version__}[/]",
+        subtitle_align="right",
         border_style="cyan",
         box=box.DOUBLE,
     )

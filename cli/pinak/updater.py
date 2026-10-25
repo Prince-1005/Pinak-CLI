@@ -3,14 +3,19 @@ from __future__ import annotations
 import contextlib
 import importlib.metadata
 import json
-import shutil
+import os
+import subprocess
 import sys
 import threading
 import time
 import urllib.request
 from pathlib import Path
 
-from .config import config, save_config
+import psutil
+from filelock import FileLock
+from filelock import Timeout as FileLockTimeout
+
+from .config import CONFIG_FILE, config, save_config
 
 UPDATE_AVAILABLE: str | None = None
 UPDATE_PACKAGE = "yt-dlp"
@@ -94,38 +99,121 @@ def _package_version(package: str) -> str | None:
     return _installed_version(package)
 
 
-def _find_pinak_binary() -> Path | None:
-    """Locate the pinak executable on Windows to work around file locks during update."""
-    for name in ("pinak.exe", "pinak"):
-        found = shutil.which(name)
-        if found:
-            p = Path(found)
-            if p.is_file():
-                return p
+def _update_status_path() -> Path:
+    return Path(CONFIG_FILE).with_name("update-result.json")
 
-    scripts_dir = Path(sys.prefix) / ("Scripts" if sys.platform.startswith("win") else "bin")
-    for name in ("pinak.exe", "pinak"):
-        p = scripts_dir / name
-        if p.is_file():
-            return p
 
-    if sys.argv and sys.argv[0]:
-        p = Path(sys.argv[0])
-        if p.is_file() and p.stem.lower() == "pinak":
-            return p
+def _status_worker_live(prior: dict[str, object]) -> bool:
+    state = prior.get("state")
+    if state == "pending":
+        return time.time() - float(prior.get("time", 0)) < 10
+    if state != "waiting":
+        return False
+    try:
+        pid = int(prior["pid"])
+        started = float(prior["process_started"])
+        return abs(psutil.Process(pid).create_time() - started) < 1
+    except (KeyError, TypeError, ValueError, psutil.Error, OSError):
+        return False
 
-    return None
+
+def _schedule_windows_pinak_update() -> str:
+    """Wait until this launcher exits before upgrading its own environment."""
+    status = _update_status_path()
+    status.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with FileLock(str(status) + ".lock", timeout=10):
+            return _schedule_windows_pinak_update_locked(status)
+    except FileLockTimeout:
+        return "Another update is being scheduled. Wait briefly and retry."
+
+
+def _schedule_windows_pinak_update_locked(status: Path) -> str:
+    from .update_worker import write_status
+
+    try:
+        prior = json.loads(status.read_text(encoding="utf-8"))
+        if _status_worker_live(prior):
+            return "Pinak update is already queued. Exit Pinak with /exit and wait for completion."
+    except (OSError, ValueError, AttributeError, TypeError):
+        pass
+    pids = [os.getpid()]
+    try:
+        parent = psutil.Process(os.getpid()).parent()
+        if parent and parent.name().casefold() == "pinak.exe":
+            pids.append(parent.pid)
+    except (psutil.Error, OSError):
+        pass
+    process: subprocess.Popen[bytes] | None = None
+    try:
+        write_status(status, "pending", "Waiting for Pinak to exit before updating.")
+        process = subprocess.Popen(  # nosec B603
+            [
+                sys.executable,
+                "-m",
+                "pinak.update_worker",
+                ",".join(str(pid) for pid in pids),
+                str(status),
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+            creationflags=0x00000008 | 0x00000200,  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+        )
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            try:
+                state = json.loads(status.read_text(encoding="utf-8")).get("state")
+                if state == "waiting":
+                    break
+                if state == "failed":
+                    raise OSError("The update helper failed to initialize")
+            except (ValueError, AttributeError, TypeError):
+                pass
+            if process.poll() is not None:
+                raise OSError("The update helper exited before it was ready")
+            time.sleep(0.05)
+        else:
+            raise OSError("The update helper did not become ready")
+    except OSError as exc:
+        if process is not None and process.poll() is None:
+            with contextlib.suppress(OSError):
+                process.terminate()
+        with contextlib.suppress(OSError):
+            write_status(status, "failed", f"Could not start update helper: {exc}")
+        command = subprocess.list2cmdline(
+            [sys.executable, "-m", "pip", "install", "--upgrade", PINAK_PACKAGE]
+        )
+        return f"Could not start the Windows update helper. Exit Pinak and run:\n  {command}"
+    return (
+        "Pinak update is queued. Exit Pinak with /exit, wait for it to finish, "
+        "then start Pinak again. The result will appear on the next launch."
+    )
+
+
+def take_update_result() -> dict[str, str] | None:
+    """Read a completed deferred update once; keep pending status for the next launch."""
+    status = _update_status_path()
+    try:
+        data = json.loads(status.read_text(encoding="utf-8"))
+        if data.get("state") not in {"succeeded", "failed"}:
+            return None
+        status.unlink()
+        return {"state": str(data["state"]), "message": str(data.get("message", ""))}
+    except (OSError, ValueError, AttributeError):
+        return None
 
 
 def perform_update(timeout: float = 300.0) -> dict[str, str]:
-    """Upgrade yt-dlp and pinak-cli itself via pip.
+    """Upgrade yt-dlp now; defer Pinak itself until exit on Windows.
 
     Returns a mapping of package name → human-readable result message.
     A real version bump is reported as ``"Updated <pkg> <old> → <new>"``
     (callers look for the ``→`` to decide whether a restart is needed);
     an already-current package reports ``"already the latest"``.
-    Success clears the cached ``*_UPDATE_AVAILABLE`` flags. Never raises:
-    failures are reported as message strings so callers can print them.
+    Success clears the cached ``*_UPDATE_AVAILABLE`` flags. Windows Pinak
+    updates retain the notice until their detached helper reports completion.
     """
     global UPDATE_AVAILABLE, PINAK_UPDATE_AVAILABLE
     from .subproc import run_cmd
@@ -133,20 +221,17 @@ def perform_update(timeout: float = 300.0) -> dict[str, str]:
     results: dict[str, str] = {}
     for package in (UPDATE_PACKAGE, PINAK_PACKAGE):
         before = _package_version(package)
-        renamed_bin: Path | None = None
-        pinak_bin: Path | None = None
         if package == PINAK_PACKAGE and sys.platform.startswith("win"):
-            pinak_bin = _find_pinak_binary()
-            if pinak_bin and pinak_bin.exists():
-                old_target = pinak_bin.with_name(f"{pinak_bin.name}.old")
-                with contextlib.suppress(OSError):
-                    if old_target.exists():
-                        old_target.unlink()
-                try:
-                    pinak_bin.rename(old_target)
-                    renamed_bin = old_target
-                except OSError:
-                    renamed_bin = None
+            try:
+                latest = _fetch_latest_version(package)
+            except (OSError, ValueError):
+                latest = None
+            if latest and before and _parse_version(latest) <= _parse_version(before):
+                PINAK_UPDATE_AVAILABLE = None
+                results[package] = f"{package} is already the latest ({before})."
+            else:
+                results[package] = _schedule_windows_pinak_update()
+            continue
 
         try:
             result = run_cmd(
@@ -154,34 +239,13 @@ def perform_update(timeout: float = 300.0) -> dict[str, str]:
                 timeout=timeout,
             )
         except Exception as exc:
-            if renamed_bin and pinak_bin and not pinak_bin.exists():
-                with contextlib.suppress(OSError):
-                    renamed_bin.rename(pinak_bin)
             results[package] = f"Update error: {exc}"
             continue
 
         if result.returncode != 0:
-            if renamed_bin and pinak_bin and not pinak_bin.exists():
-                with contextlib.suppress(OSError):
-                    renamed_bin.rename(pinak_bin)
             err = (result.stderr or result.stdout or "").strip()
-            if "winerror 32" in err.lower() or "being used by another process" in err.lower():
-                results[package] = (
-                    f"Update failed: {package} binary is currently in use on Windows.\n"
-                    f"Please exit Pinak (/exit) and run in your terminal:\n"
-                    f"  pip install --upgrade {package}"
-                )
-            else:
-                results[package] = f"Update failed. Error:\n{result.stderr}"
+            results[package] = f"Update failed. Error:\n{err}"
             continue
-
-        if renamed_bin:
-            if pinak_bin and not pinak_bin.exists():
-                with contextlib.suppress(OSError):
-                    renamed_bin.rename(pinak_bin)
-            else:
-                with contextlib.suppress(OSError):
-                    renamed_bin.unlink()
 
         if package == UPDATE_PACKAGE:
             UPDATE_AVAILABLE = None

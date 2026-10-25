@@ -321,3 +321,17 @@ def test_audio_backend_temp_wav_leak_prevention(tmp_path: Path, monkeypatch):
     ab_mod._flush_pending_temp_files()
     assert str(temp_wav) not in ab_mod._pending_temp_files
     assert not temp_wav.exists()
+
+
+def test_media_probe_no_provisioning_never_invokes_provisioning(tmp_path: Path, monkeypatch):
+    def forbidden():
+        raise AssertionError("Provisioning was invoked despite allow_provision=False")
+
+    monkeypatch.setattr("pinak.ffmpeg_setup.ensure_ffmpeg", forbidden)
+    monkeypatch.setattr("pinak.ffmpeg_setup.ensure_ffprobe", forbidden)
+    fake_video = tmp_path / "video.mkv"
+    fake_video.write_bytes(b"\x1a\x45\xdf\xa3" + b"\x00" * 100)
+
+    meta = MediaProbe.probe(fake_video, allow_provision=False)
+    assert meta.media_type == "video"
+

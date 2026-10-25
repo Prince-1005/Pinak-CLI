@@ -8,6 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import platformdirs
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm
@@ -15,18 +16,46 @@ from rich.prompt import Confirm
 from .config import config_dir
 from .history import LEGACY_DB_FILE, data_dir
 from .logging_setup import get_logger
+from .utils import trusted_which
 
 log = get_logger("pinak.uninstall")
 console = Console()
 legacy_db_file = LEGACY_DB_FILE
 command_history_file = os.path.expanduser("~/.pinak_cli_history")
+_DATA_FILES = (
+    "history.db",
+    "history.db-wal",
+    "history.db-shm",
+    "library.db",
+    "library.db-wal",
+    "library.db-shm",
+)
+
+
+def _custom_data_directory() -> Path | None:
+    path = Path(data_dir).absolute()
+    standard = Path(platformdirs.user_data_dir("pinak-cli", "pinak")).absolute()
+    if path == standard:
+        return None
+    # A custom directory may hold the user's unrelated data. Do not traverse links.
+    if path.resolve() != path or path in (Path(path.anchor), Path.home(), Path.cwd()):
+        log.warning("Refusing unsafe custom data directory: %s", path)
+        return None
+    return path
 
 
 def _purge_targets(include_cache: bool = True) -> list[str]:
-    targets = [config_dir, data_dir, legacy_db_file, command_history_file]
+    custom_data = _custom_data_directory()
+    if custom_data is not None:
+        data_targets = [custom_data / filename for filename in _DATA_FILES]
+    elif Path(data_dir).absolute() == Path(
+        platformdirs.user_data_dir("pinak-cli", "pinak")
+    ).absolute():
+        data_targets = [Path(data_dir)]
+    else:
+        data_targets = []
+    targets = [config_dir, *data_targets, legacy_db_file, command_history_file]
     if include_cache:
-        import platformdirs
-
         targets.append(platformdirs.user_cache_dir("pinak-cli", "pinak"))
     safe = []
     for target in targets:
@@ -40,17 +69,18 @@ def _purge_targets(include_cache: bool = True) -> list[str]:
         if path.is_symlink() or getattr(path, "is_junction", lambda: False)():
             log.warning("Retaining linked data directory: %s", target)
             continue
-        safe.append(str(resolved))
+        safe.append(str(path))
     return list(dict.fromkeys(safe))
 
 
 def detect_uninstall_cmd() -> list[str]:
     """Detect how pinak-cli was installed and return the corresponding uninstallation command."""
     # 1. Check if uv is installed and pinak-cli is registered in uv tools
-    if shutil.which("uv"):
+    uv = trusted_which("uv")
+    if uv:
         try:
             res = subprocess.run(  # nosec B603, B607
-                ["uv", "tool", "list"],
+                [uv, "tool", "list"],
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
@@ -58,15 +88,16 @@ def detect_uninstall_cmd() -> list[str]:
                 timeout=5,
             )
             if res.returncode == 0 and "pinak-cli" in res.stdout:
-                return ["uv", "tool", "uninstall", "pinak-cli"]
+                return [uv, "tool", "uninstall", "pinak-cli"]
         except Exception as exc:
             log.debug("uv detection failed: %r", exc)
 
     # 2. Check if pipx is installed and manages pinak-cli
-    if shutil.which("pipx"):
+    pipx = trusted_which("pipx")
+    if pipx:
         try:
             res = subprocess.run(  # nosec B603, B607
-                ["pipx", "list", "--short"],
+                [pipx, "list", "--short"],
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
@@ -74,7 +105,7 @@ def detect_uninstall_cmd() -> list[str]:
                 timeout=5,
             )
             if res.returncode == 0 and "pinak-cli" in res.stdout:
-                return ["pipx", "uninstall", "pinak-cli"]
+                return [pipx, "uninstall", "pinak-cli"]
         except Exception as exc:
             log.debug("pipx detection failed: %r", exc)
 
@@ -103,6 +134,14 @@ def purge_user_data(include_cache: bool = True) -> list[str]:
             except Exception as exc:
                 log.warning("Failed to purge %s: %r", target, exc)
 
+    custom_data = _custom_data_directory()
+    if custom_data is not None and custom_data.is_dir():
+        try:
+            custom_data.rmdir()  # Only remove a custom directory when it is empty.
+            removed.append(str(custom_data))
+        except OSError:
+            pass
+
     return removed
 
 
@@ -112,6 +151,18 @@ def _format_powershell_cmd(cmd: list[str]) -> str:
         return ""
     quoted = ["'" + arg.replace("'", "''") + "'" for arg in cmd]
     return f"& {quoted[0]} " + " ".join(quoted[1:])
+
+
+def _powershell_path() -> str | None:
+    found = trusted_which("powershell.exe") or trusted_which("powershell")
+    if found:
+        return found
+    system_root = os.environ.get("SYSTEMROOT")
+    if system_root:
+        candidate = Path(system_root) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
+        if candidate.is_file():
+            return str(candidate.resolve())
+    return None
 
 
 def execute_uninstallation(
@@ -124,7 +175,8 @@ def execute_uninstallation(
     cmd_str = " ".join(cmd)
     log.info("Executing uninstallation command: %s", cmd_str)
 
-    if sys.platform.startswith("win") and detached:
+    powershell = _powershell_path() if sys.platform.startswith("win") and detached else None
+    if powershell:
         # On Windows, running binaries/DLLs are locked while in use.
         # Launch a detached PowerShell process that pauses briefly to let pinak exit, then uninstalls.
         # Using the PowerShell call operator (&) with quoted executable path prevents failures when
@@ -138,13 +190,21 @@ def execute_uninstallation(
                 cleanup.append(
                     f"if (Test-Path -LiteralPath {literal}) {{ Remove-Item -LiteralPath {literal} -Recurse -Force -ErrorAction Stop }}"
                 )
+            custom_data = _custom_data_directory()
+            if custom_data is not None:
+                literal = "'" + str(custom_data).replace("'", "''") + "'"
+                cleanup.append(
+                    f"if ((Test-Path -LiteralPath {literal}) -and "
+                    f"-not (Get-ChildItem -LiteralPath {literal} -Force | Select-Object -First 1)) "
+                    f"{{ Remove-Item -LiteralPath {literal} -Force }}"
+                )
             powershell_script += "; if ($LASTEXITCODE -eq 0) { " + "; ".join(cleanup) + " }"
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(
             subprocess, "DETACHED_PROCESS", 0
         )
         try:
             subprocess.Popen(  # nosec B603, B607
-                ["powershell", "-NoProfile", "-Command", powershell_script],
+                [powershell, "-NoProfile", "-Command", powershell_script],
                 creationflags=flags,
                 close_fds=True,
             )
