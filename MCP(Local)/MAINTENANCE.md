@@ -2,8 +2,8 @@
 
 ## Compatibility baseline
 
-- Package: current source 2.3.0, shared with CLI; publish separately after CI passes.
-- Python: 3.10–3.14, Windows/macOS/Linux CI; preserve ordinary CLI support.
+- Package: current source 2.4.0, shared with CLI; publish separately after CI passes.
+- Python: 3.11–3.14, Windows/macOS/Linux CI; preserve ordinary CLI support.
 - Official SDK: 2.3.0, optional `mcp` extra. No Node dependency at user runtime.
 - Transport: local stdio. SDK client 2.3.0 and Inspector 2.11.0 interoperability
   tested; current SDK protocol is 2026-07-28. Do not infer every older protocol or
@@ -24,8 +24,14 @@
 2. From cli/, regenerate the MCP lock without silently relaxing core constraints:
 
    ```sh
-   uv pip compile pyproject.toml --extra dev --extra mcp --universal --python-version 3.10 --generate-hashes --constraint requirements-lock.txt --output-file requirements-mcp-lock.txt
+   uv pip compile pyproject.toml --extra dev --extra mcp --universal --python-version 3.11 --generate-hashes --constraint requirements-lock.txt --output-file requirements-mcp-lock.txt
+   python tools/audit_dependencies.py --output dependency-audit.json
    ```
+
+   Regenerate all four locks together. The audit covers every distinct locked
+   version, including OS/Python alternatives not installed on this machine.
+   Python 3.10 cannot use the required patched Pillow/FileLock releases; do not
+   restore that support by ignoring advisories or Python package requirements.
 
 3. Diff tool input/output schemas and error envelopes. Existing clients must not
    receive silently renamed tools, changed meanings or arbitrary downloader flags.

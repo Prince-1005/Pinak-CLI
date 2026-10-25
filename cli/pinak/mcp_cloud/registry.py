@@ -10,7 +10,7 @@ import secrets
 import sqlite3
 import time
 from collections.abc import Iterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import BinaryIO
 
@@ -121,7 +121,7 @@ class Registry:
             )
         return {
             "url": f"{self.settings.public_url}/files/{token}",
-            "expires_at": datetime.fromtimestamp(expires, timezone.utc).isoformat(),
+            "expires_at": datetime.fromtimestamp(expires, UTC).isoformat(),
             "bytes": stat.st_size,
             "warning": "Anyone with this temporary link can retrieve this file.",
         }

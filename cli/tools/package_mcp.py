@@ -57,7 +57,7 @@ This bundle contains the application wheel, instructions and checksums only.
 It includes Pinak's shared engine/CLI because the MCP adapter uses that engine.
 Website media, repository history, tests and planning files are not included.
 
-Requirements: Python 3.10+ and an AI application supporting local stdio MCP.
+Requirements: Python 3.11+ and an AI application supporting local stdio MCP.
 Internet access is needed for pip dependencies and later media downloads.
 Git, Node.js and a repository checkout are unnecessary.
 

@@ -1,11 +1,11 @@
-# 🔱 PINAK CLI 2.3.0 — Media Content Downloader
+# 🔱 PINAK CLI 2.4.0 — Media Content Downloader
 
 PINAK CLI is a powerful, highly aesthetic command-line media downloader wrapper around `yt-dlp` and `ffmpeg`. It features a rich, interactive REPL shell with auto-completions, suggestions, customized banners, diagnostic tools, and automatic download tracking.
 
 The [current operating guide](https://github.com/Prince-1005/Pinak-CLI/blob/main/cli/OPERATIONS.md) covers local playback, authenticated
 IPC, configuration precedence, lock files, release artifacts and recovery limits.
-The [release readiness record](https://github.com/Prince-1005/Pinak-CLI/blob/main/RELEASE_READINESS.md)
-records release fixes and verification.
+The [release notes](https://github.com/Prince-1005/Pinak-CLI/blob/main/cli/CHANGELOG.md)
+describe version changes and installation requirements.
 
 ---
 
@@ -58,7 +58,7 @@ cli/
 ## 🛠️ Installation & Setup
 
 ### Requirements
-*   Python 3.10 or higher.
+*   Python 3.11 or higher.
 *   FFmpeg (see [FFmpeg setup](#-ffmpeg-setup) — one command).
 
 ### Step 1: Install from PyPI

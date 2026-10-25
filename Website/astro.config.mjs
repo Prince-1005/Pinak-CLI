@@ -1,6 +1,7 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import sitemap from '@astrojs/sitemap';
+import { unified } from '@astrojs/markdown-remark';
 
 const repository = process.env.GITHUB_REPOSITORY;
 const [owner, name] = (repository || 'Prince-1005/Pinak-CLI').split('/');
@@ -10,6 +11,7 @@ const base = process.env.BASE_PATH || (repository && !customSite && name.toLower
 
 export default defineConfig({
   site, base, trailingSlash: 'always', output: 'static',
+  markdown: { processor: unified() },
   integrations: [
     sitemap(),
     starlight({

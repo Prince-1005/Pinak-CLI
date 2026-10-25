@@ -119,7 +119,7 @@ export async function buildMedia(options = {}) {
         const full = path.join(mediaDir, ref);
         attachments[field] = { path: full, hash: await hashFile(full) };
       }
-      const key = createHash('sha256').update(relative).update(await hashFile(source)).update(JSON.stringify(meta)).update(JSON.stringify(attachments)).update('pipeline-v4').digest('hex').slice(0, 20);
+      const key = createHash('sha256').update(relative).update(await hashFile(source)).update(JSON.stringify(meta)).update(JSON.stringify(attachments)).update(JSON.stringify(sharp.versions)).update('pipeline-v4').digest('hex').slice(0, 20);
       const cache = path.join(cacheDir, key); const dataFile = path.join(cache, 'item.json');
       let item;
       try { item = JSON.parse(await fs.readFile(dataFile, 'utf8')); } catch { /* Generate on cache miss. */ }

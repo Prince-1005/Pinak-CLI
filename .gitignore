@@ -131,3 +131,6 @@ scratch/
 .scratch/
 tmp/
 .tmp/
+
+# Local release and CI investigation reports (untracked)
+CI_FAILURE_ANALYSIS.md

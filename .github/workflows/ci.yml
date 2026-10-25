@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python: ["3.11", "3.12", "3.13", "3.14"]
 
     defaults:
       run:
@@ -89,15 +89,21 @@ jobs:
       - name: pip-audit (dependency CVEs)
         run: pip-audit --local --skip-editable
 
+      - name: Audit every pinned version in all universal dependency locks
+        run: python tools/audit_dependencies.py --output dependency-audit.json
+
       - name: SBOM (CycloneDX)
         run: |
           cyclonedx-py environment --output-format json --output-file sbom.json
 
       - name: Upload SBOM artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sbom
-          path: cli/sbom.json
+          path: |
+            cli/sbom.json
+            cli/dependency-audit.json
 
   gitleaks:
     name: secret scanning

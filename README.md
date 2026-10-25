@@ -1,6 +1,6 @@
 # Pinak
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CLI](https://img.shields.io/badge/CLI-Python%20Typer-orange.svg)](cli/pyproject.toml)
 [![FFmpeg](https://img.shields.io/badge/Powered%20by-FFmpeg-red.svg)](https://ffmpeg.org/)
@@ -12,9 +12,9 @@
 > Pinak is an open-source educational project and terminal interface wrapper around [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) and [`FFmpeg`](https://ffmpeg.org/), designed for learning CLI architecture and personal media archiving.  
 > ⚠️ **Notice:** Downloading content may violate a platform's Terms of Service. Only download media that you own, that is freely licensed, or that you have explicit permission to keep. Respect copyright laws and **be excellent to creators!**
 
-Current source version: **2.3.0**. See the [release notes](cli/CHANGELOG.md),
-[operating guide](cli/OPERATIONS.md), and [prior release readiness record](RELEASE_READINESS.md)
-for behavior and verification. GitHub releases are created manually;
+Current source version: **2.4.0**. See the [release notes](cli/CHANGELOG.md) and
+[operating guide](cli/OPERATIONS.md) for behavior and installation requirements.
+GitHub releases are created manually;
 automatic release creation is disabled.
 
 ## Connect an AI application
@@ -80,7 +80,7 @@ Pinak is a cross-platform Python CLI tool and educational wrapper around `yt-dlp
 ## Quick Start
 
 ### Prerequisites
-- Python 3.10 or higher
+- Python 3.11 or higher
 - pip (or uv/pipx)
 
 ### Installation (from source)
@@ -97,7 +97,7 @@ python -m pip install --upgrade pip
 python -m pip install ./cli
 ```
 
-Use the Python 3.10+ interpreter installed on your system (`python3` if needed).
+Use the Python 3.11+ interpreter installed on your system (`python3` if needed).
 For the latest published package, use `pipx install pinak-cli`; source and PyPI
 versions can differ before a release. Check the result with `pinak --version`.
 
@@ -187,7 +187,6 @@ Inside the interactive shell:
 Pinak-CLI/
 ├── README.md                          # Root README (this file)
 ├── PINAK_DOCUMENTATION.md             # Historical design reference
-├── RELEASE_READINESS.md               # Release fixes and verification
 ├── CHANGELOG.md                       # Link to cli/CHANGELOG.md
 ├── .gitignore                         # Git exclusions
 ├── .github/                           # CI/CD workflows
@@ -278,7 +277,7 @@ Run `pinak --config-path` to locate configuration on the current platform.
 
 ## Technology Stack
 
-Python 3.10+, Typer, yt-dlp, FFmpeg, Rich, prompt-toolkit, Pydantic Settings,
+Python 3.11+, Typer, yt-dlp, FFmpeg, Rich, prompt-toolkit, Pydantic Settings,
 platformdirs, Pillow, Mutagen, NumPy, SoundDevice and filelock. Optional OpenCV
 provides a native window with Tkinter fallback. Media playback accepts local
 files: `/media <path>` in the REPL or `pinak media <path>` from the CLI.
@@ -288,7 +287,7 @@ files: `/media <path>` in the REPL or `pinak media <path>` from the CLI.
 - **[Website/README.md](Website/README.md)** – Static informational website, automatic media showcase, local development and GitHub Pages deployment.
 - **[cli/OPERATIONS.md](cli/OPERATIONS.md)** – Current installation, settings, media controls, recovery and release guidance.
 - **[PINAK_DOCUMENTATION.md](PINAK_DOCUMENTATION.md)** – Historical 1.3 architecture/design notes; settings and claims may be obsolete.
-- **[RELEASE_READINESS.md](RELEASE_READINESS.md)** – Current release checks and resolution of the final audit findings.
+- **[cli/CHANGELOG.md](cli/CHANGELOG.md)** – Release changes and installation requirements.
 - **[cli/CLI_README.md](cli/CLI_README.md)** – CLI-specific documentation.
 
 ## Roadmap

@@ -113,7 +113,7 @@ refused to prevent mixing stale builds. Label uncommitted source revisions as
 local working trees, and verify the resulting SHA256SUMS before transferring.
 No push or release publication is required to create or use that local archive.
 
-Dependencies: Python 3.10+, pinned MCP 2.3.0 and Uvicorn for the optional cloud
+Dependencies: Python 3.11+, pinned MCP 2.3.0 and Uvicorn for the optional cloud
 extra; Python 3.12 in Docker, system FFmpeg/FFprobe, persistent local filesystem,
 HTTPS ingress and a client supporting remote HTTP with bearer headers. No hosted
 Pinak dependency, download relay service, Redis or external database is required.

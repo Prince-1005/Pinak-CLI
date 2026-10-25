@@ -7,6 +7,23 @@ Release notes are maintained manually; automatic release creation is disabled.
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-10-26
+
+### Changed
+- Require Python 3.11 or newer for the CLI, Local MCP and self-hosted Cloud MCP; update package metadata, CI compatibility checks and installation guides. Users on Python 3.10 must install a supported Python interpreter before upgrading Pinak.
+- Upgrade the website to Astro 7.4.2, Starlight 0.42.7 and Sharp 0.35.5, with Node.js 22.23.4 or newer required for website development.
+
+### Security
+- Require Pillow 13.0.0 or newer and FileLock 4.2.4 or newer; regenerate all four hashed Python dependency locks without the vulnerable Python 3.10 branches.
+- Audit every pinned package version across all Python and operating-system marker branches in CI. Fail verification when an audit is incomplete or a dependency is skipped, and preserve the combined audit report as an artifact.
+- Add an npm dependency audit gate and refresh the website dependency lock to address the previously identified Astro and native image-processing advisories.
+
+### Fixed
+- Resolve the Astro executable through its package metadata, configure the Markdown processor explicitly, and bundle version and changelog sources through raw imports so production website builds work after the Astro upgrade.
+- Invalidate cached website media when the Sharp decoder versions change, and verify AVIF decoding in the media tests.
+- Use Python 3.11-compatible standard-library imports and exception names consistently in the cloud and MCP modules.
+- Stop tracking local release-readiness and CI investigation reports, retain ignore rules, and replace public documentation links to the local reports with maintained release notes.
+
 ## [2.3.0] - 2026-10-25
 
 ### Added

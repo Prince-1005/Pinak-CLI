@@ -7,7 +7,7 @@ The AI host may still send prompts and returned metadata to its provider.
 
 ## Get started without downloading the repository
 
-Python 3.10+ and an AI application supporting local stdio MCP are required.
+Python 3.11+ and an AI application supporting local stdio MCP are required.
 
 1. Open [CI builds](https://github.com/Prince-1005/Pinak-CLI/actions/workflows/ci.yml).
 2. Select a successful **main-branch push** run that contains the installer artifact.

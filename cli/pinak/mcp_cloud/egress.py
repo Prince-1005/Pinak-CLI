@@ -122,9 +122,9 @@ class EgressProxy:
                     relay_task.cancel()
                 await asyncio.gather(*tasks, return_exceptions=True)
         except (
+            TimeoutError,
             OSError,
             ValueError,
-            asyncio.TimeoutError,
             asyncio.IncompleteReadError,
             asyncio.LimitOverrunError,
         ):

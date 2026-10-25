@@ -6,7 +6,7 @@ import contextlib
 import json
 import sqlite3
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -122,7 +122,7 @@ DEFINITIONS: dict[str, tuple[type[models.StrictModel], str, bool]] = {
 
 
 def utc(timestamp: float) -> str:
-    return datetime.fromtimestamp(timestamp, timezone.utc).isoformat()
+    return datetime.fromtimestamp(timestamp, UTC).isoformat()
 
 
 class Tools:

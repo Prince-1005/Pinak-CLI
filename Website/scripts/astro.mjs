@@ -1,6 +1,11 @@
 import { spawn } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
-const cli = fileURLToPath(new URL('../node_modules/astro/astro.js', import.meta.url));
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+const require = createRequire(import.meta.url);
+const manifest = require.resolve('astro/package.json');
+const { bin } = JSON.parse(readFileSync(manifest, 'utf8'));
+const cli = resolve(dirname(manifest), typeof bin === 'string' ? bin : bin.astro);
 const child = spawn(process.execPath, [cli, ...process.argv.slice(2)], { stdio: 'inherit', env: { ...process.env, ASTRO_TELEMETRY_DISABLED: '1' }, windowsHide: true });
 child.on('error', error => { console.error(error); process.exitCode = 1; });
 child.on('exit', code => { process.exitCode = code ?? 1; });

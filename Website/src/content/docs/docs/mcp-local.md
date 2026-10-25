@@ -3,7 +3,7 @@ title: Set up Local MCP
 description: Install the Local MCP bundle, check FFmpeg, and register a stdio process in your AI application.
 ---
 
-Local MCP runs on your own device. You need Python 3.10+ and an AI application that can launch **stdio MCP** processes. No listening port, cloud account, domain, or Pinak account is required.
+Local MCP runs on your own device. You need Python 3.11+ and an AI application that can launch **stdio MCP** processes. No listening port, cloud account, domain, or Pinak account is required.
 
 ## 1. Download and verify
 

@@ -6,12 +6,8 @@ import ast
 import json
 import os
 import sys
+import tomllib
 from pathlib import Path
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # Development checks also support Python 3.10.
-    import tomli as tomllib
 
 
 def validate_release(root: Path, event: str, tag: str = "", requested_version: str = "") -> str:

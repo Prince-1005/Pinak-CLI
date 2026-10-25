@@ -3,7 +3,7 @@
 > Historical 1.3 design reference, retained for context. Commands, settings,
 > dependency lists and implementation claims below may be obsolete. For current behavior
 > use [OPERATIONS.md](cli/OPERATIONS.md), [README.md](README.md), and the
-> [release readiness record](RELEASE_READINESS.md).
+> [release notes](cli/CHANGELOG.md).
 
 **Version:** 1.3.0  
 **Last Updated:** October 14, 2026  

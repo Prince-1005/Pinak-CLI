@@ -86,6 +86,17 @@ test('animated GIF retains frames in web renditions', async t => {
   const metadata = await sharp(output, { animated: true }).metadata();
   assert.equal(metadata.pages, 2); assert.equal(report.items[0].height, 32);
 });
+
+test('AVIF imports decode to browser-ready WebP through the patched native stack', async t => {
+  const options = await fixture(t);
+  await sharp({ create: { width: 96, height: 64, channels: 3, background: '#173a44' } }).avif().toFile(path.join(options.mediaDir, 'capture.avif'));
+  const report = await buildMedia(options);
+  assert.equal(report.items.length, 1);
+  const item = report.items[0];
+  assert.equal(item.width, 96); assert.equal(item.height, 64);
+  const decoded = await sharp(path.join(options.outputDir, item.src.replace('/generated/', ''))).metadata();
+  assert.equal(decoded.format, 'webp'); assert.equal(decoded.width, 96); assert.equal(decoded.height, 64);
+});
 test('identical bytes at different paths keep separate gallery identities', async t => {
   const options = await fixture(t);
   await picture(path.join(options.mediaDir, 'first.png'));

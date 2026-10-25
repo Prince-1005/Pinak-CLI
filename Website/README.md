@@ -4,7 +4,7 @@ Static Astro + Starlight site for Pinak’s introduction, installation, document
 
 ## Develop
 
-Use Node.js 24 LTS (minimum 22.12). From this directory:
+Use Node.js 24 LTS (minimum 22.23.4). From this directory:
 
 ```sh
 npm ci
@@ -13,12 +13,13 @@ npm run check
 npm run dev
 ```
 
-Open the printed localhost URL. Build-time FFmpeg/FFprobe and Sharp are installed as website dependencies. No visitor needs Node or these website tools. If npm reports that dependency setup scripts were blocked, review and approve only `ffmpeg-static`, `esbuild`, and `sharp` with your npm version’s script approval commands, then `npm rebuild ffmpeg-static esbuild sharp`.
+Open the printed localhost URL. Build-time FFmpeg/FFprobe and Sharp are installed as website dependencies. No visitor needs Node or these website tools. If npm reports that dependency setup scripts were blocked, review and approve only the pinned native packages listed in `package.json` with your npm version’s script approval commands, then `npm rebuild ffmpeg-static sharp`.
 
 ## Verify
 
 ```sh
 npm test
+npm audit --audit-level=moderate
 npm run build
 npx playwright install chromium firefox webkit
 npm run test:browser

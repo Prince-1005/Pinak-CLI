@@ -7,7 +7,7 @@ Use the site's **Install** page for the complete platform-specific walkthrough. 
 
 ## Prerequisites
 
-- Python 3.10 or newer for Pinak. The current pipx release requires Python 3.11 or newer; Python 3.10 users can use a virtual environment or a compatible distribution-packaged pipx.
+- Python 3.11 or newer. Pinak requires this minimum to use patched Pillow and FileLock dependencies.
 - pipx, or a Python virtual environment.
 - Network access to the source for downloads.
 - FFmpeg for merging, conversion, audio extraction, and playback.

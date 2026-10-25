@@ -299,7 +299,7 @@ def create_app(settings: Settings) -> Any:
                 file_calls.append(now)
                 try:
                     await asyncio.wait_for(file_streams.acquire(), timeout=0.1)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     await JSONResponse({"error": "Too many file transfers"}, status_code=429)(
                         scope, receive, send
                     )

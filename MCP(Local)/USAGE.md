@@ -15,7 +15,7 @@ successful build if needed. Earlier runs before installer bundles were introduce
 will not have this artifact. Never use a pull-request artifact as a trusted release.
 
 The ZIP contains a wheel, INSTALL.md, BUILD-INFO.json and SHA256SUMS. No repository
-checkout, Git installation, website media or source build is required. Python 3.10+
+checkout, Git installation, website media or source build is required. Python 3.11+
 is required; pip downloads the runtime dependencies separately. The wheel includes
 Pinak's shared CLI/engine and local MCP adapter, with SDK 2.3.0 in the optional extra.
 

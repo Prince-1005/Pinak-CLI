@@ -9,7 +9,7 @@ another destination, or a different URL/quality to make an operation appear succ
    banner. No automatic pip invocation from the server.
 2. **Unsupported Python/SDK/core combination:** reject before serving with required
    versions and the actual interpreter path. A compatible pinned release is the
-   fallback, not silently breaking Python 3.10 CLI support.
+   fallback; current builds require Python 3.11+ for patched dependencies.
 3. **Host cannot locate executable / wrong environment / wrong cwd:** generated
    config uses absolute paths; doctor prints a launch check and environment remedy.
    Runtime must not depend on starting in the repository.
